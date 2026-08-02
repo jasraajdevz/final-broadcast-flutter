@@ -163,3 +163,37 @@ double? metaStallCap(GameState s) =>
 
 /// Do owned bots come back at level 1 after sign-off?
 bool metaKeepsRoster(GameState s) => metaLevel(s, 'roster') > 0;
+
+
+// ---------------------------------------------------------------------------
+// PRODUCER MILESTONES
+//
+// Buying the 1st RABBIT EARS and buying the 500th used to be the same event:
+// a click, a blip, a number. Counts now cross marks that pay a permanent
+// multiplier and announce themselves, so the ladder has rungs you can feel.
+// ---------------------------------------------------------------------------
+
+const List<int> kProducerMarks = <int>[25, 50, 100, 200, 300, 500];
+
+/// Multiplier on a producer's output from the marks it has crossed.
+/// Each mark is +25%, compounding.
+double producerMarkMult(int owned) {
+  var m = 1.0;
+  for (final mk in kProducerMarks) {
+    if (owned >= mk) m *= 1.25;
+  }
+  return m;
+}
+
+/// The next mark this count is working toward, or null past the last one.
+int? nextProducerMark(int owned) {
+  for (final mk in kProducerMarks) {
+    if (owned < mk) return mk;
+  }
+  return null;
+}
+
+/// Marks crossed by going from [before] to [after]. Usually 0 or 1, but a
+/// BUY MAX can vault several at once.
+List<int> marksCrossed(int before, int after) =>
+    kProducerMarks.where((m) => before < m && after >= m).toList();

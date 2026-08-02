@@ -153,7 +153,7 @@ bool prodLive(AnomalyRuntime a, String id) {
 double sigRateRaw(GameState s) {
   var base = 0.0;
   for (final p in kProducers) {
-    base += (s.prod[p.id] ?? 0) * p.sig;
+    base += (s.prod[p.id] ?? 0) * p.sig * producerMarkMult(s.prod[p.id] ?? 0);
   }
   return base * sigMult(s);
 }
@@ -162,7 +162,7 @@ double sigRateRaw(GameState s) {
 double sigRate(GameState s, AnomalyRuntime a) {
   var base = 0.0;
   for (final p in kProducers) {
-    if (prodLive(a, p.id)) base += (s.prod[p.id] ?? 0) * p.sig;
+    if (prodLive(a, p.id)) base += (s.prod[p.id] ?? 0) * p.sig * producerMarkMult(s.prod[p.id] ?? 0);
   }
   return base * sigMult(s);
 }
@@ -177,7 +177,11 @@ int rpGain(GameState s) => math.pow(s.lifetimeSig / 2.5e5, 0.5).floor();
 /// point a deep career could hand-strike its way through the early rundown.
 double tuneYield(GameState s, AnomalyRuntime a) {
   final base = 2 + 1.8 * math.pow(math.max(0, s.rp).toDouble(), 0.7);
-  return (base + sigRate(s, a) * 0.28) *
+  // CARRIER LOCK multiplies the payout 1.0 -> 3.0. It is the whole reason the
+  // rhythm is worth holding, and the reason the most-repeated verb in the game
+  // now has an arc instead of a flat rate.
+  return s.tune.tierMult *
+      (base + sigRate(s, a) * 0.28) *
       ((s.ups['preheat'] ?? false) ? 1.3 : 1) *
       sponsorMult(s);
 }

@@ -1,0 +1,340 @@
+// FINAL BROADCAST — THE HOME SCREEN.
+//
+// The boot screen was a one-shot splash: a title, three lines of prose and a
+// button. It told a first-time player nothing they could act on and told a
+// returning player nothing at all — no night count, no record, no way back to
+// the manual, no sense that anything had happened before.
+//
+// This is the station's front desk. It is the same screen on night 1 and night
+// 40, but it reads completely differently on each, because it is the one place
+// the career is actually visible.
+
+import 'package:flutter/widgets.dart';
+
+import '../consts.dart';
+import '../meta.dart';
+import '../state.dart';
+import 'ui_kit.dart';
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({
+    super.key,
+    required this.s,
+    required this.onSignOn,
+    required this.onManual,
+  });
+
+  final GameState s;
+  final VoidCallback onSignOn;
+  final VoidCallback onManual;
+
+  bool get _returning => s.started && (s.night > 1 || s.survived > 0);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(s.ui);
+    final logged = s.seen.values.where((v) => v).length;
+
+    return ColoredBox(
+      color: K.black,
+      child: Stack(
+        children: <Widget>[
+          // the station's own vignette, so the screen is part of the room
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment(0, -0.15),
+                  radius: 0.95,
+                  colors: <Color>[Color(0xFF0A0C0D), Color(0xFF000000)],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 26),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text(kBootStationLine,
+                    textAlign: TextAlign.center,
+                    style: t.at(11, K.bootSig, ls: 8)),
+                const SizedBox(height: 14),
+                _Title(ui: s.ui),
+                const SizedBox(height: 18),
+
+                // WHO YOU ARE. On night one this is a promise; later it is a record.
+                if (_returning)
+                  _Ledger(s: s, logged: logged)
+                else
+                  _Brief(ui: s.ui),
+
+                const SizedBox(height: 22),
+                _Big(
+                  ui: s.ui,
+                  label: _returning ? 'TAKE THE NIGHT SHIFT' : 'SIGN ON',
+                  sub: _returning
+                      ? 'NIGHT ${s.night}'
+                      : 'YOUR FIRST SHIFT',
+                  onTap: onSignOn,
+                ),
+                const SizedBox(height: 10),
+                _Secondary(
+                  ui: s.ui,
+                  label: "OPERATOR'S MANUAL",
+                  sub: _returning
+                      ? '$logged OF ${kAnoms.length} CATALOGUED  ·  KEY M'
+                      : 'READ IT FIRST  ·  KEY M',
+                  onTap: onManual,
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  _returning
+                      ? 'The eight keys under the tube are the only thing that '
+                          'has ever worked.'
+                      : 'Eight things live in the signal. '
+                          'Each one dies to exactly one button.',
+                  textAlign: TextAlign.center,
+                  style: t.at(12, K.bootBody, h: 1.9),
+                ),
+                const SizedBox(height: 10),
+                Text(kBootFine,
+                    textAlign: TextAlign.center,
+                    style: t.at(9, K.bootFine, ls: 2)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The wordmark, with the CRT's chromatic split.
+class _Title extends StatelessWidget {
+  const _Title({required this.ui});
+  final double ui;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    const txt = 'FINAL BROADCAST';
+    TextStyle st(Color c) => t.at(44, c, ls: 14, w: FontWeight.bold);
+    return SizedBox(
+      height: 58,
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          Transform.translate(
+            offset: const Offset(-3, 0),
+            child: Text(txt, style: st(const Color(0x59FF003C))),
+          ),
+          Transform.translate(
+            offset: const Offset(3, 0),
+            child: Text(txt, style: st(const Color(0x4D00C8FF))),
+          ),
+          Text(txt,
+              style: st(K.bootTitle).copyWith(
+                  shadows: glow(const Color(0xFF57E6FF), 24, 0.35))),
+        ],
+      ),
+    );
+  }
+}
+
+/// First-run: what the job is.
+class _Brief extends StatelessWidget {
+  const _Brief({required this.ui});
+  final double ui;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 660),
+      child: Column(
+        children: <Widget>[
+          Text(kBootBody1,
+              textAlign: TextAlign.center, style: t.at(13, K.bootBody, h: 2)),
+          const SizedBox(height: 12),
+          _RuleRow(ui: ui, k: 'STRIKE THE TUBE', v: 'to put signal out by hand'),
+          _RuleRow(ui: ui, k: 'KEYS 1-8', v: 'each banishes exactly one thing'),
+          _RuleRow(ui: ui, k: 'DREAD 100', v: 'and the night is over'),
+        ],
+      ),
+    );
+  }
+}
+
+class _RuleRow extends StatelessWidget {
+  const _RuleRow({required this.ui, required this.k, required this.v});
+  final double ui;
+  final String k;
+  final String v;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          SizedBox(
+            width: 190,
+            child: Text(k,
+                textAlign: TextAlign.right,
+                style: t.at(12, K.amber, ls: 2, w: FontWeight.bold)),
+          ),
+          const SizedBox(width: 14),
+          Text(v, style: t.at(12, K.bootBody)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Returning: the record. This is the only place the career is legible.
+class _Ledger extends StatelessWidget {
+  const _Ledger({required this.s, required this.logged});
+  final GameState s;
+  final int logged;
+
+  @override
+  Widget build(BuildContext context) {
+    final held = kStationNodes
+        .where((n) => metaLevel(s, n.id) > 0)
+        .map((n) => n.nm)
+        .toList();
+    return Column(
+      children: <Widget>[
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 26,
+          runSpacing: 8,
+          children: <Widget>[
+            _Stat(ui: s.ui, k: 'NIGHTS SURVIVED', v: '${s.survived}'),
+            _Stat(ui: s.ui, k: 'BANISHED', v: fmt(s.stats.banished)),
+            _Stat(ui: s.ui, k: 'BEST STREAK', v: '${s.stats.bestStreak}'),
+            _Stat(ui: s.ui, k: 'CATALOGUED', v: '$logged/${kAnoms.length}'),
+            _Stat(ui: s.ui, k: 'RATINGS PTS', v: fmt(s.rp), amber: true),
+          ],
+        ),
+        if (held.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 14),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 700),
+            child: Text(
+              'ON THE BOOKS:  ${held.join('  ·  ')}',
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: Sty(s.ui).at(10.5, K.greenDim, ls: 1.5),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat(
+      {required this.ui, required this.k, required this.v, this.amber = false});
+  final double ui;
+  final String k;
+  final String v;
+  final bool amber;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(v,
+            style: t.at(24, amber ? K.amber : K.green,
+                ls: 1, w: FontWeight.bold)),
+        Text(k, style: t.at(9.5, K.lbl, ls: 2)),
+      ],
+    );
+  }
+}
+
+class _Big extends StatelessWidget {
+  const _Big(
+      {required this.ui,
+      required this.label,
+      required this.sub,
+      required this.onTap});
+  final double ui;
+  final String label;
+  final String sub;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    return Pressable(
+      onTap: onTap,
+      builder: (_, hover, pressed) => Container(
+        width: 420,
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        decoration: BoxDecoration(
+          color: hover ? const Color(0xFF0E2A18) : const Color(0xFF0A1A10),
+          border: Border.all(color: hover ? K.green : K.greenDim, width: 2),
+          boxShadow: hover
+              ? <BoxShadow>[
+                  const BoxShadow(color: Color(0x476DFF9A), blurRadius: 26)
+                ]
+              : null,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(label,
+                textAlign: TextAlign.center,
+                style: t.at(16, K.green, ls: 6, w: FontWeight.bold)),
+            const SizedBox(height: 3),
+            Text(sub, style: t.at(10, K.greenDim, ls: 3)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Secondary extends StatelessWidget {
+  const _Secondary(
+      {required this.ui,
+      required this.label,
+      required this.sub,
+      required this.onTap});
+  final double ui;
+  final String label;
+  final String sub;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    return Pressable(
+      onTap: onTap,
+      builder: (_, hover, pressed) => Container(
+        width: 420,
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: hover ? const Color(0xFF1A1206) : const Color(0xFF120D05),
+          border: Border.all(color: hover ? K.amber : K.amberDim),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(label, style: t.at(12.5, K.amber, ls: 3)),
+            const SizedBox(height: 2),
+            Text(sub, style: t.at(9.5, K.skeySub, ls: 1.5)),
+          ],
+        ),
+      ),
+    );
+  }
+}

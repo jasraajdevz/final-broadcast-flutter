@@ -64,12 +64,21 @@ class _RackState extends State<Rack> {
 
   void _buy(Producer p, int n) {
     audio.init();
+    final before = s.prod[p.id] ?? 0;
     if (!buyProducer(s, p, n)) {
       audio.env('square', 180, 0.08, 0.07, 140);
       s.bump();
       return;
     }
     audio.buy();
+    // Buying the 1st and the 500th used to be the same event. Crossing a mark
+    // is now its own moment, with a permanent multiplier behind it.
+    final after = s.prod[p.id] ?? 0;
+    for (final mark in marksCrossed(before, after)) {
+      audio.milestone('producer', mark);
+      s.toast('${p.nm} x$mark — OUTPUT x${producerMarkMult(after).toStringAsFixed(2)}',
+          ToastKind.gold);
+    }
     s.save();
     s.bump();
   }

@@ -27,6 +27,7 @@ import 'src/state.dart';
 import 'src/tools.dart';
 import 'src/ui/ad_break.dart';
 import 'src/ui/boot_screen.dart';
+import 'src/ui/home_screen.dart';
 import 'src/ui/deck.dart';
 import 'src/ui/end_sheet.dart';
 import 'src/ui/manual.dart';
@@ -530,7 +531,12 @@ class _GameRootState extends State<GameRoot>
                   ),
                 ),
               if (!runtime.signedOn)
-                Positioned.fill(child: BootScreen(onSignOn: _signOn)),
+                Positioned.fill(
+                    child: HomeScreen(
+                      s: s,
+                      onSignOn: _signOn,
+                      onManual: _openManual,
+                    )),
             ],
             ),
           ),

@@ -1048,7 +1048,14 @@ class AnomalyRuntime extends ChangeNotifier {
     final g = tuneYield(s, this);
     s.sig += g;
     s.tune.strike(x, y, '+${fmt(g)}', tGlobal);
-    audio.tune(s.tune.heat);
+    // Heard, not just tracked: the click steps up a fifth per lock tier, and
+    // reaching a new one gets its own rising sting.
+    audio.tune(s.tune.heat + s.tune.tier * 0.25);
+    if (s.tune.lastStrikePromoted) {
+      audio.milestone('lock', s.tune.tier);
+      s.toast('${s.tune.tierName} — x${s.tune.tierMult.toStringAsFixed(1)} BY HAND',
+          ToastKind.gold);
+    }
     notifyListeners();
   }
 

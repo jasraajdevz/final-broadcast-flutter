@@ -60,8 +60,12 @@ void main() {
     await tester.pumpWidget(const FinalBroadcastApp());
     await tester.pump(const Duration(milliseconds: 16));
 
-    expect(find.text('FINAL BROADCAST'), findsOneWidget);
+    // The wordmark is a three-layer chromatic split (red / cyan / white), so
+    // it is deliberately three Text widgets, not one.
+    expect(find.text('FINAL BROADCAST'), findsNWidgets(3));
     expect(find.text('SIGN ON'), findsOneWidget);
+    // The home screen is the front desk, not just a splash.
+    expect(find.text("OPERATOR'S MANUAL"), findsOneWidget);
     // The deck is behind the boot overlay but already built.
     expect(find.text('DEGAUSS'), findsOneWidget);
   });

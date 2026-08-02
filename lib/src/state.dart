@@ -105,13 +105,65 @@ class TuneState {
   double heat = 0;
   int strikes = 0;
 
+  // --- CARRIER LOCK -------------------------------------------------------
+  // The most-repeated verb in the game used to be flat: `heat` saturated after
+  // four strikes and paid nothing at all, so the thing you do several hundred
+  // times a night had no arc. Keeping a rhythm now builds a LOCK, in four
+  // visible, audible steps, and letting the rhythm go drops it.
+
+  /// 0..4. Multiplies the strike payout and drives the pop's size and colour.
+  int tier = 0;
+
+  /// Progress toward the next tier, 0..1.
+  double lockP = 0;
+
+  /// Seconds since the last strike. The lock decays once you stop.
+  double idle = 0;
+
+  /// Payout multiplier for the current lock.
+  static const List<double> kTierMult = <double>[1.0, 1.3, 1.7, 2.2, 3.0];
+
+  /// Strikes needed to reach each tier from the one below.
+  static const List<int> kTierNeed = <int>[6, 10, 14, 18];
+
+  /// How long a gap is forgiven before the lock starts falling apart.
+  static const double kLockGrace = 1.1;
+
+  int _held = 0;
+
+  double get tierMult => kTierMult[tier.clamp(0, 4)];
+
+  /// The name printed on the lock meter.
+  String get tierName => const <String>[
+        '', 'CARRIER LOCK', 'STEADY', 'HOT', 'PEAKING',
+      ][tier.clamp(0, 4)];
+
   /// Strikes in the last second (the "MANUAL HOLD n/s" readout).
   int rate = 0;
   final List<double> recent = <double>[];
 
+  /// True when this strike pushed the lock up a step — the caller uses it to
+  /// fire the escalation sting, so the step is heard as well as seen.
+  bool lastStrikePromoted = false;
+
   void strike(double x, double y, String label, double tGlobal) {
     strikes++;
     recent.add(tGlobal);
+    idle = 0;
+    lastStrikePromoted = false;
+    if (tier < 4) {
+      _held++;
+      final need = kTierNeed[tier];
+      lockP = (_held / need).clamp(0.0, 1.0);
+      if (_held >= need) {
+        tier++;
+        _held = 0;
+        lockP = 0;
+        lastStrikePromoted = true;
+      }
+    } else {
+      lockP = 1;
+    }
     heat = heat + 0.28 > 1 ? 1 : heat + 0.28;
     pops.add(TunePop(x, y, label));
     ripples.add(TuneRipple(x, y));
@@ -123,6 +175,19 @@ class TuneState {
   void tick(double dt, double tGlobal) {
     heat = heat - dt * 0.55;
     if (heat < 0) heat = 0;
+    // The lock is a rhythm, so it is held by CONTINUING, not by having once
+    // reached it. A short gap is forgiven; a long one walks it back a step at
+    // a time rather than dumping you to zero, which would feel like a punish.
+    idle += dt;
+    if (idle > kLockGrace && tier > 0) {
+      final over = idle - kLockGrace;
+      if (over > 0.85) {
+        tier--;
+        _held = 0;
+        lockP = 0;
+        idle = kLockGrace;
+      }
+    }
     for (final p in pops) {
       p.t += dt;
     }
@@ -136,6 +201,11 @@ class TuneState {
   }
 
   void reset() {
+    tier = 0;
+    lockP = 0;
+    idle = 0;
+    _held = 0;
+    lastStrikePromoted = false;
     pops.clear();
     ripples.clear();
     recent.clear();

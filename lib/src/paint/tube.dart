@@ -470,20 +470,57 @@ void drawMainCRT(ui.Canvas g, GameState s, AnomalyRuntime a, ui.Image feed,
             const <double>[0, 0.35]));
 
   // tuning feedback — struck-glass rings and the signal you knocked loose
+  // CARRIER LOCK tiers the feedback: the rings get wider and the numbers get
+  // bigger, hotter and eventually white, so the rhythm you are holding is
+  // legible at a glance instead of being a hidden multiplier.
+  final int lockTier = s.tune.tier.clamp(0, 4);
+  const List<ui.Color> lockInk = <ui.Color>[
+    ui.Color(0xFFB4FFD7),
+    ui.Color(0xFF8FF0FF),
+    ui.Color(0xFF7FD8FF),
+    ui.Color(0xFFFFC46B),
+    ui.Color(0xFFFFFFFF),
+  ];
+  final double lockSize = 15 + lockTier * 2.6;
   for (final TuneRipple r in s.tune.ripples) {
     final double p = r.t / 0.55;
     if (p > 1) continue;
-    g.drawCircle(ui.Offset(r.x, r.y), 8 + p * 54,
-        stroke(rgba(150, 255, 200, 0.5 * (1 - p)), 2 * (1 - p) + 0.5));
+    final ui.Color rc = lockInk[lockTier];
+    g.drawCircle(ui.Offset(r.x, r.y), 8 + p * (54 + lockTier * 16),
+        stroke(rc.withValues(alpha: 0.5 * (1 - p)), 2 * (1 - p) + 0.5));
+    if (lockTier >= 2) {
+      g.drawCircle(ui.Offset(r.x, r.y), 8 + p * (30 + lockTier * 10),
+          stroke(rc.withValues(alpha: 0.26 * (1 - p)), 1.2 * (1 - p) + 0.4));
+    }
   }
   for (final TunePop p in s.tune.pops) {
     final double k = p.t / 0.9;
     if (k > 1) continue;
-    groupLayer(g, ui.Rect.fromLTWH(p.x - 80, p.y - 60, 160, 60), (ui.Canvas c) {
-      fillText(c, p.v, ui.Offset(p.x, p.y - k * 34),
-          mono(15, rgba(180, 255, 215, 1), weight: ui.FontWeight.bold),
+    groupLayer(g, ui.Rect.fromLTWH(p.x - 90, p.y - 70, 180, 70), (ui.Canvas c) {
+      fillText(c, p.v, ui.Offset(p.x, p.y - k * (34 + lockTier * 6)),
+          mono(lockSize, lockInk[lockTier], weight: ui.FontWeight.bold),
           anchor: TextAnchor.center, cache: _dynCache());
     }, alpha: clampD(1 - k, 0, 1));
+  }
+  // the lock meter, on the tube's lower strap where the eye already is
+  if (s.tune.tier > 0 || s.tune.lockP > 0.02) {
+    final double mw = kScr.width * 0.42;
+    final double mx = kScr.left + (kScr.width - mw) / 2;
+    final double my = kScr.bottom - 16;
+    g.drawRect(ui.Rect.fromLTWH(mx, my, mw, 5), fill(rgba(0, 0, 0, 0.55)));
+    final double fillW =
+        s.tune.tier >= 4 ? mw : mw * clampD(s.tune.lockP, 0, 1);
+    g.drawRect(ui.Rect.fromLTWH(mx, my, fillW, 5),
+        fill(lockInk[lockTier].withValues(alpha: 0.85)));
+    if (s.tune.tier > 0) {
+      fillText(
+          g,
+          '${s.tune.tierName}  x${s.tune.tierMult.toStringAsFixed(1)}',
+          ui.Offset(kScr.left + kScr.width / 2, my - 6),
+          mono(11, lockInk[lockTier], weight: ui.FontWeight.bold),
+          anchor: TextAnchor.center,
+          cache: _dynCache());
+    }
   }
   g.restore();
 
