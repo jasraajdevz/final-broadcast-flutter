@@ -306,17 +306,16 @@ class _OnAir extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Sty(s.ui);
-    String text = 'OFF AIR';
-    bool live = false;
-    if (runtime.lost) {
-      text = 'SIGNAL LOST';
-    } else if (runtime.signedOn) {
-      text = runtime.active != null ? '## INTRUSION' : 'ON AIR';
-      live = true;
-    }
+    // The lamp is now the readout for the whole air state, including ALL CLEAR —
+    // "safe if you get it right" is worthless if the player cannot see it.
+    final AirState air = runtime.airState;
+    final String text = runtime.airLabel;
+    final bool safe = air == AirState.allClear;
+    final bool live = air != AirState.off && air != AirState.lost;
 
     double opacity = 1;
-    if (live) {
+    // ALL CLEAR holds STEADY. The pulse is the alarm; a steady lamp is the point.
+    if (live && !safe) {
       final p = (runtime.tGlobal / 1.6) % 1.0;
       opacity = p < 0.5 ? 1 - 0.45 * (p * 2) : 0.55 + 0.45 * ((p - 0.5) * 2);
     }
@@ -324,19 +323,29 @@ class _OnAir extends StatelessWidget {
     return Opacity(
       opacity: opacity,
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 180),
+        constraints: const BoxConstraints(maxWidth: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: live ? K.onAirLiveBg : K.onAirOffBg,
+          color: safe
+              ? const Color(0xFF08210F)
+              : (live ? K.onAirLiveBg : K.onAirOffBg),
           border: Border.all(
-              color: live ? K.red : K.onAirOffBorder, width: 2),
+              color: safe
+                  ? K.greenDim
+                  : (live ? K.red : K.onAirOffBorder),
+              width: 2),
         ),
         child: Text(
           text,
           maxLines: 1,
           softWrap: false,
-          style: t.at(15, live ? K.onAirLive : K.onAirOff,
-              ls: 2, sh: live ? glow(K.red, 10, 0.8) : null),
+          style: t.at(
+              15,
+              safe ? K.green : (live ? K.onAirLive : K.onAirOff),
+              ls: 2,
+              sh: safe
+                  ? glow(K.green, 10, 0.8)
+                  : (live ? glow(K.red, 10, 0.8) : null)),
         ),
       ),
     );

@@ -6,7 +6,7 @@
 // audio engine, the ad break and the widget chrome.
 //
 // The simulation is NOT run here. One call per frame does all of it:
-//     runtime.tick(dt);
+//     runtime.tick(dt);  tools.tick(dt);  bots.tick(dt);
 // Everything else in _tick is presentation cadence — the 0.09s UI pulse and
 // the 12s autosave, both straight out of the JS main loop.
 
@@ -19,10 +19,12 @@ import 'package:flutter/services.dart';
 
 import 'src/anomalies.dart';
 import 'src/audio.dart';
+import 'src/bots.dart';
 import 'src/bake.dart' show mono;
 import 'src/consts.dart';
 import 'src/economy.dart';
 import 'src/state.dart';
+import 'src/tools.dart';
 import 'src/ui/ad_break.dart';
 import 'src/ui/boot_screen.dart';
 import 'src/ui/deck.dart';
@@ -95,6 +97,8 @@ class _GameRootState extends State<GameRoot>
   late final GameState s;
   late final AnomalyRuntime runtime;
   late final AdController ad;
+  late final BotRuntime bots;
+  late final Tools tools;
   late final Ticker _ticker;
   late final Listenable _uiListen;
 
@@ -130,8 +134,10 @@ class _GameRootState extends State<GameRoot>
     super.initState();
     s = GameState.boot();
     runtime = AnomalyRuntime(s, audio: createGameAudio());
+    tools = Tools(runtime);
     ad = AdController(s: s, runtime: runtime);
     runtime.playAd = ad.play;
+    bots = BotRuntime.of(s, runtime);
     _uiListen = Listenable.merge(<Listenable>[_uiPulse, s]);
 
     // TAPE VAULT — offline accrual while the tab was away.
@@ -199,6 +205,13 @@ class _GameRootState extends State<GameRoot>
 
     if (ad.active) ad.tick(dt);
     runtime.tick(dt);
+    // ORDER IS LOAD-BEARING. tools.tick must run after runtime.tick with the same
+    // dt: the flare freeze subtracts back the dt the runtime just added, and the
+    // mirror intercepts one frame before the window expires. bots.tick is a plain
+    // sequential call, never a runtime listener — the Librarian calls
+    // pressCounter(), which notifies, and a listener would re-enter.
+    tools.tick(dt);
+    bots.tick(dt);
 
     _uiAcc += dt;
     if (_uiAcc > 0.09) {
@@ -269,6 +282,12 @@ class _GameRootState extends State<GameRoot>
       } else {
         _openManual();
       }
+      return KeyEventResult.handled;
+    }
+    if (ch != null && kToolKeys.contains(ch)) {
+      runtime.audio.init();
+      runtime.audio.resume();
+      tools.pressKey(ch, purchase: HardwareKeyboard.instance.isShiftPressed);
       return KeyEventResult.handled;
     }
     if (ch != null) {
@@ -436,6 +455,7 @@ class _GameRootState extends State<GameRoot>
                   builder: (_, _) => Deck(
                     s: s,
                     runtime: runtime,
+                    tools: tools,
                     onManual: _openManual,
                     kbDown: _kbDown,
                   ),

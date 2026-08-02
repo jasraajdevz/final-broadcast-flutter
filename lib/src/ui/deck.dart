@@ -11,6 +11,8 @@ import 'package:flutter/widgets.dart';
 import '../anomalies.dart';
 import '../consts.dart';
 import '../state.dart';
+import '../tools.dart';
+import 'tools_bar.dart';
 import 'ui_kit.dart';
 
 class Deck extends StatelessWidget {
@@ -18,12 +20,14 @@ class Deck extends StatelessWidget {
     super.key,
     required this.s,
     required this.runtime,
+    required this.tools,
     required this.onManual,
     this.kbDown,
   });
 
   final GameState s;
   final AnomalyRuntime runtime;
+  final Tools tools;
   final VoidCallback onManual;
 
   /// Counter id currently depressed by the keyboard (`.key.down`, 90ms).
@@ -44,13 +48,22 @@ class Deck extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Expanded(child: _keys()),
-          const SizedBox(width: 8),
-          SizedBox(width: kSideKeysW, child: _sideKeys()),
+          SizedBox(height: kToolsBarH, child: ToolsBar(s: s, tools: tools)),
+          const SizedBox(height: 5),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Expanded(child: _keys()),
+                const SizedBox(width: 8),
+                SizedBox(width: kSideKeysW, child: _sideKeys()),
+              ],
+            ),
+          ),
         ],
       ),
     );

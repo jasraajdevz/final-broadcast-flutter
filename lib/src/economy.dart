@@ -1,8 +1,14 @@
 // FINAL BROADCAST — derived economy, difficulty and the shift clock.
 //
-// Straight port of the "derived economy" / "sabotage" / "manual tuning" /
-// "difficulty" blocks of index.html. Same constants, same order of operations,
-// same floating-point shape. Do not retune anything here.
+// Port of the "derived economy" / "sabotage" / "manual tuning" / "difficulty"
+// blocks of index.html. The MONEY half is the original, number for number, and
+// must stay that way — costOf/bulkCost/maxAfford/sigRate/rpGain/tuneYield are
+// load-bearing against the save format and the rack's sticker prices.
+//
+// The PACING half (the "Difficulty" section below) has been deliberately
+// retuned away from the original; see the block comment there for why and by
+// how much. Everything the anomaly runtime needs to promise the player a safe
+// window after a correct answer also lives there.
 //
 // Everything is a top-level function taking the state explicitly. Functions
 // whose JS original read the global `A` take the AnomalyRuntime as well.
@@ -151,18 +157,78 @@ double offlineGrant(GameState s) {
 // Difficulty
 // ---------------------------------------------------------------------------
 
-/// JS depth().
+/// JS depth(). NOTE: `stats` is never wiped by resetForNewNight(), so depth is
+/// a CAREER counter, not a per-night one — it only ever goes up. Anything that
+/// scales on it therefore has to saturate, or night four is unplayable.
 int depth(GameState s) => s.stats.banished + s.stats.scared * 2;
 
-/// JS anomInterval(). Difficulty lives in the GAP, not in a shrinking window.
-/// Randomised by rr(0.78,1.25) on every call — call it once per schedule.
-double anomInterval(GameState s) {
-  final d = depth(s);
-  var base = math.max(8.0, 27 - d * 0.42);
-  if (s.ups['failsafe'] ?? false) base += 1;
-  if (s.stalled) base = math.max(6.5, base * 0.75);
-  return base * rr(0.78, 1.25);
+// --- pacing -----------------------------------------------------------------
+//
+// The original ramp was `max(8, 27 - depth*0.42)`: linear, and because depth is
+// a career counter it hit the 8s floor at depth 45 — roughly two nights in —
+// and stayed there forever. With a ~7.5s window and a ~1.6s telegraph that is a
+// 17s cycle of which 9s is an emergency. That is the "relentless" the player is
+// describing, and it never stops getting worse.
+//
+// The replacement is a saturating curve that can never close past kGapFloor:
+//
+//     gap(d) = kGapFloor + (kGapOpen - kGapFloor) / (1 + d / kGapHalfDepth)
+//
+//   depth   0 -> 34.0s      depth  80 -> 24.0s
+//   depth  20 -> 29.0s      depth 200 -> 21.5s
+//   depth  40 -> 26.5s      depth  inf -> 19.0s
+//
+// A 21-minute night at ~34s + 2.0s telegraph + ~7.5s window is ~24 intrusions;
+// deep in a career it tops out near ~44. The old curve was pushing 70+. The
+// late game is now tense (a fifth of the time is an emergency) rather than
+// spammy (a half of it was).
+
+/// The gap a fresh career gets, in seconds.
+const double kGapOpen = 34;
+
+/// The hard floor the gap approaches and never reaches.
+const double kGapFloor = 19;
+
+/// Career depth at which the gap has closed half the distance to the floor.
+const double kGapHalfDepth = 40;
+
+/// Per-night ease-in. A night has to have room to breathe before it bites, so
+/// the first four intrusions of a shift are spaced out on top of everything
+/// else. At depth 0 that is 70s / 55s / 45s / 39s, then the steady 34s.
+const List<double> kNightOpening = <double>[2.05, 1.62, 1.34, 1.15];
+
+/// The multiplier applied to the gap before the `nightIndex`-th intrusion of
+/// the night (0-based). 1.0 from the fifth onward.
+double openingEase(int nightIndex) {
+  if (nightIndex < 0) return kNightOpening.first;
+  if (nightIndex >= kNightOpening.length) return 1;
+  return kNightOpening[nightIndex];
 }
+
+/// The expected gap in seconds — [anomInterval] without the jitter. Exposed so
+/// the UI can draw a carrier-stability readout that does not lie.
+///
+/// `nightIndex` is how many anomalies have already manifested this night.
+double anomIntervalMean(GameState s, int nightIndex) {
+  final d = depth(s);
+  var base = kGapFloor + (kGapOpen - kGapFloor) / (1 + d / kGapHalfDepth);
+  // FAILSAFE RELAY buys real quiet now, not a rounding error.
+  if (s.ups['failsafe'] ?? false) base += 2.5;
+  // A held clock still leans on you, but it may not spiral: being behind on
+  // quota used to cut the gap by a quarter down to 6.5s, which is how a bad
+  // segment turned into a dead run.
+  if (s.stalled) base = math.max(15.0, base * 0.9);
+  return base * openingEase(nightIndex);
+}
+
+/// Seconds until the next telegraph. Randomised on every call — call it once
+/// per schedule, never per frame.
+///
+/// The jitter is tighter than the original's rr(0.78,1.25) so the pacing is
+/// legible: you can learn roughly how long you have, which is the only way the
+/// ALL CLEAR window below can mean anything.
+double anomInterval(GameState s, int nightIndex) =>
+    anomIntervalMean(s, nightIndex) * rr(0.86, 1.18);
 
 /// JS banishWindow(). 7.5s -> 6.0s floor, +1.2s with FERRITE CORE.
 double banishWindow(GameState s) {
@@ -172,8 +238,62 @@ double banishWindow(GameState s) {
   return w;
 }
 
-/// JS telegraph().
-double telegraph(GameState s) => (s.ups['phosphor'] ?? false) ? 2.5 : 1.6;
+/// JS telegraph(), lengthened by 0.4s at both ends. PHOSPHOR MASK is still
+/// worth exactly the +0.9s its rack copy promises.
+double telegraph(GameState s) => (s.ups['phosphor'] ?? false) ? 2.9 : 2.0;
+
+// --- the ALL CLEAR ----------------------------------------------------------
+//
+// A correct counter has to actually make you safe, or the deck is just a slot
+// machine. Every successful banish opens a window in which NOTHING can
+// manifest, its length set by how clean the kill was and compounded by the
+// streak. Missing one resets the streak, so the compounding is earned.
+//
+//   scraped it at the buzzer, streak 1 ->  5.0s
+//   instant kill, streak 1              -> 14.0s
+//   instant kill, streak 6              -> 22.5s
+//   instant kill, streak 7+             -> 24.0s (cap), +2s with FAILSAFE
+//
+// Against a ~19-34s gap that is a guaranteed third-to-half of the downtime,
+// on top of the gap rather than inside it.
+
+/// Floor of the calm window — what even a buzzer-beater buys.
+const double kCalmBase = 5;
+
+/// Extra seconds a perfectly clean kill adds on top of [kCalmBase].
+const double kCalmClean = 9;
+
+/// Seconds added per banish of streak, past the first.
+const double kCalmStreakStep = 1.7;
+
+/// Cap on the streak component, so calm never swallows the night whole.
+const double kCalmStreakCap = 10;
+
+/// Length of the guaranteed-quiet window a successful banish opens.
+///
+/// * [cleanliness] 0..1 — 1 when the key was hit the instant it manifested,
+///   0 at the last frame of the window.
+/// * [streak] — consecutive successful banishes INCLUDING this one.
+/// * [fumbles] — wrong keys pressed during this visit; panicking costs you
+///   some of the reward, but never all of it.
+double calmWindow(
+  GameState s, {
+  required double cleanliness,
+  required int streak,
+  int fumbles = 0,
+}) {
+  var w = kCalmBase + kCalmClean * clampD(cleanliness, 0, 1);
+  w += math.min(kCalmStreakCap, math.max(0, streak - 1) * kCalmStreakStep);
+  if (fumbles > 0) w *= math.max(0.55, 1 - fumbles * 0.18);
+  if (s.ups['failsafe'] ?? false) w += 2;
+  return w;
+}
+
+/// Forced quiet after a jumpscare. Nothing may manifest during it, which is the
+/// guarantee that a scare can never chain into a second one while you are still
+/// reeling — and the reason the run is always recoverable.
+double scareRecovery(GameState s) =>
+    9.0 + ((s.ups['failsafe'] ?? false) ? 2.0 : 0.0);
 
 /// JS unlockedAnoms(). tier 1 at depth 6, tier 2 at depth 16.
 List<Anom> unlockedAnoms(GameState s) {

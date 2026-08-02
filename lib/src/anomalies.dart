@@ -10,6 +10,17 @@
 //     leak a debuff into the next intrusion
 //   * a first sighting is LONGER but HALF strength — a demonstration, not a hazing
 //   * nothing may ever disable the key that banishes it
+//
+// Three rules the scheduler adds on top, and the reason the runtime owns three
+// timers instead of one:
+//   * CALM — a correct counter opens a window in which nothing can manifest.
+//     It is earned, it compounds with the streak, and the UI can read it
+//     (`allClear`, `calmP`, `airState`). Getting it right must BUY something.
+//   * AFTERMATH — a jumpscare opens a longer forced-quiet window. A scare can
+//     therefore never chain into another one, which is the guarantee that keeps
+//     a bad night recoverable rather than a death spiral.
+//   * The two are mutually exclusive except during the FALSE CLEAR scare beat,
+//     which lights the ALL CLEAR lamp on purpose and then takes it away.
 
 import 'dart:math' as math;
 
@@ -185,9 +196,48 @@ class ActiveAnom {
   double ringIv = 1.5;
   double dreadPaid = 0;
 
+  /// Wrong keys pressed during this visit. Shortens the calm window a correct
+  /// answer eventually buys — panicking costs you some of the reward.
+  int wrongs = 0;
+
   /// 0..1 progress through the banish window.
   double get p => window <= 0 ? 0 : t / window;
+
+  /// 1 when the counter was hit the instant it manifested, 0 at the last frame.
+  double get cleanliness => clampD(1 - p, 0, 1);
 }
+
+// ---------------------------------------------------------------------------
+// Scares
+// ---------------------------------------------------------------------------
+
+/// How a jumpscare is staged. One is chosen per entity when the window runs
+/// out; each has a different shape in time, a different audio script and a
+/// different thing for the painters to do.
+enum ScareBeat {
+  /// It arrives at the glass. Immediate hit, hard zoom, scream on top of the
+  /// impact, two thumps behind it.
+  lunge,
+
+  /// The lights go. Room to black and total silence for [0.75]s — no static,
+  /// no drone, a creak and a whisper — and then everything comes back at once
+  /// with the thing already there.
+  blackout,
+
+  /// A false all-clear that turns. Plays the banish stinger, lights the ALL
+  /// CLEAR lamp and toasts a banish that never happened, then, a second later,
+  /// takes all of it back. The tell is that a real banish always quotes a
+  /// signal figure and this one does not.
+  falseClear,
+
+  /// It leaves something behind. Softer opening hit, but the after-image burns
+  /// into the tube for six seconds afterwards instead of two.
+  afterimage,
+}
+
+/// What the ON AIR lamp — and anything else that wants one word for the state
+/// of the booth — should be showing. Ordered worst to best.
+enum AirState { off, lost, intrusion, warning, recovering, allClear, onAir }
 
 /// A deck key lighting up green (correct) or red (wrong) for 260ms.
 class KeyFlash {
@@ -268,6 +318,65 @@ class AnomalyRuntime extends ChangeNotifier {
   double wrongFx = 0;
   bool lost = false;
 
+  // -------------------------------------------------------------------------
+  // Pacing and safety
+  // -------------------------------------------------------------------------
+
+  /// Seconds of GUARANTEED quiet bought by the last successful banish. While
+  /// this is running the gap timer is frozen, so nothing can telegraph and
+  /// nothing can manifest. This is the ALL CLEAR the deck promises.
+  double calm = 0;
+
+  /// The full length [calm] was granted at, for a countdown meter.
+  double calmSpan = 0;
+
+  /// Seconds of forced quiet after a jumpscare. Freezes the gap timer the same
+  /// way [calm] does, so a scare can never chain into a second one. Dread also
+  /// bleeds off much faster while this runs — the recovery is real.
+  double aftermath = 0;
+
+  /// The full length [aftermath] was granted at.
+  double aftermathSpan = 0;
+
+  /// The interval the last [scheduleNext] rolled, for the stability readout.
+  double gapSpan = 0;
+
+  /// Anomalies that have manifested since SIGN ON, or since the last sign-off.
+  /// Feeds `openingEase()` so the first few of a night are spaced right out.
+  int nightAnoms = 0;
+
+  // -------------------------------------------------------------------------
+  // Scare channels the painters read
+  // -------------------------------------------------------------------------
+
+  /// How the live (or most recent) scare is being staged.
+  ScareBeat? scareBeat;
+
+  /// Seconds of full room blackout left — the BLACKOUT beat's dark. Painters
+  /// should use [blackoutAlpha], which fades the tail rather than popping.
+  double blackout = 0;
+
+  /// 0..1 burn left on the tube after the scare frame itself is over. Painters
+  /// draw [afterimageDef]'s face at low alpha over the picture while this runs.
+  double afterimage = 0;
+
+  /// Total seconds [afterimage] decays over. 2.6s normally, 6.5s for the
+  /// AFTERIMAGE beat.
+  double afterimageSpan = 0;
+
+  /// What is burned into the tube. Outlives [scareDef], which the scare frame
+  /// clears after 1.5s.
+  Anom? afterimageDef;
+
+  /// True during the lie in the middle of a FALSE CLEAR beat. Everything looks
+  /// banished — including [allClear] — and it is not.
+  bool falseClear = false;
+
+  /// Bumped whenever the world moves on. Every delayed scare beat captures it
+  /// and no-ops if it no longer matches, so a sign-off mid-scare cannot fire a
+  /// theft into the next night.
+  int _scareSerial = 0;
+
   /// The global animation clock every painter reads. JS `tGlobal`.
   double tGlobal = 0;
 
@@ -321,14 +430,110 @@ class AnomalyRuntime extends ChangeNotifier {
   bool get keysHot => active != null;
 
   // -------------------------------------------------------------------------
+  // Read-side API — everything the status bar and the painters need
+  // -------------------------------------------------------------------------
+
+  /// True while the booth is under the guaranteed-quiet window earned by a
+  /// correct counter. Nothing can manifest. Show it.
+  bool get allClear => calm > 0 && active == null && warn <= 0 && !lost;
+
+  /// 0..1 of the calm window left, for a draining meter.
+  double get calmP => calmSpan <= 0 ? 0 : clampD(calm / calmSpan, 0, 1);
+
+  /// Whole seconds of calm left, for a countdown.
+  int get calmSeconds => calm <= 0 ? 0 : calm.ceil();
+
+  /// The streak the current calm window was compounded from.
+  int get calmStreak => s.stats.streak;
+
+  /// True while the booth is in post-jumpscare recovery. Also a hard no-spawn
+  /// window, but it was not earned and it should not read as safety.
+  bool get recovering => aftermath > 0 && !falseClear;
+
+  /// 0..1 of the recovery window left.
+  double get recoverP =>
+      aftermathSpan <= 0 ? 0 : clampD(aftermath / aftermathSpan, 0, 1);
+
+  int get recoverSeconds => aftermath <= 0 ? 0 : aftermath.ceil();
+
+  /// Room-wide blackout alpha for the BLACKOUT beat, 0..1, self-fading.
+  double get blackoutAlpha => clampD(blackout * 3, 0, 1);
+
+  /// The lingering burn on the tube, 0..1. Zero while the scare frame itself is
+  /// still up — this is what is left AFTER it.
+  double get burn => scare > 0 ? 0 : clampD(afterimage, 0, 1);
+
+  /// 0..1 — how far the carrier has drifted towards the next intrusion. Flat 0
+  /// while protected, so a stability meter reads as genuinely parked.
+  double get threatP {
+    if (lost || !signedOn) return 0;
+    if (active != null || warn > 0) return 1;
+    if (calm > 0 || aftermath > 0) return 0;
+    if (gapSpan <= 0) return 0;
+    return clampD(1 - nextAt / gapSpan, 0, 1);
+  }
+
+  /// One word for the state of the booth.
+  AirState get airState {
+    if (lost) return AirState.lost;
+    if (!signedOn) return AirState.off;
+    if (active != null) return AirState.intrusion;
+    if (warn > 0) return AirState.warning;
+    if (calm > 0) return AirState.allClear;
+    if (aftermath > 0) return AirState.recovering;
+    return AirState.onAir;
+  }
+
+  /// The ON AIR lamp's text for [airState].
+  String get airLabel {
+    switch (airState) {
+      case AirState.off:
+        return 'OFF AIR';
+      case AirState.lost:
+        return 'SIGNAL LOST';
+      case AirState.intrusion:
+        return '## INTRUSION';
+      case AirState.warning:
+        return '!! DISTURBANCE';
+      case AirState.allClear:
+        return 'ALL CLEAR ${calmSeconds}s';
+      case AirState.recovering:
+        return 'RECOVERING ${recoverSeconds}s';
+      case AirState.onAir:
+        return 'ON AIR';
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Scheduler
   // -------------------------------------------------------------------------
 
+  /// Rolls the next gap. The gap timer does NOT start running until both
+  /// protection windows have expired — see [_simulate].
   void scheduleNext() {
-    nextAt = anomInterval(s);
+    nextAt = anomInterval(s, nightAnoms);
+    gapSpan = nextAt;
+  }
+
+  /// Opens the guaranteed-quiet window a correct answer just bought.
+  ///
+  /// Never shortens an existing window — a rapid second banish can only ever
+  /// add safety — and always clears the post-scare recovery, because earned
+  /// calm supersedes it.
+  void grantCalm(double seconds) {
+    if (seconds <= 0) return;
+    aftermath = 0;
+    aftermathSpan = 0;
+    if (seconds > calm) {
+      calm = seconds;
+      calmSpan = seconds;
+    }
   }
 
   void beginWarn() {
+    // Belt and braces: the caller already checked, but nothing may telegraph
+    // inside a protection window under any circumstances.
+    if (calm > 0 || aftermath > 0 || lost) return;
     final pool = unlockedAnoms(s);
     warnDef = pick(pool);
     warn = telegraph(s);
@@ -341,6 +546,9 @@ class AnomalyRuntime extends ChangeNotifier {
     final Anom def = warnDef ?? pick<Anom>(unlockedAnoms(s));
     warnDef = null;
     warn = 0;
+    calm = 0;
+    calmSpan = 0;
+    nightAnoms++;
     final d = depth(s);
     final masked = d >= 28 && rand() < 0.22;
     final first = !(s.seen[def.id] ?? false);
@@ -426,6 +634,7 @@ class AnomalyRuntime extends ChangeNotifier {
     s.stats.wrong++;
     wrongFx = 1;
     final pen = (s.ups['autocue'] ?? false) ? 0.45 : 0.9;
+    active?.wrongs++;
     active?.t += pen;
     shake = math.max(shake, 6);
     s.dread = math.min(100, s.dread + 3);
@@ -453,6 +662,12 @@ class AnomalyRuntime extends ChangeNotifier {
     audio.setVol(s.sfx);
     signedOn = true;
     s.started = true;
+    // Coming back to the desk — mid-night or not — earns the slow opening.
+    nightAnoms = 0;
+    calm = 0;
+    calmSpan = 0;
+    aftermath = 0;
+    aftermathSpan = 0;
     scheduleNext();
     s.save();
     audio.env('sine', 1000, 0.5, 0.12, 1000);
@@ -505,6 +720,22 @@ class AnomalyRuntime extends ChangeNotifier {
       s.toast(
           '${fast ? "CLEAN KILL — " : "BANISHED — "}${a.def.nm}  +${fmt(bonus)} SIG'
           '${s.stats.streak > 2 ? "   ×${s.stats.streak} STREAK" : ""}',
+          ToastKind.good);
+
+      // --- the ALL CLEAR ---
+      // The whole point of the deck: if you got it right, you are SAFE, and
+      // the game says so in as many words. Length scales with how clean the
+      // kill was and compounds with the streak; a jumpscare resets the streak,
+      // so the compounding has to be defended every time.
+      grantCalm(calmWindow(s,
+          cleanliness: a.cleanliness,
+          streak: s.stats.streak,
+          fumbles: a.wrongs));
+      audio.env('sine', 700, 0.18, 0.05, 1050);
+      s.toasts.pushDelayed(
+          760,
+          'ALL CLEAR — ${calm.round()}s'
+          '${s.stats.streak > 2 ? "   (×${s.stats.streak} STREAK)" : ""}',
           ToastKind.good);
     }
     scheduleNext();
@@ -560,29 +791,218 @@ class AnomalyRuntime extends ChangeNotifier {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Jumpscares
+  // -------------------------------------------------------------------------
+
+  /// Each entity scares in its own idiom. It gets its signature beat most of
+  /// the time and a wildcard the rest, so meeting the same thing twice is not
+  /// the same scare twice.
+  static const Map<String, ScareBeat> kSignatureBeat = <String, ScareBeat>{
+    'snow': ScareBeat.lunge, // the grain finishes the face, then comes
+    'sleep': ScareBeat.falseClear, // a performer: he says goodnight, then turns
+    'vert': ScareBeat.blackout, // he lives in the seam; the seam widens
+    'dead': ScareBeat.blackout, // an absence — it takes the lights with it
+    'card': ScareBeat.falseClear, // she steps back into the card. She does not
+    'rerun': ScareBeat.afterimage, // four seconds of tape that will not erase
+    'niel': ScareBeat.lunge, // he files, and then he is at the glass
+    'call': ScareBeat.falseClear, // the line goes dead. The line is not dead
+  };
+
+  ScareBeat beatFor(Anom def) {
+    final ScareBeat sig = kSignatureBeat[def.id] ?? ScareBeat.lunge;
+    if (rand() < 0.68) return sig;
+    return pick(ScareBeat.values.where((b) => b != sig).toList());
+  }
+
+  /// Seconds between the window running out and the hit actually landing. The
+  /// staged beats spend it lying to you.
+  static double beatLead(ScareBeat b) {
+    switch (b) {
+      case ScareBeat.blackout:
+        return 0.75;
+      case ScareBeat.falseClear:
+        return 1.0;
+      case ScareBeat.lunge:
+      case ScareBeat.afterimage:
+        return 0;
+    }
+  }
+
   /// JS jumpscare(). The window ran out.
+  ///
+  /// Opens the forced-quiet recovery window FIRST, so that whatever the beat
+  /// does with the next second, nothing can telegraph over the top of it and
+  /// nothing can manifest while the player is still recovering.
   void jumpscare() {
     final a = active;
     if (a == null) return;
-    final def = a.def;
+    final Anom def = a.def;
+    final double held = a.held;
     active = null;
     glitch = 0;
-    scare = 1.5;
-    scareDef = def;
-    shake = 26;
-    flash = 1;
-    audio.scare();
-    audio.setStatic(0.22);
-    audio.setDrone(0, 42);
-    audio.deadAir(false);
-    audio.setHeart(150, 0.30);
-    _later(1400, () {
-      audio.setStatic(0.03);
-      audio.setHeart(70, 0.06);
-    });
+    calm = 0;
+    calmSpan = 0;
+    falseClear = false;
 
     s.stats.scared++;
     s.stats.streak = 0;
+
+    final ScareBeat beat = beatFor(def);
+    scareBeat = beat;
+    final int serial = ++_scareSerial;
+
+    // recovery = the lead-in + the 1.5s scare frame + the earned quiet
+    aftermathSpan = beatLead(beat) + 1.5 + scareRecovery(s);
+    aftermath = aftermathSpan;
+
+    _stageScare(def, beat, serial, held);
+    scheduleNext();
+    notifyListeners();
+  }
+
+  /// The pre-hit half of a beat. Everything here is a lie the player is about
+  /// to be punished for believing.
+  void _stageScare(Anom def, ScareBeat beat, int serial, double held) {
+    switch (beat) {
+      case ScareBeat.lunge:
+      case ScareBeat.afterimage:
+        audio.deadAir(false);
+        audio.duck(0.3, 800);
+        _scareHit(def, beat, serial, held);
+        break;
+
+      case ScareBeat.blackout:
+        // The lights go, and the room goes with them: no static, no drone, no
+        // room tone at all. Just a creak, and something breathing in it.
+        blackout = 1.08; // 0.75s of solid dark, then a self-expiring tail
+        audio.deadAir(true);
+        audio.setStatic(0);
+        audio.setDrone(0, 18);
+        audio.setHeart(58, 0.05);
+        audio.env('sine', 130, 0.40, 0.10, 34);
+        shake = math.max(shake, 4);
+        s.toast('.. MAINS DROPPED', ToastKind.bad);
+        _atScare(serial, 240, audio.creak);
+        _atScare(serial, 520, audio.whisper);
+        _atScare(serial, 750, () => _scareHit(def, beat, serial, held));
+        break;
+
+      case ScareBeat.falseClear:
+        // It plays the banish. Stinger, green wash, ALL CLEAR lamp, the lot.
+        // The only tell is the toast: a real banish always quotes a signal
+        // figure, and this one never does.
+        falseClear = true;
+        banishFx = 1;
+        calm = 4;
+        calmSpan = 4;
+        audio.deadAir(false);
+        audio.setStatic(0.03);
+        audio.setDrone(0, 42);
+        audio.setHeart(52, 0.04);
+        audio.banishStinger(false);
+        audio.good();
+        s.toast('BANISHED — ${def.nm}', ToastKind.good);
+        _atScare(serial, 560, () {
+          audio.riser(0.44);
+          audio.whisper();
+        });
+        _atScare(serial, 1000, () => _scareHit(def, beat, serial, held));
+        break;
+    }
+  }
+
+  /// The hit. Sets the render channels, plays the beat's audio, takes what it
+  /// came for, and starts the long climb back down.
+  void _scareHit(Anom def, ScareBeat beat, int serial, double held) {
+    if (_scareSerial != serial) return;
+    falseClear = false;
+    blackout = 0;
+    banishFx = 0;
+    calm = 0;
+    calmSpan = 0;
+
+    // the channel feed.dart and tube.dart already read: 1.5s, counting down
+    scare = 1.5;
+    scareDef = def;
+    // and the burn it leaves on the tube afterwards
+    afterimageDef = def;
+    afterimage = 1;
+    afterimageSpan = beat == ScareBeat.afterimage ? 6.5 : 2.6;
+
+    switch (beat) {
+      case ScareBeat.lunge:
+        shake = math.max(shake, 34);
+        flash = 1;
+        audio.scare();
+        audio.impact();
+        audio.scream(0.55, 190, 0.34);
+        audio.thump(0.60, 44);
+        _atScare(serial, 130, () => audio.thump(0.42, 33));
+        _atScare(serial, 380, () {
+          audio.burst(0.35, 0.18, 1400, 120);
+          shake = math.max(shake, 16);
+        });
+        _atScare(serial, 900, audio.farThud);
+        break;
+
+      case ScareBeat.blackout:
+        shake = math.max(shake, 36);
+        flash = 1;
+        audio.deadAir(false); // everything comes back at once
+        audio.scare();
+        audio.impact();
+        audio.scream(0.50, 150, 0.36);
+        audio.thump(0.70, 40);
+        _atScare(serial, 300, () => audio.thump(0.40, 30));
+        _atScare(serial, 820, audio.pipe);
+        break;
+
+      case ScareBeat.falseClear:
+        shake = math.max(shake, 40);
+        flash = 1;
+        audio.scare();
+        audio.impact();
+        audio.scream(0.62, 210, 0.38);
+        audio.thump(0.75, 48);
+        _atScare(serial, 240, () => audio.thump(0.40, 34));
+        _atScare(serial, 700, audio.whisper);
+        break;
+
+      case ScareBeat.afterimage:
+        shake = math.max(shake, 26);
+        flash = 0.75;
+        audio.scare();
+        audio.impact();
+        audio.scream(0.40, 170, 0.26);
+        audio.thump(0.50, 42);
+        _atScare(serial, 620, () => audio.burst(0.50, 0.14, 700, 60));
+        _atScare(serial, 1500, audio.whisper);
+        _atScare(serial, 2700, audio.pipe);
+        break;
+    }
+
+    audio.setStatic(0.26);
+    audio.setDrone(0, 42);
+    audio.setHeart(158, 0.34);
+    // The old recovery was one 1.4s step. This is four, over five seconds, so
+    // the room takes as long to settle as the player does.
+    _atScare(serial, 1500, () {
+      audio.setStatic(0.12);
+      audio.setHeart(104, 0.16);
+    });
+    _atScare(serial, 3200, () {
+      audio.setStatic(0.06);
+      audio.setHeart(78, 0.08);
+    });
+    _atScare(serial, 5200, () {
+      audio.setStatic(0.03);
+      audio.setHeart(50, 0.03);
+      audio.creak();
+      s.toast('CARRIER RECOVERED', ToastKind.plain);
+    });
+
+    // --- what it takes. Unchanged per-entity maths; only the timing moved. ---
     final half = (s.ups['lead'] ?? false) ? 0.5 : 1.0;
     final halo = s.ups['halo'] ?? false;
     var lostSig = 0.0, lostSeg = 0.0;
@@ -597,7 +1017,7 @@ class AnomalyRuntime extends ChangeNotifier {
       // She already has the pile; taking a third of the bank on top would be a
       // double charge for the same visit. Reported loss includes `held`, but
       // only the 10% is actually deducted — held was never in the bank.
-      lostSig = a.held + s.sig * 0.10 * half;
+      lostSig = held + s.sig * 0.10 * half;
       s.sig -= s.sig * 0.10 * half;
     } else if (def.id == 'dead') {
       lostSig = s.sig * 0.55 * half;
@@ -610,12 +1030,39 @@ class AnomalyRuntime extends ChangeNotifier {
     s.segSig = math.max(0, s.segSig);
     s.dread = math.min(100, s.dread + 26);
     s.toast(
-        'X ${def.nm} GOT THROUGH — -${fmt(lostSig)} SIG'
+        'X ${def.nm} '
+        '${beat == ScareBeat.falseClear ? "NEVER LEFT" : "GOT THROUGH"}'
+        ' — -${fmt(lostSig)} SIG'
         '${lostSeg > 1 ? " / -${fmt(lostSeg)} OUTPUT" : ""}',
         ToastKind.bad);
-    scheduleNext();
     if (s.dread >= 100) signalLost();
     notifyListeners();
+  }
+
+  /// [_later], but the callback is dropped if the world moved on — a sign-off,
+  /// a dawn, a death or another scare all invalidate a pending beat.
+  void _atScare(int serial, int millis, void Function() fn) {
+    _later(millis, () {
+      if (_scareSerial != serial) return;
+      fn();
+    });
+  }
+
+  /// Wipes every scare channel and cancels any beat still in flight.
+  void _clearScareFx() {
+    _scareSerial++;
+    scare = 0;
+    scareDef = null;
+    scareBeat = null;
+    afterimage = 0;
+    afterimageSpan = 0;
+    afterimageDef = null;
+    blackout = 0;
+    falseClear = false;
+    calm = 0;
+    calmSpan = 0;
+    aftermath = 0;
+    aftermathSpan = 0;
   }
 
   // -------------------------------------------------------------------------
@@ -626,6 +1073,16 @@ class AnomalyRuntime extends ChangeNotifier {
     if (lost) return;
     lost = true;
     active = null;
+    // No beat still in flight may fire over the sheet, and neither protection
+    // window survives the run ending. `scare` / `afterimage` are deliberately
+    // left alone so the frame that killed you gets to finish playing.
+    _scareSerial++;
+    falseClear = false;
+    blackout = 0;
+    calm = 0;
+    calmSpan = 0;
+    aftermath = 0;
+    aftermathSpan = 0;
     audio.setStatic(0.3);
     audio.setDrone(0.25, 26);
     final rg = rpGain(s);
@@ -682,9 +1139,16 @@ class AnomalyRuntime extends ChangeNotifier {
       s.dread = 45;
       lost = false;
       s.sponsorEnd = math.max(s.sponsorEnd, 45);
+      _clearScareFx();
+      // You came back from the dead. You do not get hit in the doorway: a full
+      // recovery window, and the night's ease-in is partly re-armed.
+      aftermathSpan = scareRecovery(s);
+      aftermath = aftermathSpan;
+      nightAnoms = 1;
       scheduleNext();
       audio.setStatic(0.03);
       audio.setDrone(0, 42);
+      audio.deadAir(false);
       s.toast('SPONSOR SECURED — BACK ON AIR', ToastKind.gold);
       notifyListeners();
     });
@@ -697,6 +1161,7 @@ class AnomalyRuntime extends ChangeNotifier {
     active = null;
     warn = 0;
     warnDef = null;
+    _clearScareFx();
     audio.setStatic(0.03);
     audio.setDrone(0, 42);
     audio.deadAir(false);
@@ -754,14 +1219,18 @@ class AnomalyRuntime extends ChangeNotifier {
     // telegraphed anomaly may still have been pending.
     warn = 0;
     warnDef = null;
-    scare = 0;
-    scareDef = null;
     shake = 0;
     flash = 0;
     glitch = 0;
+    banishFx = 0;
+    wrongFx = 0;
     keyFlashes.clear();
+    _clearScareFx();
+    // A fresh night gets the slow opening back.
+    nightAnoms = 0;
     audio.setStatic(0.03);
     audio.setDrone(0, 42);
+    audio.deadAir(false);
     scheduleNext();
     s.save();
     s.toast('SIGNED OFF — +${fmt(g)} RP — NIGHT ${s.night} BEGINS',
@@ -822,13 +1291,24 @@ class AnomalyRuntime extends ChangeNotifier {
 
     shake = math.max(0, shake - dt * 36);
     flash = math.max(0, flash - dt * 3.2);
-    banishFx = math.max(0, banishFx - dt * 2.4);
+    // The false clear holds its green wash until the beat takes it away.
+    if (!falseClear) banishFx = math.max(0, banishFx - dt * 2.4);
     wrongFx = math.max(0, wrongFx - dt * 3);
+    blackout = math.max(0, blackout - dt);
     if (scare > 0) {
       scare -= dt;
       if (scare <= 0) {
         scare = 0;
         scareDef = null;
+      }
+    } else if (afterimage > 0) {
+      // The burn only starts fading once the scare frame is off the tube.
+      afterimage = afterimageSpan <= 0 ? 0 : afterimage - dt / afterimageSpan;
+      if (afterimage <= 0) {
+        afterimage = 0;
+        afterimageSpan = 0;
+        afterimageDef = null;
+        scareBeat = null;
       }
     }
     if (keyFlashes.isNotEmpty) {
@@ -886,8 +1366,16 @@ class AnomalyRuntime extends ChangeNotifier {
     }
 
     // --- dread decay ---
-    final dec = ((s.ups['failsafe'] ?? false) ? 1.6 : 0.8) * dt;
-    if (active == null) s.dread = math.max(0, s.dread - dec);
+    // Bleeds off much faster inside a protection window. Recovering from a
+    // scare is supposed to be something you can watch happen, and the calm you
+    // bought with a clean kill should visibly pay for the last one.
+    var dec = (s.ups['failsafe'] ?? false) ? 1.6 : 0.8;
+    if (aftermath > 0) {
+      dec *= 2.6;
+    } else if (calm > 0) {
+      dec *= 1.5;
+    }
+    if (active == null) s.dread = math.max(0, s.dread - dec * dt);
 
     // --- sponsor timers ---
     if (s.sponsorEnd > 0) {
@@ -918,8 +1406,27 @@ class AnomalyRuntime extends ChangeNotifier {
       // Between anomalies the heart is only there if the night has gone badly.
       audio.setHeart(44 + s.dread * 0.36,
           s.dread > 55 ? (s.dread - 55) / 45 * 0.13 : 0);
-      nextAt -= dt;
-      if (nextAt <= 0) beginWarn();
+      // The gap timer is FROZEN inside a protection window. This is the whole
+      // promise: while ALL CLEAR (or the post-scare recovery) is up, nothing
+      // can telegraph and nothing can manifest, full stop.
+      if (aftermath > 0) {
+        aftermath -= dt;
+        if (aftermath <= 0) {
+          aftermath = 0;
+          aftermathSpan = 0;
+        }
+      } else if (calm > 0) {
+        calm -= dt;
+        if (calm <= 0) {
+          calm = 0;
+          calmSpan = 0;
+          // The lamp going out is the only warning that the gap is live again.
+          audio.env('sine', 240, 0.22, 0.045, 190);
+        }
+      } else {
+        nextAt -= dt;
+        if (nextAt <= 0) beginWarn();
+      }
     }
     if (s.dread >= 100 && active == null && !lost) signalLost();
   }

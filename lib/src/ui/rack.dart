@@ -10,6 +10,7 @@ import '../anomalies.dart';
 import '../consts.dart';
 import '../economy.dart';
 import '../state.dart';
+import 'bots_panel.dart';
 import 'ui_kit.dart';
 
 /// Asks the shell to put a confirm sheet up inside the cabinet.
@@ -127,6 +128,7 @@ class _RackState extends State<Rack> {
     const labels = <List<String>>[
       <String>['tx', 'TRANSMIT'],
       <String>['hw', 'HARDWARE'],
+      <String>['bot', 'AUTO'],
       <String>['st', 'STATION'],
     ];
     final t = Sty(s.ui);
@@ -158,14 +160,24 @@ class _RackState extends State<Rack> {
                             width: 2),
                       ),
                     ),
-                    child: Text(
-                      labels[i][1],
-                      style: t.at(
-                          13,
-                          on
-                              ? K.amber
-                              : (hover ? UX.itemHoverBorder : K.tabInk),
-                          ls: 1.5),
+                    // Four tabs share 334px, i.e. ~83px each; "TRANSMIT" in
+                    // Courier at 13*ui with ls 1.5 is already 84px at the
+                    // default ui of 1.15 and 124px at 1.8. softWrap:false stops
+                    // it breaking to two lines, and FittedBox then shrinks it
+                    // instead of overflowing.
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        labels[i][1],
+                        maxLines: 1,
+                        softWrap: false,
+                        style: t.at(
+                            13,
+                            on
+                                ? K.amber
+                                : (hover ? UX.itemHoverBorder : K.tabInk),
+                            ls: 1.5),
+                      ),
                     ),
                   );
                 },
@@ -180,6 +192,8 @@ class _RackState extends State<Rack> {
     switch (s.tab) {
       case 'hw':
         return _hardware();
+      case 'bot':
+        return botsRackRows(s, runtime);
       case 'st':
         return _station();
       default:

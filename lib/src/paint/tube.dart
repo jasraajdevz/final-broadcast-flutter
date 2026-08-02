@@ -578,5 +578,15 @@ void drawMainCRT(ui.Canvas g, GameState s, AnomalyRuntime a, ui.Image feed,
                 : const ui.Color(0xFF7A2A24),
             weight: ui.FontWeight.bold),
         anchor: TextAnchor.center);
+  } else if (a.allClear) {
+    // A green ring that drains is the clearest possible reading of "you are safe,
+    // and this is exactly how long for".
+    g.drawRect(ui.Rect.fromLTWH(cx, cy - 42, cw, 26), fill(rgba(0, 0, 0, .6)));
+    fillText(
+        g,
+        'ALL CLEAR   ${a.calmSeconds}s',
+        ui.Offset(cx + cw / 2, cy - 24),
+        mono(14, K.green, weight: ui.FontWeight.bold),
+        anchor: TextAnchor.center);
   }
 }

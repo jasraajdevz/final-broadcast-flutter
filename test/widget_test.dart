@@ -17,6 +17,7 @@
 import 'package:final_broadcast/main.dart';
 import 'package:final_broadcast/src/anomalies.dart';
 import 'package:final_broadcast/src/state.dart';
+import 'package:final_broadcast/src/tools.dart';
 import 'package:final_broadcast/src/ui/ad_break.dart';
 import 'package:final_broadcast/src/ui/boot_screen.dart';
 import 'package:final_broadcast/src/ui/deck.dart';
@@ -126,7 +127,7 @@ void main() {
       });
 
       testWidgets('deck', (WidgetTester tester) async {
-        await stage(tester, Deck(s: s, runtime: runtime, onManual: () {}),
+        await stage(tester, Deck(s: s, runtime: runtime, tools: Tools(runtime), onManual: () {}),
             width: 940, height: 120);
         expect(find.text('OFF-HOOK'), findsOneWidget);
         expect(find.text('SPONSOR'), findsOneWidget);
