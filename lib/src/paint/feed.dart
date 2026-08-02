@@ -252,6 +252,16 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     }
   } else {
     drawFeedNormal(f, s, a, t);
+    // AFTERIMAGE beat — the thing is gone and its face is still burned into
+    // the phosphor. Drawn over the restored picture, decaying with a.burn.
+    final Anom? ghost = a.afterimageDef;
+    final double burn = a.burn;
+    if (ghost != null && burn > 0.004) {
+      f.saveLayer(const ui.Rect.fromLTWH(0, 0, 320, 240),
+          ui.Paint()..color = rgba(255, 255, 255, burn * 0.42));
+      drawAnom(f, ghost, t, 1);
+      f.restore();
+    }
     if (a.warn > 0) {
       final n = noiseTile(t, 30);
       if (n != null) {

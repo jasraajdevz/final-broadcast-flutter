@@ -48,12 +48,12 @@ class Deck extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 4, 10, 4),
+      padding: const EdgeInsets.fromLTRB(10, 2, 10, 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           SizedBox(height: kToolsBarH, child: ToolsBar(s: s, tools: tools)),
-          const SizedBox(height: 5),
+          const SizedBox(height: 3),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,

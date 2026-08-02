@@ -204,9 +204,16 @@ class Tools {
     for (final d in kTools) {
       _charge[d.id] = 0;
     }
-    // Enough to see them work once, not enough to lean on.
-    _charge['flare'] = 1;
-    _charge['splice'] = 1;
+    final saved = runtime.s.toolCharges;
+    if (saved.isEmpty) {
+      // Enough to see them work once, not enough to lean on.
+      _charge['flare'] = 1;
+      _charge['splice'] = 1;
+    } else {
+      for (final d in kTools) {
+        _charge[d.id] = (saved[d.id] ?? 0).clamp(0, d.cap);
+      }
+    }
     _lastPerfect = runtime.s.stats.perfect;
     _night = runtime.s.night;
   }
@@ -230,6 +237,16 @@ class Tools {
   // --- read-out for the bar ---------------------------------------------
 
   int chargesOf(String id) => _charge[id] ?? 0;
+
+  /// Mirror the charge map into the save blob. Called on every mutation — the
+  /// autosave is 12s away and a charge bought at second 3 must survive a reload
+  /// at second 5.
+  void _persist() {
+    s.toolCharges
+      ..clear()
+      ..addAll(Map<String, int>.fromEntries(
+          _charge.entries.where((e) => e.value > 0)));
+  }
 
   /// 0..1 press flash, for the chip highlight.
   double flashOf(String id) => _flash[id] ?? 0;
@@ -303,6 +320,7 @@ class Tools {
     }
     s.sig -= p;
     _charge[d.id] = chargesOf(d.id) + 1;
+    _persist();
     _flash[d.id] = 1;
     runtime.audio.buy();
     s.toast('${d.nm} CHARGE LOADED — -${fmt(p)} SIG');
@@ -330,6 +348,7 @@ class Tools {
     }
 
     _charge[d.id] = chargesOf(d.id) - 1;
+    _persist();
     _flash[d.id] = 1;
     _lock = kToolLock;
 
@@ -400,7 +419,16 @@ class Tools {
     runtime.audio.env('square', 520, 0.10, 0.12, 780);
     runtime.audio.env('square', 780, 0.10, 0.10, 1040);
     if (c != null) {
-      s.toast('SPLICE — ${a.def.nm} DIES TO ${c.nm}  (KEY ${c.key})',
+      // It NARROWS, it does not name. SECOND CAMERA costs 2.2e10 and its whole
+      // payload is naming the key outright; a 15-second consumable must not
+      // deliver that from night one. Two candidates, one of them right.
+      final others = kCounters.where((x) => x.id != c.id).toList();
+      final decoy = others[(rand() * others.length).floor()];
+      final pair = rand() < 0.5
+          ? <Counter>[c, decoy]
+          : <Counter>[decoy, c];
+      s.toast(
+          'SPLICE — ${a.def.nm} DIES TO ${pair[0].nm} OR ${pair[1].nm}',
           ToastKind.gold);
     }
   }
@@ -553,6 +581,7 @@ class Tools {
     }
     if (best == null) return;
     _charge[best.id] = chargesOf(best.id) + 1;
+    _persist();
     _flash[best.id] = 1;
     s.toast('$why — ${best.nm} RECHARGED', ToastKind.good);
   }

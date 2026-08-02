@@ -30,7 +30,7 @@ import '../tools.dart';
 import 'ui_kit.dart';
 
 /// Height of the rail. The deck reserves exactly this.
-const double kToolsBarH = 24;
+const double kToolsBarH = 28;
 
 const double _kChipGap = 5;
 const double _kCapW = 16;
@@ -188,7 +188,7 @@ class _Chip extends StatelessWidget {
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.ellipsis,
-                  style: t.at(9.5, labelInk, ls: 1),
+                  style: t.at(11.5, labelInk, ls: 1),
                 ),
               ),
               const SizedBox(width: 3),
@@ -199,7 +199,7 @@ class _Chip extends StatelessWidget {
                   fmt(price),
                   maxLines: 1,
                   softWrap: false,
-                  style: t.at(9, afford ? K.amber : K.lostDim, ls: 0.5),
+                  style: t.at(10.5, afford ? K.amber : K.lostDim, ls: 0.5),
                 ),
               const SizedBox(width: 3),
               _buy(t, full, afford),
@@ -221,7 +221,7 @@ class _Chip extends StatelessWidget {
           def.keyCap,
           maxLines: 1,
           softWrap: false,
-          style: t.at(9, lit ? K.amber : K.keySub, ls: 0),
+          style: t.at(11, lit ? K.amber : K.keySub, ls: 0),
         ),
       );
 

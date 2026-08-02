@@ -258,6 +258,7 @@ class BotRuntime extends ChangeNotifier {
   // --- KEYING ARM ---
   double _armAcc = 0;
   double _armPaid = 0;
+  int _armBeat = 0;
   int _armSkipped = 0;
 
   // --- THE WATCHER ---
@@ -475,14 +476,20 @@ class BotRuntime extends ChangeNotifier {
       _armPaid += g;
       // It is visibly hitting the tube — but only while YOUR hand is off it,
       // so the arm can never pin the phosphor heat or drown your own feedback.
-      if (s.tune.heat < 0.55) {
+      // Presentation is DECIMATED and silenced inside a protection window. At
+      // L5 this fires 2/s forever; a click track running under the ALL CLEAR
+      // silences is the opposite of what the pacing pass built. One visible
+      // pop in four, and never while the room is supposed to be quiet.
+      _armBeat++;
+      final quiet = runtime.allClear || runtime.aftermath > 0;
+      if (!quiet && s.tune.heat < 0.55 && _armBeat % 4 == 0) {
         s.tune.strike(
           rr(kScr.left + 46, kScr.left + 150),
           rr(kScr.bottom - 96, kScr.bottom - 34),
           '+${fmt(g)}',
           runtime.tGlobal,
         );
-        runtime.audio.tune(s.tune.heat);
+        runtime.audio.tune(s.tune.heat * 0.5);
       }
     }
   }

@@ -89,6 +89,12 @@ class Booth {
       fillRect(g, 0, 0, kRoom.width, kRoom.height,
           rgba(120, 0, 0, (s.dread - 25) / 75 * 0.16));
     }
+    // BLACKOUT beat — the room's lights go. Drawn before the flash so a scare
+    // that blacks out and then hits still reads as two separate events.
+    final double dark = runtime.blackoutAlpha;
+    if (dark > 0.001) {
+      fillRect(g, 0, 0, kRoom.width, kRoom.height, rgba(0, 0, 0, dark * 0.92));
+    }
     if (runtime.flash > 0 && s.flash) {
       fillRect(g, 0, 0, kRoom.width, kRoom.height,
           rgba(255, 240, 240, runtime.flash * 0.5));

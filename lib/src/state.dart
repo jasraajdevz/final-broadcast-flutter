@@ -213,6 +213,11 @@ class GameState extends ChangeNotifier {
   /// Output broadcast during the CURRENT run-down segment. Quotas are met by
   /// TRANSMITTING, not by holding a balance, so spending never un-meets one.
   double segSig = 0;
+
+  /// Tool charges, by ToolDef.id. Owned by Tools, persisted here — buying a
+  /// charge spends SIGNAL, and a purchase that evaporates on reload is a bug
+  /// the player experiences as theft.
+  final Map<String, int> toolCharges = <String, int>{};
   int rp = 0;
   double lifetimeSig = 0;
 
@@ -331,6 +336,7 @@ class GameState extends ChangeNotifier {
       'started': started,
       'tab': tab,
       'manPage': manPage,
+      'toolCharges': toolCharges,
       'dawnBonus': dawnBonus,
     };
   }
@@ -383,6 +389,14 @@ class GameState extends ChangeNotifier {
     started = _bool(o['started'], started);
     tab = _str(o['tab'], tab);
     manPage = _str(o['manPage'], manPage);
+    final tc = o['toolCharges'];
+    if (tc is Map) {
+      toolCharges.clear();
+      tc.forEach((k, v) {
+        final n = v is num ? v.toInt() : 0;
+        if (n > 0) toolCharges['$k'] = n;
+      });
+    }
   }
 
   /// JS save(): stamps lastSave and writes the blob. Never throws.
