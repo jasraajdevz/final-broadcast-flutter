@@ -38,6 +38,7 @@ import 'package:flutter/foundation.dart';
 
 import 'consts.dart';
 import 'economy.dart';
+import 'meta.dart';
 import 'encounter.dart';
 import 'state.dart';
 
@@ -799,7 +800,7 @@ class AnomalyRuntime extends ChangeNotifier {
       calm = seconds;
       calmSpan = seconds;
     }
-    final g = calmGuardOf(calm);
+    final g = calmGuardOf(calm) + metaCalmBonus(s); // STEADY HAND, permanent
     if (g > calmGuard) {
       calmGuard = g;
       calmGuardSpan = g;
@@ -1693,7 +1694,10 @@ class AnomalyRuntime extends ChangeNotifier {
     final double dt = rawDt > 0.1 ? 0.1 : (rawDt < 0 ? 0.0 : rawDt);
     tGlobal += dt;
 
-    if (signedOn && !adPlaying && !lost) {
+    // `paused` is the manual. The game's ONE instruction is "Press M", the
+    // manual page for an entity is a ~29s read, and a first-sighting window is
+    // 9.4s — so following the instruction used to guarantee the jumpscare.
+    if (signedOn && !adPlaying && !lost && !paused) {
       _simulate(dt);
     }
 

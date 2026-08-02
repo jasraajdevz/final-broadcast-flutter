@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../anomalies.dart';
 import '../consts.dart';
 import '../economy.dart';
+import '../meta.dart';
 import '../state.dart';
 import 'bots_panel.dart';
 import 'ui_kit.dart';
@@ -311,6 +312,38 @@ class _RackState extends State<Rack> {
     final note = t.at(13, K.noteInk, h: 1.5);
     final b = note.copyWith(fontWeight: FontWeight.bold);
 
+    // THE STATION BOARD — the sink RATINGS POINTS never had. It goes ABOVE
+    // sign-off deliberately: the player should see what the points buy before
+    // being asked whether to earn more.
+    final board = <Widget>[
+      RackHead('STATION — ${fmt(s.rp)} RP ON THE BOOKS', ui: s.ui),
+      for (final n in kStationNodes)
+        Builder(builder: (_) {
+          final lvl = metaLevel(s, n.id);
+          final cost = metaCost(s, n.id);
+          final maxed = cost == null;
+          return _Item(
+            ui: s.ui,
+            name: n.maxLvl > 1 ? '${n.nm}  ${'I' * lvl}' : n.nm,
+            cost: maxed ? 'HELD' : '$cost RP',
+            afford: !maxed && s.rp >= cost,
+            desc: n.ds,
+            owned: maxed,
+            qty: n.maxLvl > 1 ? '$lvl/${n.maxLvl}' : null,
+            onTap: maxed || s.rp < cost
+                ? null
+                : () {
+                    if (buyMeta(s, n.id)) {
+                      runtime.audio.buy();
+                      s.toast('${n.nm} — SIGNED OFF ON', ToastKind.gold);
+                      s.save();
+                      s.bump();
+                    }
+                  },
+          );
+        }),
+    ];
+
     return <Widget>[
       RackHead('SIGN-OFF', ui: s.ui),
       Padding(
@@ -343,6 +376,8 @@ class _RackState extends State<Rack> {
           runtime.signOff,
         ),
       ),
+      ...board,
+
       RackHead('LOGBOOK', ui: s.ui),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),

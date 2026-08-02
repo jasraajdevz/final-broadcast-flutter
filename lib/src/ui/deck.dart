@@ -45,6 +45,17 @@ class Deck extends StatelessWidget {
     return known.isEmpty ? 'KEY ${c.key}' : known.join(' / ');
   }
 
+  /// Everything this key is known to kill, or the empty string. Unlike
+  /// [subLabel] this never falls back to the digit — the digit is now printed
+  /// separately and unconditionally, so it can never be traded away.
+  static String killList(GameState s, Counter c) {
+    final known = kAnoms
+        .where((a) => a.counter == c.id && (s.seen[a.id] ?? false))
+        .map((a) => a.nm.replaceFirst(_article, ''))
+        .toList();
+    return known.join(' / ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -166,7 +177,22 @@ class Deck extends StatelessWidget {
             ),
             // The CSS let an oversized label spill out of the keycap; scaling
             // it down instead keeps the deck readable at TEXT SIZE 180%.
-            child: FittedBox(
+            // The digit sits in a Stack OVER the cap so it is present whether
+            // or not the entity name has taken the sub-line.
+            child: Stack(
+              children: <Widget>[
+                Positioned(
+                  left: 3,
+                  top: 1,
+                  child: Text(
+                    c.key,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: t.at(12, bad ? K.keyBadInk : K.keySub, ls: 0),
+                  ),
+                ),
+                Positioned.fill(
+                  child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -190,6 +216,9 @@ class Deck extends StatelessWidget {
                   ),
                 ],
               ),
+                ),
+                ),
+              ],
             ),
           ),
         );

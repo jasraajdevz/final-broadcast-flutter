@@ -20,6 +20,7 @@ import 'dart:math' as math;
 import 'anomalies.dart';
 import 'consts.dart';
 import 'encounter.dart';
+import 'meta.dart';
 import 'state.dart';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +135,7 @@ double sigMult(GameState s) {
   // read the flag, so the one upgrade that exists to dig you out of a held
   // clock did nothing at all.
   if ((s.ups['halide'] ?? false) && !quotaMet(s)) m *= 1.6;
+  m *= metaOutputMult(s); // NIGHT SHIFT PAY, permanent
   return m;
 }
 
@@ -306,6 +308,7 @@ double banishWindow(GameState s) {
   var w = 7.5 - math.min(1.5, d * 0.02);
   w *= 1 - kWindowNightSqueeze * nightPressure(s);
   if (s.ups['ferrite'] ?? false) w += 1.2;
+  w += metaWindowBonus(s); // FERRITE STOCK, permanent
   return math.max(kWindowFloor, w);
 }
 

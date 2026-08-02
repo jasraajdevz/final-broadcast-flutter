@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import 'consts.dart';
+import 'meta.dart';
 // Web-only local storage is quarantined behind this conditional import.
 import 'storage_stub.dart' if (dart.library.js_interop) 'storage_web.dart';
 
@@ -218,6 +219,10 @@ class GameState extends ChangeNotifier {
   /// charge spends SIGNAL, and a purchase that evaporates on reload is a bug
   /// the player experiences as theft.
   final Map<String, int> toolCharges = <String, int>{};
+
+  /// Permanent station upgrades bought with RATINGS POINTS, by node id.
+  /// Survives sign-off — that is the entire point of it.
+  final Map<String, int> meta = <String, int>{};
   int rp = 0;
   double lifetimeSig = 0;
 
@@ -286,8 +291,12 @@ class GameState extends ChangeNotifier {
     sig = 0;
     segSig = 0;
     lifetimeSig = 0;
-    for (final p in kProducers) {
-      prod[p.id] = 0;
+    // STANDING ORDER: the cheapest N tiers survive sign-off, so prestige buys
+    // a floor to start from rather than a slightly larger multiplier on zero.
+    final kept = keptTiers(this);
+    for (var i = 0; i < kProducers.length; i++) {
+      if (i < kept) continue;
+      prod[kProducers[i].id] = 0;
     }
     dread = 0;
     airtime = 0;
@@ -337,6 +346,7 @@ class GameState extends ChangeNotifier {
       'tab': tab,
       'manPage': manPage,
       'toolCharges': toolCharges,
+      'meta': meta,
       'dawnBonus': dawnBonus,
     };
   }
@@ -389,6 +399,14 @@ class GameState extends ChangeNotifier {
     started = _bool(o['started'], started);
     tab = _str(o['tab'], tab);
     manPage = _str(o['manPage'], manPage);
+    final mt = o['meta'];
+    if (mt is Map) {
+      meta.clear();
+      mt.forEach((k, v) {
+        final n = v is num ? v.toInt() : 0;
+        if (n > 0) meta['$k'] = n;
+      });
+    }
     final tc = o['toolCharges'];
     if (tc is Map) {
       toolCharges.clear();

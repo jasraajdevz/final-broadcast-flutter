@@ -64,6 +64,7 @@ import 'dart:math' as math;
 import 'anomalies.dart';
 import 'consts.dart';
 import 'economy.dart';
+import 'meta.dart';
 import 'state.dart';
 
 // ---------------------------------------------------------------------------
@@ -246,7 +247,8 @@ class Tools {
       _charge['flare'] = 2;
     } else {
       for (final d in kTools) {
-        _charge[d.id] = (saved[d.id] ?? 0).clamp(0, d.cap);
+        _charge[d.id] = (saved[d.id] ?? 0)
+            .clamp(0, d.cap + metaToolCapBonus(runtime.s));
       }
     }
     _lastPerfect = runtime.s.stats.perfect;

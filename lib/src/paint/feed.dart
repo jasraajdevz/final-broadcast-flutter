@@ -191,6 +191,30 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
 
   final act = a.active;
   final scareDef = a.scareDef;
+  final ui.Image? dyingNoise = noiseTile(t, 40);
+  final ActiveAnom? corpse = a.dying;
+  if (corpse != null && act == null) {
+    // PAINT THE KILL. The runtime leaves a body for 0.35s; without this the
+    // thing you beat is deleted between two frames and being RIGHT looks like
+    // nothing happened. Done in the compositor with a scale + additive blow-out
+    // so none of the eight entity painters need to know about it.
+    final k = a.dyingP;
+    final e = k * k;
+    f.save();
+    f.translate(_fw / 2, _fh / 2);
+    f.scale(1 + e * 0.28, 1 + e * 0.28);
+    f.translate(-_fw / 2, -_fh / 2);
+    f.saveLayer(_feedRect, ui.Paint()..color = rgba(255, 255, 255, 1 - e));
+    drawAnom(f, corpse.def, t, 1);
+    f.restore();
+    f.restore();
+    // it goes to grain and light on the way out
+    if (dyingNoise != null) {
+      drawImageStretch(f, dyingNoise, _feedRect, nearestPaint(alpha: 0.25 + e * 0.5));
+    }
+    fillRect(f, 0, 0, _fw, _fh, rgba(190, 255, 215, (1 - e) * 0.34),
+        mode: ui.BlendMode.plus);
+  }
   if (act != null) {
     final prog = act.t / act.window;
     drawAnom(f, act.def, t, prog);

@@ -261,8 +261,19 @@ class _GameRootState extends State<GameRoot>
       }
       return KeyEventResult.handled;
     }
-    // #boot covers the screen but does not block keys; without this, 1-8 and M
-    // would start the audio graph before SIGN ON.
+    // M must work BEFORE sign-on: the boot screen literally says "Press M any
+    // time" and the bail below used to swallow it on exactly that screen.
+    final chEarly = e.character?.toLowerCase();
+    if (chEarly == 'm') {
+      if (_manualOpen) {
+        _closeManual();
+      } else {
+        _openManual();
+      }
+      return KeyEventResult.handled;
+    }
+    // Everything else still waits for SIGN ON — otherwise 1-8 would start the
+    // audio graph before the player has asked for any.
     if (!runtime.signedOn) return KeyEventResult.ignored;
 
     if (key == LogicalKeyboardKey.escape) {
@@ -314,10 +325,16 @@ class _GameRootState extends State<GameRoot>
     // if something is on the screen right now, that is the page you want
     final a = runtime.active;
     if (a != null && !(a.masked && a.stage == 0)) s.manPage = a.def.id;
-    setState(() => _manualOpen = true);
+    setState(() {
+      _manualOpen = true;
+      runtime.paused = true;
+    });
   }
 
-  void _closeManual() => setState(() => _manualOpen = false);
+  void _closeManual() => setState(() {
+        _manualOpen = false;
+        runtime.paused = false;
+      });
 
   void _signOn() {
     runtime.startBroadcast();

@@ -89,6 +89,22 @@ class Booth {
       fillRect(g, 0, 0, kRoom.width, kRoom.height,
           rgba(120, 0, 0, (s.dread - 25) / 75 * 0.16));
     }
+    // PAINT THE FUMBLE. wrongFx was set, reset and decayed entirely inside
+    // anomalies.dart and read by NOTHING in paint/ or ui/ — a wrong key was
+    // literally invisible. A hard red wash plus a bezel-height bloom makes it
+    // the loudest thing in the room for a third of a second.
+    if (runtime.wrongFx > 0.004) {
+      final w = runtime.wrongFx;
+      fillRect(g, 0, 0, kRoom.width, kRoom.height, rgba(255, 40, 30, w * 0.20));
+      final ui.Paint wp = ui.Paint()
+        ..blendMode = ui.BlendMode.plus
+        ..shader = ui.Gradient.radial(
+          ui.Offset(kScr.center.dx, kScr.center.dy),
+          kScr.width * 0.9,
+          <ui.Color>[rgba(255, 60, 45, w * 0.30), rgba(255, 60, 45, 0)],
+        );
+      g.drawRect(kRoom, wp);
+    }
     // BLACKOUT beat — the room's lights go. Drawn before the flash so a scare
     // that blacks out and then hits still reads as two separate events.
     final double dark = runtime.blackoutAlpha;
