@@ -191,7 +191,14 @@ void main() {
         runtime.signalLost();
         await stage(tester, EndSheet(s: s, runtime: runtime),
             width: 1280, height: 720);
-        expect(find.text('## SIGNAL LOST'), findsOneWidget);
+        expect(find.text('## THE CARRIER DROPPED'), findsOneWidget);
+        // The failure has to state a CONSEQUENCE, not a score. The sheet's
+        // paragraphs are RichText spans, not Text widgets, so the finder has
+        // to be told to look inside them.
+        expect(
+            find.textContaining('NOT IN THE SIGNAL ANY MORE',
+                findRichText: true),
+            findsOneWidget);
         expect(find.textContaining('EMERGENCY SPONSOR'), findsOneWidget);
       });
 

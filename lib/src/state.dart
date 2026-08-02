@@ -303,6 +303,10 @@ class GameState extends ChangeNotifier {
   /// Has the operator been through the line-up card? Asked ONCE, then never
   /// again — a wall between a player and the game is worse than a bad mix.
   bool hardwareChecked = false;
+
+  /// Which of the previous operator's log pages have been found. Keyed by the
+  /// night that hands them over, so it survives a save that predates the log.
+  final Map<int, bool> log = <int, bool>{};
   int rp = 0;
   double lifetimeSig = 0;
 
@@ -428,6 +432,7 @@ class GameState extends ChangeNotifier {
       'toolCharges': toolCharges,
       'meta': meta,
       'hardwareChecked': hardwareChecked,
+      'log': log.map((k, v) => MapEntry(k.toString(), v)),
       'dawnBonus': dawnBonus,
     };
   }
@@ -481,6 +486,14 @@ class GameState extends ChangeNotifier {
     tab = _str(o['tab'], tab);
     manPage = _str(o['manPage'], manPage);
     hardwareChecked = _bool(o['hardwareChecked'], hardwareChecked);
+    final lg = o['log'];
+    if (lg is Map) {
+      log.clear();
+      lg.forEach((k, v) {
+        final n = int.tryParse('$k');
+        if (n != null && v == true) log[n] = true;
+      });
+    }
     final mt = o['meta'];
     if (mt is Map) {
       meta.clear();

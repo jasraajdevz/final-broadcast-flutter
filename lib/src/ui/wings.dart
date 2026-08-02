@@ -23,6 +23,7 @@ import '../consts.dart';
 import '../economy.dart';
 import '../nights.dart';
 import '../objective.dart';
+import '../story.dart';
 import '../state.dart';
 import 'ui_kit.dart';
 
@@ -192,6 +193,10 @@ class OrderWing extends StatelessWidget {
         const SizedBox(height: 8),
 
         // HOW YOU LOSE — stated, permanently, in the same words every night.
+        Text('WHAT YOU ARE HOLDING', style: t.at(9, K.lbl, ls: 2.5)),
+        const SizedBox(height: 3),
+        Text(kPremise, style: t.at(9.5, K.amberDim, h: 1.5)),
+        const SizedBox(height: 8),
         Text('HOW THE NIGHT ENDS', style: t.at(9, K.lbl, ls: 2.5)),
         const SizedBox(height: 4),
         for (final l in kLossConditions)

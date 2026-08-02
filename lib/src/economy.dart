@@ -352,7 +352,23 @@ const double kCalmClean = 9;
 const double kCalmStreakStep = 1.7;
 
 /// Cap on the streak component, so calm never swallows the night whole.
-const double kCalmStreakCap = 10;
+const double kCalmStreakCap = 6;
+
+/// The largest share of the CURRENT mean gap that an ALL CLEAR window may
+/// occupy.
+///
+/// calm blocks a manifest but deliberately does NOT pause the countdown, so
+/// the spacing between intrusions is max(gap, calm) — not gap + calm. With
+/// calm paying up to 24s against a mean rolled gap of 13-18s, calm won 78-83%
+/// of intervals, which meant the GAP dial was simply overwritten: STORM FRONT
+/// (x0.75) and OPEN LINE (x0.70) advertised a busier night and delivered one
+/// within 2-7% of a card with no gap dial at all, and the depth ramp was half
+/// swallowed. Measured across 8 nights, the tube had something on it for 2.3%
+/// to 4.1% of a night.
+///
+/// Holding calm under the gap hands the tempo back to the scheduler while
+/// keeping the promise that a correct answer buys real, guaranteed quiet.
+const double kCalmGapShare = 0.62;
 
 /// Fraction of a calm window that is an ABSOLUTE guarantee.
 const double kCalmGuardFrac = 0.62;
@@ -376,12 +392,19 @@ double calmWindow(
   GameState s, {
   required double cleanliness,
   required int streak,
+  double? meanGap,
   int fumbles = 0,
 }) {
   var w = kCalmBase + kCalmClean * clampD(cleanliness, 0, 1);
   w += math.min(kCalmStreakCap, math.max(0, streak - 1) * kCalmStreakStep);
   if (fumbles > 0) w *= math.max(0.55, 1 - fumbles * 0.18);
   if (s.ups['failsafe'] ?? false) w += 2;
+  // Never longer than a share of the gap it has to fit inside. See
+  // [kCalmGapShare] — without this the reward for a clean kill silently
+  // becomes the game's tempo control, and every night runs at one speed.
+  if (meanGap != null && meanGap > 0) {
+    w = math.min(w, meanGap * kCalmGapShare);
+  }
   return w;
 }
 

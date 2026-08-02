@@ -193,11 +193,22 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
   final scareDef = a.scareDef;
   final ui.Image? dyingNoise = noiseTile(t, 40);
   final ActiveAnom? corpse = a.dying;
-  if (corpse != null && act == null) {
-    // PAINT THE KILL. The runtime leaves a body for 0.35s; without this the
-    // thing you beat is deleted between two frames and being RIGHT looks like
-    // nothing happened. Done in the compositor with a scale + additive blow-out
-    // so none of the eight entity painters need to know about it.
+  // PAINT THE KILL. The runtime leaves a body for 0.35s; without this the
+  // thing you beat is deleted between two frames and being RIGHT looks like
+  // nothing happened. Done in the compositor with a scale + additive blow-out
+  // so none of the eight entity painters need to know about it.
+  //
+  // This used to run HERE, above the act/lost/normal branch — and `act` is
+  // always null while a corpse exists, so the final `else` always ran, and
+  // drawFeedNormal's first operation is an opaque fillRect over the whole
+  // 320x240 feed. The body was painted and erased inside the same frame:
+  // baking the feed with and without a corpse produced 0 of 307200 bytes
+  // differing, at every phase of the animation. Nobody has ever seen it.
+  //
+  // It is now a closure, called from inside the else AFTER the picture is
+  // restored, so it composites over the feed instead of under it.
+  void paintCorpse() {
+    if (corpse == null) return;
     final k = a.dyingP;
     final e = k * k;
     f.save();
@@ -276,6 +287,8 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     }
   } else {
     drawFeedNormal(f, s, a, t);
+    // the body, over the restored picture rather than under an opaque fill
+    if (act == null) paintCorpse();
     // AFTERIMAGE beat — the thing is gone and its face is still burned into
     // the phosphor. Drawn over the restored picture, decaying with a.burn.
     final Anom? ghost = a.afterimageDef;

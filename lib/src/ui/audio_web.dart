@@ -69,6 +69,10 @@ extension type _Biquad._(JSObject _) implements _Node {
   external _Param get frequency;
   @JS('Q')
   external _Param get q;
+
+  /// Only meaningful on the shelf and peaking types — the proximity shelf in
+  /// [WebAudio.breath] is what makes a close breath sound close.
+  external _Param get gain;
 }
 
 extension type _Shaper._(JSObject _) implements _Node {
@@ -177,6 +181,19 @@ class WebAudio implements GameAudio {
   /// Which of the eight desk relays closes next. See [relay].
   int _relayN = 0;
 
+  // --- the horror layer ---
+  _Gain? _subG;
+  _Osc? _subOsc;
+  _Osc? _subOsc2;
+  double _sub = 0, _subT = 0;
+  Timer? _holdTimer;
+  bool _holding = false;
+
+  /// Seconds until the room tone next STOPS on its own. Silence that arrives
+  /// without a cause is the cheapest dread in the game and the bed never once
+  /// used it — the room hummed at a constant 0.85 from 23:00 to 06:00.
+  double _stop = 26;
+
   // -------------------------------------------------------------------------
   // init / lifecycle
   // -------------------------------------------------------------------------
@@ -209,6 +226,52 @@ class WebAudio implements GameAudio {
     master.connect(panner);
     panner.connect(lim);
     lim.connect(c.destination);
+
+    // --- THE SUB BED ---------------------------------------------------
+    //
+    // Nothing in the old mix went below ~90Hz with any energy, so the room
+    // had no weight: every scare was bright and thin, which the ear reads as
+    // "harsh", not as "wrong". Two detuned oscillators at 24 and 31Hz beat
+    // against each other at 7Hz — below pitch, below rhythm, right in the
+    // band that reads as physical unease. It measures as almost nothing and
+    // it is the reason the room feels like it has a floor under it.
+    //
+    // Routed AROUND the main limiter, on its own path to the destination.
+    //
+    // Measured: with the sub feeding `master` like everything else, a 24Hz bed
+    // at -27dBFS came out of the tap at -62 — ten dB UNDER the mid-band room
+    // tone it was supposed to sit beneath. The station bed keeps that limiter
+    // in constant gain reduction, and a compressor cannot tell the difference
+    // between a hi-hat and the floor of the world; it just pulls everything
+    // down together. Which is exactly the thing that makes a mix feel thin.
+    //
+    // So the floor gets its own path and its own gentle ceiling. It is the one
+    // element in this game that must not be allowed to duck.
+    final subLim = c.createDynamicsCompressor();
+    subLim.threshold.setValueAtTime(-2, t);
+    subLim.knee.setValueAtTime(2, t);
+    subLim.ratio.setValueAtTime(20, t);
+    subLim.connect(c.destination);
+
+    final subG = c.createGain();
+    subG.gain.value = 0;
+    subG.connect(subLim);
+    _subG = subG;
+    for (var i = 0; i < 2; i++) {
+      final o = c.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(i == 0 ? 24.0 : 31.0, t);
+      final g = c.createGain();
+      g.gain.value = i == 0 ? 1.0 : 0.72;
+      o.connect(g);
+      g.connect(subG);
+      o.start(t);
+      if (i == 0) {
+        _subOsc = o;
+      } else {
+        _subOsc2 = o;
+      }
+    }
 
     // looping noise bed. The one-pole coefficient 0.05 puts its corner at
     // ~342Hz, above the 220Hz highpass right after it.
@@ -572,18 +635,57 @@ class WebAudio implements GameAudio {
       _hbPh = 0.9;
     }
 
+    // the infrasonic floor. Follows dread but never all the way to zero —
+    // this room has a bottom to it even at 23:00, which is why 23:00 does not
+    // feel safe.
+    _sub += (_subT - _sub) * math.min(1.0, dt * 0.7);
+    if (_pa == 0) {
+      // Levels are what the tap measured back, not what looked reasonable in
+      // source: the old 0.06/0.62 pair landed the whole bed around -62dBFS.
+      _subG?.gain.setTargetAtTime(
+          _holding ? 0.0 : (0.16 + _sub * 0.85) * _vol, t, 0.5);
+      // the beat frequency tightens as dread climbs: 7Hz at rest, ~11Hz at
+      // the top, which crosses from "unease" into "wrong"
+      _subOsc?.frequency.setTargetAtTime(24 - _sub * 2.5, t, 1.2);
+      _subOsc2?.frequency.setTargetAtTime(31 + _sub * 3.0, t, 1.2);
+    }
+
     _ev -= dt;
     if (_ev <= 0) {
       _ev = rr(13 - d * 7, 26 - d * 14);
       final r = rand();
-      if (r < 0.30 + d * 0.28) {
+      // The old table was four ambient sounds in a room. Half of it is now
+      // BODIES: something breathing on one side of you, something almost
+      // saying a word. Both scale toward you as dread climbs.
+      if (r < 0.20 + d * 0.22) {
+        breath(rand() < 0.5 ? -1 : 1, 0.15 + d * 0.7);
+      } else if (r < 0.34 + d * 0.26) {
+        voice(0.1 + d * 0.7, rr(-1, 1));
+      } else if (r < 0.55) {
         whisper();
-      } else if (r < 0.62) {
+      } else if (r < 0.72) {
         creak();
-      } else if (r < 0.84) {
+      } else if (r < 0.88) {
         pipe();
       } else {
         farThud();
+      }
+    }
+
+    // THE ROOM STOPS. Once every 40-90s the bed simply ceases for a beat,
+    // with no cause and no consequence. A room that hums at a constant level
+    // from 23:00 to 06:00 is a room you stop hearing; a room that stops is a
+    // room you start listening to. Never during a scare or a Dead Air.
+    _stop -= dt;
+    if (_stop <= 0) {
+      _stop = rr(40 - d * 16, 92 - d * 34);
+      if (!_dead && !_holding) {
+        hold((240 + rand() * 420).round());
+        // and sometimes something is in the hole
+        if (rand() < 0.22 + d * 0.35) {
+          _later(120 + (rand() * 180).round(),
+              () => breath(rand() < 0.5 ? -1 : 1, 0.55 + d * 0.4));
+        }
       }
     }
   }
@@ -1737,15 +1839,313 @@ class WebAudio implements GameAudio {
   }
 
   @override
+  /// THE SCARE.
+  ///
+  /// The old one was 120ms of duck and then harsh noise — loud, bright, over
+  /// in a second, and the room came straight back exactly as it was. Loudness
+  /// is not fear. This is a five-beat sequence:
+  ///
+  ///   1. the room dies completely. 340ms of nothing.
+  ///   2. a sub drop you feel before you hear.
+  ///   3. the voice, RIGHT at the ear, both sides at once.
+  ///   4. the harsh layer, on top, not instead.
+  ///   5. the room comes back — and for two seconds afterwards it is wrong:
+  ///      the sub is still up, and something is breathing.
+  ///
+  /// Beat 1 is the one that does the work. Everything else is the payoff for
+  /// having taken the world away first.
+  @override
   void scare() {
-    if (!_on) return;
-    duck(0.1, 120); // yank the room away, then hit
-    scream(1.2, 330, 1); // the scream itself
-    _later(90, () => scream(0.8, 480, 0.55)); // a second voice, behind it
-    burst(0.9, 0.55, 4200, 90);
-    env('sawtooth', 720, 1.1, 0.30, 55, 3);
-    env('square', 311, 0.7, 0.15, 44);
-    _later(160, () => burst(0.5, 0.24, 1800, 120));
+    final c = _c;
+    if (!_on || c == null) return;
+
+    // 1. the hole
+    hold(340);
+
+    // 2. the drop — starts inside the silence, so the first thing back is
+    //    something you feel in the chest rather than hear
+    _later(300, () {
+      final cc = _c, mm = _master;
+      if (cc == null || mm == null) return;
+      final tt = cc.currentTime;
+      final o = cc.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(120, tt);
+      o.frequency.exponentialRampToValueAtTime(17, tt + 0.85);
+      final g = cc.createGain();
+      g.gain.setValueAtTime(0.0001, tt);
+      g.gain.exponentialRampToValueAtTime(0.85, tt + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, tt + 1.5);
+      o.connect(g);
+      g.connect(mm);
+      o.start(tt);
+      o.stop(tt + 1.6);
+    });
+
+    // 3. the voice, at the ear, on BOTH sides — the one thing a real body
+    //    cannot do, which is why it does not read as a person in the room
+    _later(345, () {
+      voice(1.0, -0.95);
+      voice(1.0, 0.95);
+    });
+
+    // 4. the harsh layer, over the top rather than in place of it
+    _later(360, () {
+      scream(1.2, 330, 1);
+      burst(0.9, 0.55, 4200, 90);
+      env('sawtooth', 720, 1.1, 0.30, 55, 3);
+      env('square', 311, 0.7, 0.15, 44);
+    });
+    _later(450, () => scream(0.8, 480, 0.55));
+    _later(520, () => burst(0.5, 0.24, 1800, 120));
+
+    // 5. the room comes back WRONG and stays wrong for a couple of seconds
+    final double keep = _subT;
+    setSub(1.0);
+    _later(1500, () => breath(rand() < 0.5 ? -1 : 1, 0.95));
+    _later(2600, () => setSub(math.max(keep, 0.45)));
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // THE HORROR LAYER
+  //
+  // Everything above this line is a TV station. Everything below it is the
+  // reason you do not want to be alone in one.
+  // ---------------------------------------------------------------------------
+
+  /// THE BREATH. Someone is close enough that you can hear them do it.
+  ///
+  /// Three parts, because a breath is not noise: the intake (bright, rising),
+  /// the body of it (a filtered hiss that sits where a throat sits, ~500Hz),
+  /// and a tiny transient of cloth or lip at the front. Panned HARD, because
+  /// the whole point is that it is on ONE side of you and the other side is
+  /// empty. On a laptop speaker this is a puff of nothing; on headphones it
+  /// is a person.
+  @override
+  void breath(double side, double near) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final t = c.currentTime;
+    final double n = near.clamp(0.0, 1.0);
+
+    final pan = c.createStereoPanner();
+    pan.pan.value = (side < 0 ? -1.0 : 1.0) * (0.55 + n * 0.45);
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(pan);
+    pan.connect(master);
+
+    final double dur = 1.15 - n * 0.35;
+    final src = _noise(t, dur + 0.25);
+    if (src != null) {
+      // the throat: a formant-ish band that opens as the breath comes in
+      final bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.q.value = 1.1;
+      bp.frequency.setValueAtTime(320 + n * 180, t);
+      bp.frequency.exponentialRampToValueAtTime(900 + n * 700, t + dur * 0.45);
+      bp.frequency.exponentialRampToValueAtTime(260, t + dur);
+      // proximity: close things are brighter AND have more low end
+      final hs = c.createBiquadFilter();
+      hs.type = 'highshelf';
+      hs.frequency.value = 2600;
+      hs.gain.value = -14 + n * 20;
+
+      final g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.045 + n * 0.10, t + dur * 0.38);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+      src.connect(bp);
+      bp.connect(hs);
+      hs.connect(g);
+      g.connect(out);
+    }
+
+    // the lip/cloth transient — what makes it a body rather than a sound
+    final tick = _noise(t, 0.05);
+    if (tick != null) {
+      final hp = c.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 2400;
+      final tg = c.createGain();
+      tg.gain.setValueAtTime(0.0001, t);
+      tg.gain.exponentialRampToValueAtTime(0.022 * (0.3 + n), t + 0.006);
+      tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      tick.connect(hp);
+      hp.connect(tg);
+      tg.connect(out);
+    }
+    _kill(out, dur + 0.4);
+  }
+
+  /// THE HOLD. Not a duck — a hole.
+  ///
+  /// duck() rides the room down to a floor and back. This takes the master to
+  /// actual zero and leaves it there. Half a second of true digital silence in
+  /// headphones is deeply wrong: the ear knows the difference between a quiet
+  /// room and no room, and it starts hunting. Every real scare in this build
+  /// is now a hole with something at the bottom of it.
+  @override
+  void hold(int ms) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null) return;
+    final t = c.currentTime;
+    _holding = true;
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value, t);
+    master.gain.linearRampToValueAtTime(0.0, t + 0.012);
+    // the sub bypasses master, so it has to be taken down by hand — otherwise
+    // the "hole" is a hole with a hum still in it, which is just a mix change
+    final sg = _subG;
+    if (sg != null) {
+      sg.gain.cancelScheduledValues(t);
+      sg.gain.setValueAtTime(sg.gain.value, t);
+      sg.gain.linearRampToValueAtTime(0.0, t + 0.012);
+    }
+    _holdTimer?.cancel();
+    _holdTimer = Timer(Duration(milliseconds: ms), () {
+      final cc = _c, mm = _master;
+      _holding = false;
+      if (cc == null || mm == null) return;
+      final tt = cc.currentTime;
+      mm.gain.cancelScheduledValues(tt);
+      mm.gain.setValueAtTime(0.0, tt);
+      // back FAST. A slow fade-in reads as a mix change; a fast one reads as
+      // the world switching back on, which is the part that hurts.
+      mm.gain.linearRampToValueAtTime(_vol, tt + 0.03);
+    });
+  }
+
+  /// THE PRE-ECHO. A swell that ends exactly when the thing arrives.
+  ///
+  /// Reversed-cymbal logic without a sample: noise through a bandpass that
+  /// climbs while the gain climbs, cut dead on the beat. Played [ms] ahead of
+  /// an event, the ear registers the arrival BEFORE the eye does, which is
+  /// what "I knew something was about to happen" is made of.
+  @override
+  void preEcho(int ms) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null) return;
+    final t = c.currentTime;
+    final double d = ms / 1000.0;
+    final src = _noise(t, d + 0.06);
+    if (src == null) return;
+
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+
+    final bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.q.value = 2.4;
+    bp.frequency.setValueAtTime(160, t);
+    bp.frequency.exponentialRampToValueAtTime(3400, t + d);
+
+    final g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.085, t + d * 0.92);
+    // the cut is the point — no tail, so the swell is a ramp to a cliff
+    g.gain.linearRampToValueAtTime(0.0, t + d);
+
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(out);
+    _kill(out, d + 0.2);
+
+    // a sub swell underneath it, so the ramp is felt as well as heard
+    final o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(38, t);
+    o.frequency.exponentialRampToValueAtTime(21, t + d);
+    final og = c.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.16, t + d * 0.9);
+    og.gain.linearRampToValueAtTime(0.0, t + d);
+    o.connect(og);
+    og.connect(out);
+    o.start(t);
+    o.stop(t + d + 0.05);
+  }
+
+  /// The infrasonic floor, 0..1.
+  @override
+  void setSub(double v) {
+    _subT = v < 0 ? 0 : (v > 1 ? 1 : v);
+  }
+
+  /// THE VOICE. Something almost says a word.
+  ///
+  /// whisper() already slides three formants over noise and reads as "a room
+  /// with people in it". This is the opposite: a SINGLE source, close, whose
+  /// formants land near real vowel positions and then fail to resolve into a
+  /// consonant. The brain runs it through the speech decoder, gets most of the
+  /// way, and does not finish — which is far worse than an actual word,
+  /// because you keep trying.
+  @override
+  void voice(double near, double side) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final t = c.currentTime;
+    final double n = near.clamp(0.0, 1.0);
+
+    final pan = c.createStereoPanner();
+    pan.pan.value = side.clamp(-1.0, 1.0) * (0.3 + n * 0.6);
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(pan);
+    pan.connect(master);
+
+    // a glottal source: a saw at speech pitch, wobbling like a real larynx
+    final o = c.createOscillator();
+    o.type = 'sawtooth';
+    final double f0 = 88 + rand() * 34; // low, adult, indeterminate
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.linearRampToValueAtTime(f0 * (0.88 + rand() * 0.2), t + 0.75);
+
+    final vib = c.createOscillator();
+    vib.type = 'sine';
+    vib.frequency.value = 4.4 + rand() * 1.8;
+    final vibG = c.createGain();
+    vibG.gain.value = 2.6;
+    vib.connect(vibG);
+    vibG.connect(o.detune);
+    vib.start(t);
+    vib.stop(t + 1.1);
+
+    // three formants walking between two vowels and stopping in between
+    const List<List<double>> vowels = <List<double>>[
+      <double>[540, 1680, 2500], // "eh"
+      <double>[730, 1090, 2440], // "ah"
+      <double>[300, 870, 2240], // "oo"
+    ];
+    final a = vowels[(rand() * 3).floor().clamp(0, 2)];
+    final b = vowels[(rand() * 3).floor().clamp(0, 2)];
+
+    final mix = c.createGain();
+    mix.gain.setValueAtTime(0.0001, t);
+    mix.gain.exponentialRampToValueAtTime(0.030 + n * 0.055, t + 0.14);
+    mix.gain.setValueAtTime(0.030 + n * 0.055, t + 0.52);
+    // it stops rather than ends — no release, like a held breath
+    mix.gain.exponentialRampToValueAtTime(0.0001, t + 0.80);
+    mix.connect(out);
+
+    for (var i = 0; i < 3; i++) {
+      final bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.q.value = 7.5 - i * 1.6;
+      bp.frequency.setValueAtTime(a[i], t);
+      bp.frequency.linearRampToValueAtTime(b[i], t + 0.62);
+      final g = c.createGain();
+      g.gain.value = i == 0 ? 1.0 : (i == 1 ? 0.55 : 0.28);
+      o.connect(bp);
+      bp.connect(g);
+      g.connect(mix);
+    }
+    o.start(t);
+    o.stop(t + 0.9);
+    _kill(out, 1.2);
   }
 
   @override

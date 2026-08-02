@@ -24,12 +24,14 @@ import 'src/bake.dart' show mono;
 import 'src/consts.dart';
 import 'src/economy.dart';
 import 'src/state.dart';
+import 'src/story.dart';
 import 'src/tools.dart';
 import 'src/ui/ad_break.dart';
 import 'src/ui/boot_screen.dart';
 import 'src/ui/home_screen.dart';
 import 'src/ui/deck.dart';
 import 'src/ui/end_sheet.dart';
+import 'src/ui/log_sheet.dart';
 import 'src/ui/manual.dart';
 import 'src/ui/rack.dart';
 import 'src/paint/booth.dart';
@@ -346,9 +348,26 @@ class _GameRootState extends State<GameRoot>
         runtime.paused = false;
       });
 
+  /// The page from the desk, if tonight hands one over. Read between taking
+  /// the shift and the shift starting — the one moment the player is not
+  /// being asked to do anything.
+  LogPage? _pendingLog;
+
   void _signOn() {
+    final page = logPageFor(s.night);
+    if (page != null && !logPageSeen(s, s.night)) {
+      s.log[s.night] = true;
+      s.save();
+      setState(() => _pendingLog = page);
+      return; // the night starts when the drawer closes
+    }
     runtime.startBroadcast();
     setState(() {});
+  }
+
+  void _closeLog() {
+    setState(() => _pendingLog = null);
+    runtime.startBroadcast();
   }
 
   void _showConfirm(String message, VoidCallback onYes, {bool danger = false}) {
@@ -591,6 +610,14 @@ class _GameRootState extends State<GameRoot>
                   child: AnimatedBuilder(
                     animation: runtime,
                     builder: (_, _) => AdSheet(s: s, controller: ad),
+                  ),
+                ),
+              if (_pendingLog != null)
+                Positioned.fill(
+                  child: LogSheet(
+                    s: s,
+                    page: _pendingLog!,
+                    onDone: _closeLog,
                   ),
                 ),
               if (runtime.endScreen != EndScreen.none)

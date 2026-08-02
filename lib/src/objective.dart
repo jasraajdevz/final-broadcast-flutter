@@ -15,6 +15,7 @@ import 'consts.dart';
 import 'economy.dart';
 import 'meta.dart';
 import 'state.dart';
+import 'story.dart';
 
 /// How loud a directive should be shouted.
 enum Urgency { calm, watch, urgent }
@@ -25,15 +26,16 @@ class Directive {
   final Urgency urgency;
 }
 
-/// The standing order: what "winning tonight" means, in one line.
-String nightOrder(GameState s) =>
-    'HOLD THE TRANSMITTER FROM 23:00 TO 06:00.';
+/// The standing order. It used to read "HOLD THE TRANSMITTER FROM 23:00 TO
+/// 06:00", which is a rule with no reason attached — a fair player asks "or
+/// what?" and the honest answer was "nothing". See story.dart.
+String nightOrder(GameState s) => kStandingOrder;
 
 /// Why you are here at all, across nights. This is the long goal, and it is
 /// deliberately a career and not a boss: nights are the unit, RP is the wage.
 String careerLine(GameState s) {
   if (s.survived == 0) {
-    return 'Survive one whole night. Nobody at this station has, lately.';
+    return 'Hold it until sunrise. The last operator managed 1,114 nights.';
   }
   final unowned = kStationNodes
       .where((n) => metaCost(s, n.id) != null)
@@ -51,29 +53,54 @@ String careerLine(GameState s) {
   return '${next.nm} — $have of $cost RATINGS POINTS.';
 }
 
-/// The two ways a night ends badly, stated flatly. These never change, which
-/// is the point: a player should be able to recite them by night three.
-const List<String> kLossConditions = <String>[
-  'DREAD 100 — the signal is lost and the night ends where it stands.',
-  'A MISSED QUOTA holds the clock. 06:00 never arrives while you are short.',
-];
+/// The two ways a night ends badly. These never change, which is the point:
+/// a player should be able to recite them by night three. They now describe a
+/// CONSEQUENCE rather than a scoring event — see story.dart.
+const List<String> kLossConditions = kStakes;
 
 /// The single most important thing right now. Order matters: this is a
 /// priority list, and only the top hit is ever shown.
 Directive primeDirective(GameState s, AnomalyRuntime r) {
+  // 0. The night is over. The wings sit outside the modal scrim on an
+  // ultrawide, so without this the panel cheerfully advises you to spend your
+  // signal next to the sheet explaining that the carrier has dropped.
+  if (r.lost) {
+    return const Directive('THE NIGHT IS OVER', Urgency.calm);
+  }
+
   final a = r.active;
 
-  // 1. Something is on the tube. Nothing else exists.
+  // 1. THE TELEGRAPH. This branch did not exist: the function only inspected
+  // r.active, which is null while the riser runs, so control fell all the way
+  // through to the terminal ALL CLEAR cases and the loudest line on screen sat
+  // calm-green saying "SPEND IT BEFORE IT COSTS YOU" while the ON AIR lamp two
+  // dozen pixels above it pulsed red "!! DISTURBANCE". Measured at 65-72% of
+  // telegraph frames across nights 1, 3 and 6.
+  if (a == null && r.warn > 0) {
+    return const Directive(
+        'SOMETHING IS COMING — HANDS ON THE KEYS', Urgency.urgent);
+  }
+
+  // 2. Something is on the tube. Nothing else exists.
   if (a != null && a.stage >= 1) {
     final known = s.seen[a.def.id] ?? false;
+    // Read the LIVE key, not def.counter. On a COUPLED pair liveKeys drops
+    // def.counter the moment the first half is answered, and pressCounter
+    // routes a repeat of that dead key to wrongPress() — so the strip was
+    // naming a key that had just started costing 0.9s of window and 3 dread.
+    final live = a.liveKeys;
+    final Counter? c =
+        live.isEmpty ? kCounterBy[a.def.counter] : kCounterBy[live.first];
+    // and name it the way the keycap does: the raw id says "VHOLD" and
+    // "HOOK" where the deck reads "V-HOLD" and "OFF-HOOK".
     return Directive(
-      known
-          ? 'ANSWER IT — ${a.def.nm} DIES TO ${a.def.counter.toUpperCase()}'
+      known && c != null
+          ? 'ANSWER IT — ${a.def.nm} DIES TO ${c.nm}  (KEY ${c.key})'
           : 'ANSWER IT — READ THE BEZEL, THEN THE MANUAL',
       Urgency.urgent,
     );
   }
-  // 2. Something is coming.
+  // 3. Masked, and not yet stripped.
   if (a != null) {
     return const Directive('SOMETHING IS ARRIVING — HANDS ON THE KEYS',
         Urgency.urgent);

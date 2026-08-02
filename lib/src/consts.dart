@@ -19,7 +19,16 @@ const double tau = math.pi * 2;
 double clampD(double v, double a, double b) => v < a ? a : (v > b ? b : v);
 double lerpD(double a, double b, double t) => a + (b - a) * t;
 
-final math.Random _rng = math.Random();
+math.Random _rng = math.Random();
+
+/// Pin the RNG so a headless night is reproducible.
+///
+/// Balance in this game is only ever established by simulating whole nights,
+/// and an unseeded generator makes those sims coin-flips: a guard written
+/// against one run's numbers fails on another with no code change, which is
+/// worse than no guard because it teaches you to ignore red. Tests seed this;
+/// nothing in the game ever calls it.
+void seedRandom(int seed) => _rng = math.Random(seed);
 
 /// JS `rr(a,b)` — uniform random in [a,b).
 double rr(double a, double b) => a + _rng.nextDouble() * (b - a);

@@ -650,7 +650,6 @@ class RoomScene {
   static final ui.Paint _monBlack = fill(_hex(0x040807));
   static final ui.Paint _monScan = fill(rgba(0, 0, 0, .3));
   static final ui.Paint _monSil = fill(rgba(0, 0, 0, .94));
-  static final ui.Paint _monEyes = fill(rgba(255, 255, 255, .75));
   static final TextStyle _monLabelHot = mono(10, rgba(255, 140, 130, .95));
   static final TextStyle _monLabelCold = mono(10, rgba(150, 190, 185, .75));
 
@@ -714,12 +713,33 @@ class RoomScene {
         }
       }
 
-      // warning: something in the cams
-      if (runtime.warn > 0 && i == (t * 3).toInt() % kSide.length) {
-        final gy = m.dy + sh - 6;
-        bodySil(g, m.dx + sw / 2, gy, 0.55, _monSil);
-        _fillRect(g, m.dx + sw / 2 - 4, gy - 64 * 0.55, 2, 2, _monEyes);
-        _fillRect(g, m.dx + sw / 2 + 2, gy - 64 * 0.55, 2, 2, _monEyes);
+      // --- THE THING IN THE HALLWAY ---
+      //
+      // This used to be `i == (t * 3).toInt() % kSide.length`: the figure
+      // teleported between all four cameras three times a second, which the
+      // eye reads as screen noise and dismisses. It is now in ONE camera, the
+      // same one for the whole telegraph, and it does not move — it just
+      // gets closer, and its eyes come up, and then it is on the tube.
+      //
+      // Stillness is the whole effect. Nothing here is allowed to jitter.
+      if (runtime.warn > 0 && i == runtime.warnCam) {
+        final double p = runtime.warnP;
+        final double gy = m.dy + sh - 6;
+        // 0.34 at the far end of the hall to 0.92 filling the frame
+        final double sc = 0.34 + p * 0.58;
+        // it walks up the frame as it approaches, so perspective reads
+        final double y = gy - (1 - p) * sh * 0.16;
+        bodySil(g, m.dx + sw / 2, y, sc, _monSil);
+        // the eyes only open in the last third. Before that it is a shape;
+        // after that it is looking at the camera.
+        if (p > 0.62) {
+          final double eo = ((p - 0.62) / 0.38).clamp(0.0, 1.0);
+          final ui.Paint eyes = ui.Paint()
+            ..color = rgba(255, 236, 210, 0.25 + eo * 0.75);
+          final double ey = y - 64 * sc;
+          _fillRect(g, m.dx + sw / 2 - 5 * sc, ey, 3 * sc + 1, 2 * sc + 1, eyes);
+          _fillRect(g, m.dx + sw / 2 + 2 * sc, ey, 3 * sc + 1, 2 * sc + 1, eyes);
+        }
       }
 
       if (_noise.isNotEmpty) {

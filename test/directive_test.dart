@@ -65,6 +65,65 @@ void main() {
     expect(primeDirective(s, AnomalyRuntime(s)).urgency, Urgency.calm);
   });
 
+  test('a telegraph is never green', () {
+    // Measured on the shipped build: 65-72% of telegraph frames showed a calm
+    // green directive while the ON AIR lamp two dozen pixels above pulsed red
+    // "!! DISTURBANCE". primeDirective only ever inspected r.active, which is
+    // null for the whole riser.
+    seedRandom(31337);
+    final s = _fresh();
+    s.prod['rabbit'] = 40;
+    final r = AnomalyRuntime(s);
+    r.startBroadcast();
+
+    var t = 0.0, warnFrames = 0, calmDuringWarn = 0;
+    const dt = 1 / 60.0;
+    while (t < 21 * 60 && !r.lost && warnFrames < 400) {
+      r.tick(dt);
+      t += dt;
+      if (r.warn > 0 && r.active == null) {
+        warnFrames++;
+        if (primeDirective(s, r).urgency != Urgency.urgent) calmDuringWarn++;
+      }
+      final a = r.active;
+      if (a != null && a.stage == 1 && a.p > 0.3) r.pressCounter(a.def.counter);
+    }
+    expect(warnFrames, greaterThan(60), reason: 'no telegraph was observed');
+    expect(calmDuringWarn, 0,
+        reason: '\$calmDuringWarn of \$warnFrames telegraph frames read calm');
+  });
+
+  test('the directive names the keycap and the digit, not the raw id', () {
+    final s = _fresh();
+    for (final a in kAnoms) {
+      s.seen[a.id] = true;
+    }
+    final r = AnomalyRuntime(s);
+    r.startBroadcast();
+    var t = 0.0;
+    const dt = 1 / 60.0;
+    while (t < 21 * 60 && (r.active == null || r.active!.stage < 1) && !r.lost) {
+      r.tick(dt);
+      t += dt;
+    }
+    final a = r.active!;
+    final c = kCounterBy[a.liveKeys.first]!;
+    final d = primeDirective(s, r);
+    expect(d.text, contains(c.nm),
+        reason: 'the strip must say what the keycap says');
+    expect(d.text, contains('KEY ' + c.key));
+    // and it must name a key that is actually LIVE
+    expect(a.liveKeys, contains(c.id));
+  });
+
+  test('the panel goes quiet once the night is over', () {
+    final s = _fresh();
+    final r = AnomalyRuntime(s);
+    r.startBroadcast();
+    r.signalLost();
+    expect(primeDirective(s, r).text, 'THE NIGHT IS OVER');
+  });
+
   test('the stall toast and the HUD quote the same figure', () {
     // Both used to read segOf(s).quota, the printed night-one table, while the
     // game enforced quotaScale(). Fixed in the status bar first; the toast and

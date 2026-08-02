@@ -102,8 +102,11 @@ void main() {
       expect(primeDirective(s, r).text, contains('MANUAL'));
 
       s.seen[a.def.id] = true;
-      expect(primeDirective(s, r).text,
-          contains(a.def.counter.toUpperCase()));
+      // The keycap name, not the raw id: the ids read "VHOLD" and "HOOK"
+      // where the deck the player is looking at reads "V-HOLD" and "OFF-HOOK".
+      final c = kCounterBy[a.liveKeys.first]!;
+      expect(primeDirective(s, r).text, contains(c.nm));
+      expect(primeDirective(s, r).text, contains('KEY ' + c.key));
     });
 
     test('with the tube clear, high dread beats an unmet quota', () {

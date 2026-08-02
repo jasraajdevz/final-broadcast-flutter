@@ -116,6 +116,35 @@ abstract class GameAudio {
   void buy();
   void warn();
   void scare();
+
+  // --- THE HORROR LAYER ---------------------------------------------------
+  //
+  // The old bed was loud but not frightening: everything lived between 90Hz
+  // and 4kHz, the room never went truly quiet, and the jumpscare was 120ms of
+  // duck followed by harsh noise. Loudness is not fear. These five are.
+
+  /// A breath, very close, hard to one ear. [side] is -1 or 1; [near] 0..1
+  /// scales how close the mouth is. The single most effective thing in the
+  /// build on headphones, and inaudible on a laptop speaker — which is what
+  /// the line-up card exists to catch.
+  void breath(double side, double near);
+
+  /// Cut EVERYTHING to true silence for [ms], then let it back. Not a duck —
+  /// a hole. The brain fills a hole with something worse than any sample.
+  void hold(int ms);
+
+  /// A reversed swell that ENDS on the beat you pass it. Play it [ms] before
+  /// the thing it precedes and the arrival is heard before it is seen.
+  void preEcho(int ms);
+
+  /// The infrasonic bed, 0..1. 24-31Hz has no pitch you can name; it is felt
+  /// in the chest as unease and reads on a meter as almost nothing.
+  void setSub(double v);
+
+  /// Something in the room says almost a word. Formants that nearly resolve.
+  /// [near] 0..1 moves it from down the hall to directly behind you.
+  void voice(double near, double side);
+
   void ring();
   void boxNote(double f);
   void whisper();
@@ -189,6 +218,16 @@ class NullAudio implements GameAudio {
   void warn() {}
   @override
   void scare() {}
+  @override
+  void breath(double side, double near) {}
+  @override
+  void hold(int ms) {}
+  @override
+  void preEcho(int ms) {}
+  @override
+  void setSub(double v) {}
+  @override
+  void voice(double near, double side) {}
   @override
   void ring() {}
   @override
@@ -454,6 +493,17 @@ class AnomalyRuntime extends ChangeNotifier {
   double nextAt = 20;
   double warn = 0;
   Anom? warnDef;
+
+  /// How long this telegraph started out as, so the painters can express it
+  /// as progress. Without it the cams could only flicker on `warn > 0`, which
+  /// is why the figure in the hallway used to hop between monitors three
+  /// times a second instead of standing there getting closer.
+  double warnSpan = 0;
+
+  /// Which camera it is standing in. Fixed for the whole telegraph — a thing
+  /// that moves between cameras is a glitch; a thing that does not move at
+  /// all, in one camera, while the clock runs down, is a problem.
+  int warnCam = 0;
   double shake = 0;
   double flash = 0;
   double glitch = 0;
@@ -855,13 +905,25 @@ class AnomalyRuntime extends ChangeNotifier {
     warn = telegraphFor(s, def);
     // An arrival inside the taper of an ALL CLEAR window comes in gently.
     if (softNext) warn *= 1.35;
+    warnSpan = warn;
+    warnCam = (rand() * 4).floor().clamp(0, 3);
     audio.warn();
     audio.riser(warn);
+    // THE PRE-ECHO. A swell that ends on the manifest, so the arrival is
+    // heard a beat before it is seen. This is the difference between "a thing
+    // appeared" and "something is coming" — and it costs one call.
+    audio.preEcho((warn * 1000).round().clamp(400, 4000));
+    // and something takes a breath, on one side of you, while you wait
+    audio.breath(rand() < 0.5 ? -1 : 1, 0.35 + s.dread / 100 * 0.5);
     // The tell is per-entity flavour that HINTS at what is coming without
     // naming it, and only once you have met the thing. Learning the eight
     // tells is the skill ceiling; a debut still gets the generic warning.
     s.toast(tellFor(s, def), ToastKind.bad);
   }
+
+  /// 0 -> 1 across the telegraph. 1 is "it is about to be on the tube".
+  double get warnP =>
+      warnSpan <= 0 ? 0 : (1 - (warn / warnSpan)).clamp(0.0, 1.0);
 
   void manifest({bool cold = false}) {
     final Anom def = warnDef ?? pick<Anom>(unlockedAnoms(s));
@@ -1193,7 +1255,8 @@ class AnomalyRuntime extends ChangeNotifier {
       grantCalm(calmWindow(s,
           cleanliness: a.cleanliness,
           streak: s.stats.streak,
-          fumbles: a.wrongs));
+          fumbles: a.wrongs,
+          meanGap: anomIntervalMean(s, nightAnoms)));
       audio.env('sine', 700, 0.18, 0.05, 1050);
       s.toasts.pushDelayed(
           760,
@@ -1355,10 +1418,27 @@ class AnomalyRuntime extends ChangeNotifier {
         // It plays the banish. Stinger, green wash, ALL CLEAR lamp, the lot.
         // The only tell is the toast: a real banish always quotes a signal
         // figure, and this one never does.
+        // THE LIE HAS TO BE PERFECT.
+        //
+        // This sets calm but never calmGuard, and airLabel branches on exactly
+        // that: `calmGuard > 0 ? 'ALL CLEAR Ns' : 'CLEAR - FADING'`. Since a
+        // real banish always goes through grantCalm(), which always sets a
+        // guard, the lamp read 'ALL CLEAR Ns' on every real banish and
+        // 'CLEAR - FADING' on every fake one — a 100% reliable tell, measured
+        // 19/19 fake and 82/82 real. The one second of staged relief that is
+        // supposed to make you believe was pre-labelled as a fake.
+        //
+        // MR. SLEEPWELL, THE TEST CARD GIRL and THE CALLER all draw this as
+        // their signature beat, so this is three of eight entities' best
+        // moment. The guard is also given a plausible LENGTH: a flat 4s
+        // against a real distribution of 13-15s was its own tell.
         falseClear = true;
         banishFx = 1;
-        calm = 4;
-        calmSpan = 4;
+        final double lie = rr(11.5, 15.5);
+        calm = lie;
+        calmSpan = lie;
+        calmGuard = lie;
+        calmGuardSpan = lie;
         audio.deadAir(false);
         audio.setStatic(0.03);
         audio.setDrone(0, 42);
@@ -1384,6 +1464,22 @@ class AnomalyRuntime extends ChangeNotifier {
     banishFx = 0;
     calm = 0;
     calmSpan = 0;
+    // the staged guard goes with it, or the lamp keeps counting down a
+    // promise of safety over the top of the jumpscare that broke it
+    calmGuard = 0;
+    calmGuardSpan = 0;
+
+    // THE STREAK. jumpscare() zeroes it and nothing ever acknowledged that.
+    // GameAudio.streakBroken() is declared, documented ("play the loss of it,
+    // not just the scare on top") and fully implemented — a descending
+    // three-saw glissando onto a floor thud, scaled by how long the run was —
+    // and had no call site anywhere in the codebase. The game shouts the
+    // streak from five places and then took a mean 7.3-kill run away in
+    // silence.
+    final int lostStreak = s.stats.streak;
+    if (lostStreak > 2) {
+      _later(5200, () => audio.streakBroken(lostStreak));
+    }
 
     // the channel feed.dart and tube.dart already read: 1.5s, counting down
     scare = 1.5;
@@ -1556,21 +1652,27 @@ class AnomalyRuntime extends ChangeNotifier {
     endScreen = EndScreen.signalLost;
     endScreenModel = EndScreenModel(
       win: false,
-      title: '## SIGNAL LOST',
+      title: '## THE CARRIER DROPPED',
       reviveLabel: 'EMERGENCY SPONSOR — STAY ON AIR',
       acceptLabel:
           rg > 0 ? 'SIGN OFF — BANK ${fmt(rg)} RP' : 'SIGN OFF (0 RP)',
       body: <EndPara>[
+        // A failure screen that reads as a scoreboard is a failure screen a
+        // player shrugs at. This one states the consequence the premise set up:
+        // the carrier was the lid, and you were the one holding it.
         EndPara(<String>[
-          'The dread meter is full. Every monitor in the building is showing '
-              'the same room, and it is ',
-          'this',
-          ' one.',
+          'KBLK-7 is off the air for the first time since 1963.',
+        ]),
+        EndPara(<String>[
+          '',
+          'IT IS NOT IN THE SIGNAL ANY MORE.',
+          ' Every monitor in the building is showing the same room, and it is '
+              'this one. The window in the booth has never opened. It is open.',
         ]),
         EndPara(<String>[
           'The clock stopped at ',
           shiftClock(s),
-          ' during ${segOf(s).nm}. You needed to reach 06:00.',
+          ' during ${segOf(s).nm}. Sunrise was at 06:00 and it was not close.',
         ]),
         EndPara(<String>[
           'NIGHT ${s.night}  ·  BANISHED ${s.stats.banished}'
@@ -1647,9 +1749,9 @@ class AnomalyRuntime extends ChangeNotifier {
       acceptLabel: 'SIGN THE LOG — BANK ${fmt(g)} RP',
       body: <EndPara>[
         EndPara(<String>[
-          'The test card comes up on its own. Whatever was in the signal goes '
-              'back down into it, the way it does every morning, and the room '
-              'is just a room again.',
+          'The test card comes up on its own and the sun takes over the '
+              'holding. Whatever was in the signal goes back down into it, the '
+              'way it does every morning, and the room is just a room again.',
         ]),
         EndPara(<String>[
           '',
@@ -1757,6 +1859,11 @@ class AnomalyRuntime extends ChangeNotifier {
     // The room keeps breathing behind modals, the manual and the ad break.
     audio.tick(dt);
     audio.setDread(s.dread / 100);
+    // The floor under the room. Dread sets the bed; an anomaly on the tube
+    // pushes it most of the way up on its own, so the room gets HEAVY the
+    // moment something is present even on a calm night.
+    audio.setSub(math.min(
+        1.0, s.dread / 100 * 0.75 + (active != null && active!.stage >= 1 ? 0.55 : 0)));
 
     s.tune.tick(dt, tGlobal);
 
@@ -1880,7 +1987,35 @@ class AnomalyRuntime extends ChangeNotifier {
     } else if (calm > 0) {
       dec *= 1.5;
     }
-    if (active == null) s.dread = math.max(0, s.dread - dec * dt);
+    // THE FLOOR. dreadFloor() and kDreadFloorClimb were written, documented
+    // with a worked table, and never called: decay clamped at 0 instead, so
+    // DREAD returned to empty after every single encounter.
+    //
+    // Measured on the shipped build: over a competently played night, DREAD
+    // sat under 1.0/100 for 96.4% of frames on night 1 and 99.6% on night 6.
+    // The widest gauge in the status strip — the thing the home screen names
+    // as the loss condition — was a flat empty rectangle for the whole game,
+    // and everything hanging off it (the canteen, the red room wash, the
+    // lights going out, the bot failures) was unreachable dead code.
+    //
+    // The night now has a rising tide under it. It is capped at
+    // kDreadFloorCap = 42 so atmosphere can never kill you on its own —
+    // SIGNAL LOST still has to be something you did.
+    if (active == null) {
+      final double floor = dreadFloor(s);
+      if (s.dread > floor) {
+        s.dread = math.max(floor, s.dread - dec * dt);
+      } else if (s.dread < floor) {
+        s.dread = math.min(floor, s.dread + kDreadFloorClimb * dt);
+      }
+    }
+
+    // (b) THE WINDOW IS A THREAT. lurkPressure was declared and written by
+    // nobody; the field full of figures was scenery you could safely ignore.
+    if (lurkPressure > 0) {
+      s.dread = math.min(
+          100, s.dread + kLurkDread * lurkPressure.clamp(0.0, 1.0) * dt);
+    }
 
     // --- sponsor timers ---
     if (s.sponsorEnd > 0) {
@@ -1897,8 +2032,13 @@ class AnomalyRuntime extends ChangeNotifier {
     final a = active;
     if (a != null) {
       a.t += dt;
+      // Saturated. This was the only depth() consumer in the codebase
+      // without a ceiling, so with the floor now live a deep career
+      // would cross 0->100 inside one ordinary encounter.
       s.dread = math.min(
-          100, s.dread + dt * (1.2 + depth(s) * 0.02) * cardOf(s).dread);
+          100,
+          s.dread +
+              dt * (1.2 + math.min(2.4, depth(s) * 0.02)) * cardOf(s).dread);
       final p = a.t / a.window;
       audio.setStatic(a.def.id == 'dead' ? 0.005 : 0.08 + p * 0.22);
       // 54 -> 172bpm; p*p back-loads the panic

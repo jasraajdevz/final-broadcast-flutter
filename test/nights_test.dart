@@ -34,6 +34,10 @@ GameState _forNight(int night) {
   int night, {
   required bool play,
 }) {
+  // Pinned, because these assertions are about a CARD's effect on a night and
+  // an unseeded run turns each one into a coin-flip — the RATINGS SWEEP guard
+  // passed alone and failed in a batch with no code change between them.
+  seedRandom(night * 7919 + (play ? 1 : 2));
   final s = _forNight(night);
   final r = AnomalyRuntime(s);
   r.startBroadcast();

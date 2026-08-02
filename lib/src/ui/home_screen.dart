@@ -14,6 +14,7 @@ import 'package:flutter/widgets.dart';
 import '../consts.dart';
 import '../meta.dart';
 import '../nights.dart';
+import '../story.dart';
 import '../state.dart';
 import 'ui_kit.dart';
 
@@ -178,12 +179,20 @@ class _Brief extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 660),
       child: Column(
         children: <Widget>[
-          Text(kBootBody1,
-              textAlign: TextAlign.center, style: t.at(13, K.bootBody, h: 2)),
-          const SizedBox(height: 12),
+          // THE COLD OPEN. Three lines, before anything else, because a
+          // player who does not know WHY the carrier matters is playing a
+          // spreadsheet with a skull on it.
+          for (final l in kColdOpen)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Text(l,
+                  textAlign: TextAlign.center,
+                  style: t.at(13, K.bootBody, h: 1.75)),
+            ),
+          const SizedBox(height: 14),
           _RuleRow(ui: ui, k: 'STRIKE THE TUBE', v: 'to put signal out by hand'),
           _RuleRow(ui: ui, k: 'KEYS 1-8', v: 'each banishes exactly one thing'),
-          _RuleRow(ui: ui, k: 'DREAD 100', v: 'and the night is over'),
+          _RuleRow(ui: ui, k: 'DREAD 100', v: 'and it comes out here instead'),
         ],
       ),
     );
