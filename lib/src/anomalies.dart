@@ -1837,7 +1837,7 @@ class AnomalyRuntime extends ChangeNotifier {
       _stallSay -= dt;
       if (_stallSay <= 0) {
         _stallSay = 19;
-        final short = math.max(0.0, segOf(s).quota - s.segSig);
+        final short = quotaShortfall(s); // TONIGHT's, not the printed table
         s.toast('CLOCK HELD — ${fmt(short)} MORE OUTPUT NEEDED THIS SEGMENT',
             ToastKind.bad);
         const advice = <String>[

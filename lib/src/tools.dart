@@ -508,7 +508,10 @@ class Tools {
     // Burn output — but only SURPLUS. If the segment's quota is already met the
     // burn floors on the quota, and if it is not met yet segSig is untouched.
     // An EMP can therefore never stall the clock or undo a quota.
-    final q = segOf(s).quota;
+    // TONIGHT's quota. Reading the printed table meant that from night 2 on
+    // the floor sat BELOW the real threshold, so an EMP could burn output
+    // past it and stall the clock this comment promises it never can.
+    final q = segQuota(s);
     // Floor on the NEXT quota, not this one: everything above the current
     // threshold is principal on the next segment, which is ~14x bigger.
     final floorAt = s.segSig >= q ? q : s.segSig;

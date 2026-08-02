@@ -54,7 +54,15 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
-          Padding(
+          // MUST be Positioned.fill, not a bare child. A Stack hands its
+          // non-positioned children LOOSE constraints, so this Padding
+          // shrink-wrapped the Column and the Stack pinned the result to its
+          // top-LEFT: measured 1190.5 wide inside a 1280 cabinet, with the
+          // wordmark sitting 45px left of centre and the whole desk riding
+          // high. mainAxisAlignment.center was a no-op for the same reason —
+          // an unbounded Column has no spare height to centre within.
+          Positioned.fill(
+            child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 26),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -117,6 +125,7 @@ class HomeScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: t.at(9, K.bootFine, ls: 2)),
               ],
+            ),
             ),
           ),
         ],

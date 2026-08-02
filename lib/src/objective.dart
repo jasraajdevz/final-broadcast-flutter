@@ -10,8 +10,6 @@
 // the standing order for the night, the one thing that matters this second,
 // and the two ways the night can be taken off you.
 
-import 'dart:math' as math;
-
 import 'anomalies.dart';
 import 'consts.dart';
 import 'economy.dart';
@@ -89,17 +87,35 @@ Directive primeDirective(GameState s, AnomalyRuntime r) {
     return const Directive(
         'DREAD IS HIGH — THE CANTEEN SELLS IT BACK', Urgency.watch);
   }
-  // 4. The clock is stalled on you.
-  if (!quotaMet(s)) {
-    final short = quotaShortfall(s);
-    final rate = math.max(0.001, sigRateRaw(s));
-    final eta = short / rate;
-    if (eta > 45) {
-      return Directive(
-          'THE CLOCK IS HELD — BUY TRANSMITTERS, YOU ARE ${fmt(short)} SHORT',
-          Urgency.watch);
-    }
-    return Directive('${fmt(short)} SHORT THIS SEGMENT — KEEP IT OUT',
+  // 4. The quota.
+  //
+  // This branch used to fire on `!quotaMet(s)` alone, which is TRUE on the
+  // first frame of every segment — so the loudest element on screen opened
+  // night one with "THE CLOCK IS HELD", a sentence that was not true (the
+  // clock only holds at :59) about a state that is simply the start of a
+  // segment. A warning that is on by default is not a warning.
+  if (s.stalled) {
+    return Directive(
+        'THE CLOCK IS HELD — ${fmt(quotaShortfall(s))} MORE OUTPUT',
+        Urgency.urgent);
+  }
+  // 5. THE BOOTSTRAP. With nothing on air, sigRateRaw is 0, so "on pace" is
+  // false by construction and the strip opened the game on a warning. A
+  // station that has not started is not behind — it has not started. Say the
+  // first action instead.
+  final int owned = kProducers.fold<int>(0, (a, p) => a + (s.prod[p.id] ?? 0));
+  if (owned == 0) {
+    final double first = costOf(s, kProducers.first);
+    return Directive(
+        s.sig >= first
+            ? 'BUY ${kProducers.first.nm} — THE RACK IS ON YOUR RIGHT'
+            : 'STRIKE THE TUBE — THAT IS HOW SIGNAL STARTS',
+        Urgency.calm);
+  }
+
+  // 6. Behind, with the segment running out.
+  if (!quotaMet(s) && !onPaceForQuota(s)) {
+    return Directive('BEHIND THE QUOTA — ${fmt(quotaShortfall(s))} TO GO',
         Urgency.watch);
   }
   // 5. Nothing is wrong. Bank the quiet.
@@ -108,6 +124,19 @@ Directive primeDirective(GameState s, AnomalyRuntime r) {
         Urgency.calm);
   }
   return const Directive('ALL CLEAR — STRIKE THE TUBE', Urgency.calm);
+}
+
+/// Will the station clear this segment's quota before the clock reaches :59
+/// at the current rate? Being short early in a segment is the normal state and
+/// must not read as an alarm; being short with no time left is the alarm.
+bool onPaceForQuota(GameState s) {
+  if (quotaMet(s)) return true;
+  final double minsLeft = 60 - (s.shiftMin % 60);
+  final double secsLeft = minsLeft * kMinReal;
+  final double rate = sigRateRaw(s);
+  if (rate <= 0) return false;
+  // 25% headroom: "just barely on pace" should still nudge.
+  return quotaShortfall(s) / rate <= secsLeft * 0.75;
 }
 
 /// Is anything at all in the rack currently affordable? Cheap enough to run
