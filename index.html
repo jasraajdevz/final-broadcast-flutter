@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="/final-broadcast-flutter/">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>FINAL BROADCAST — KBLK-7</title>
+  <meta name="description" content="You have the night shift at a dead TV station. Keep the signal climbing, and when something gets into the feed, cut it out before it looks back. A retro horror idle game.">
+  <meta name="theme-color" content="#05070a">
+  <meta name="color-scheme" content="dark">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="KBLK-7">
+  <meta property="og:title" content="FINAL BROADCAST — eight things live in the signal">
+  <meta property="og:description" content="A retro horror idle game. Harvest signal, grow subscribers, and banish whatever crawls into the feed before it takes the numbers with it. Each anomaly dies to exactly one button. Free, in your browser.">
+  <meta property="og:image" content="share.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="FINAL BROADCAST — eight things live in the signal">
+  <meta name="twitter:description" content="A retro horror idle game. Keep the station on air. Banish what gets into the feed.">
+  <meta name="twitter:image" content="share.jpg">
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="FINAL BROADCAST">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* The engine takes a beat to boot. Until it does, the page must already look like
+       the game — a white flash before a horror game in a dark room is the worst
+       possible first frame. The shim is removed on flutter-first-frame. */
+    html,body{margin:0;height:100%;background:#000;overflow:hidden}
+    #boot-shim{position:fixed;inset:0;display:grid;place-items:center;z-index:9;
+      background:radial-gradient(120% 90% at 50% 40%,#0a0c0d 0%,#000 75%);
+      font-family:"Courier New",Courier,monospace;color:#4d6164;
+      letter-spacing:6px;font-size:12px;text-align:center}
+    #boot-shim b{display:block;font-size:26px;letter-spacing:12px;color:#c9d6d4;
+      margin-bottom:14px;font-weight:700}
+    #boot-shim i{display:block;font-style:normal;margin-top:18px;font-size:10px;
+      color:#33403f;animation:bs 1.6s infinite}
+    @keyframes bs{0%,100%{opacity:.35}50%{opacity:1}}
+  </style>
+</head>
+<body>
+  <div id="boot-shim">
+    <div>
+      <b>FINAL BROADCAST</b>
+      STATION KBLK-7 &nbsp;·&nbsp; 1,140 kHz
+      <i>WARMING THE TUBE</i>
+    </div>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var s = document.getElementById('boot-shim');
+      if (s) s.remove();
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
