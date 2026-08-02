@@ -159,7 +159,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
   }
 
   // ticker
-  final tick = '  SIGNAL ${fmt(s.sig)}   SUBSCRIBERS ${fmt(s.subs)}'
+  final tick = '  SIGNAL ${fmt(s.sig)}   THIS SEGMENT ${fmt(s.segSig)}'
       '   OUTPUT ${fmt(rate)}/s   STREAK ${s.stats.streak} ';
   final tw = measureText(tick, _tickerStyle, cache: feedText);
   final off = -((t * 34) % tw);

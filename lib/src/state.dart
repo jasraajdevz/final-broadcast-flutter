@@ -210,9 +210,11 @@ class GameState extends ChangeNotifier {
 
   // --- resources ---
   double sig = 0;
-  double subs = 0;
+  /// Output broadcast during the CURRENT run-down segment. Quotas are met by
+  /// TRANSMITTING, not by holding a balance, so spending never un-meets one.
+  double segSig = 0;
   int rp = 0;
-  double lifetimeSubs = 0;
+  double lifetimeSig = 0;
 
   // --- owned ---
   final Map<String, int> prod = <String, int>{};
@@ -277,8 +279,8 @@ class GameState extends ChangeNotifier {
     stalled = false;
     night++;
     sig = 0;
-    subs = 0;
-    lifetimeSubs = 0;
+    segSig = 0;
+    lifetimeSig = 0;
     for (final p in kProducers) {
       prod[p.id] = 0;
     }
@@ -306,9 +308,9 @@ class GameState extends ChangeNotifier {
     lastSave = DateTime.now().millisecondsSinceEpoch;
     return <String, dynamic>{
       'sig': sig,
-      'subs': subs,
+      'segSig': segSig,
       'rp': rp,
-      'lifetimeSubs': lifetimeSubs,
+      'lifetimeSig': lifetimeSig,
       'prod': Map<String, dynamic>.from(prod),
       'ups': Map<String, dynamic>.from(ups),
       'seen': Map<String, dynamic>.from(seen),
@@ -335,9 +337,9 @@ class GameState extends ChangeNotifier {
 
   void readJson(Map<String, dynamic> o) {
     sig = _dbl(o['sig'], sig);
-    subs = _dbl(o['subs'], subs);
+    segSig = _dbl(o['segSig'], segSig);
     rp = _int(o['rp'], rp);
-    lifetimeSubs = _dbl(o['lifetimeSubs'], lifetimeSubs);
+    lifetimeSig = _dbl(o['lifetimeSig'], lifetimeSig);
 
     final rawProd = o['prod'];
     if (rawProd is Map) {

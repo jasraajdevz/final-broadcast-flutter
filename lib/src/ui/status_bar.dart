@@ -1,6 +1,6 @@
 // FINAL BROADCAST — the top status strip (#status).
 //
-// SIGNAL / SUBSCRIBERS / SHIFT / VIEWERS NEEDED / DREAD / ON AIR.
+// SIGNAL / BROADCAST / SHIFT / QUOTA / DREAD / ON AIR.
 // The readout logic is syncUI() from index.html, line for line — including the
 // three-way SIGNAL rate line that makes the Test Card Girl's theft legible.
 
@@ -42,7 +42,7 @@ class StatusBar extends StatelessWidget {
     }
 
     final sg = segOf(s);
-    final quotaP = sg.quota <= 0 ? 1.0 : math.min(1.0, s.subs / sg.quota);
+    final quotaP = sg.quota <= 0 ? 1.0 : math.min(1.0, s.segSig / sg.quota);
 
     return Container(
       decoration: vgrad(
@@ -71,11 +71,11 @@ class StatusBar extends StatelessWidget {
           _Rdo(
             ui: s.ui,
             maxWidth: 160,
-            label: 'SUBSCRIBERS',
-            value: fmt(s.subs),
+            label: 'BROADCAST',
+            value: fmt(s.segSig),
             valueColor: K.cyan,
             valueGlowAlpha: 0.4,
-            sub: '+${fmt(subRate(s, runtime))} /s',
+            sub: 'THIS SEGMENT',
           ),
           _Rdo(
             ui: s.ui,
@@ -84,14 +84,14 @@ class StatusBar extends StatelessWidget {
             label: 'SHIFT ENDS 06:00',
             value: shiftClock(s),
             valueColor: s.stalled ? K.red : K.green,
-            sub: '${s.stalled ? "⧗ HELD · " : ""}${sg.nm}',
+            sub: '${s.stalled ? "HELD - " : ""}${sg.nm}',
           ),
           _Rdo(
             ui: s.ui,
             minWidth: 118,
             maxWidth: 175,
-            label: 'VIEWERS NEEDED',
-            value: '${fmt(math.min(s.subs, sg.quota))} / ${fmt(sg.quota)}',
+            label: 'QUOTA',
+            value: '${fmt(math.min(s.segSig, sg.quota))} / ${fmt(sg.quota)}',
             valueColor: K.green,
             valueSize: 17,
             below: Padding(

@@ -292,7 +292,6 @@ class Producer {
     required this.cost,
     required this.mul,
     required this.sig,
-    required this.reach,
     required this.ds,
   });
   final String id;
@@ -300,7 +299,6 @@ class Producer {
   final double cost;
   final double mul;
   final double sig;
-  final double reach;
   final String ds;
 }
 
@@ -311,7 +309,6 @@ const List<Producer> kProducers = [
       cost: 15,
       mul: 1.13,
       sig: 0.8,
-      reach: 0.014,
       ds: 'Bent coat hanger. Somehow it works.'),
   Producer(
       id: 'dipole',
@@ -319,7 +316,6 @@ const List<Producer> kProducers = [
       cost: 140,
       mul: 1.13,
       sig: 5.4,
-      reach: 0.09,
       ds: 'Roof-mounted. Hums in the rain.'),
   Producer(
       id: 'vhf',
@@ -327,7 +323,6 @@ const List<Producer> kProducers = [
       cost: 1.3e3,
       mul: 1.14,
       sig: 34,
-      reach: 0.55,
       ds: 'Red beacon. Nobody climbs it twice.'),
   Producer(
       id: 'relay',
@@ -335,7 +330,6 @@ const List<Producer> kProducers = [
       cost: 12e3,
       mul: 1.14,
       sig: 215,
-      reach: 3.4,
       ds: 'Line of sight to the next dead town.'),
   Producer(
       id: 'head',
@@ -343,7 +337,6 @@ const List<Producer> kProducers = [
       cost: 110e3,
       mul: 1.15,
       sig: 1.4e3,
-      reach: 21,
       ds: 'Copper into every living room.'),
   Producer(
       id: 'sat',
@@ -351,7 +344,6 @@ const List<Producer> kProducers = [
       cost: 1.0e6,
       mul: 1.15,
       sig: 9.2e3,
-      reach: 135,
       ds: 'Bounce it off something in orbit.'),
   Producer(
       id: 'ghost',
@@ -359,7 +351,6 @@ const List<Producer> kProducers = [
       cost: 9.5e6,
       mul: 1.16,
       sig: 64e3,
-      reach: 900,
       ds: 'Rebroadcasts what was never sent.'),
   Producer(
       id: 'mirror',
@@ -367,7 +358,6 @@ const List<Producer> kProducers = [
       cost: 90e6,
       mul: 1.16,
       sig: 480e3,
-      reach: 6.5e3,
       ds: 'The whole hemisphere can see the picture.'),
   Producer(
       id: 'dead',
@@ -375,7 +365,6 @@ const List<Producer> kProducers = [
       cost: 850e6,
       mul: 1.17,
       sig: 4.0e6,
-      reach: 50e3,
       ds: 'A frequency with no license and no end.'),
   Producer(
       id: 'choir',
@@ -383,7 +372,6 @@ const List<Producer> kProducers = [
       cost: 8.0e9,
       mul: 1.17,
       sig: 36e6,
-      reach: 400e3,
       ds: 'They were the night shift, once.'),
 ];
 
@@ -446,7 +434,7 @@ final List<Upgrade> kUpgrades = [
       id: 'halide',
       nm: 'SILVER HALIDE',
       cost: 9.0e5,
-      ds: 'Subscriber gain +60%.',
+      ds: 'Output +60% while a quota is unmet.',
       req: (s) => true),
   Upgrade(
       id: 'failsafe',
@@ -488,7 +476,7 @@ final List<Upgrade> kUpgrades = [
       id: 'halo',
       nm: 'CARRIER HALO',
       cost: 8.0e11,
-      ds: 'Subscribers can no longer be stolen.',
+      ds: 'Segment output can no longer be restated.',
       req: (s) => s.stats.scared >= 6),
 ];
 
@@ -579,32 +567,32 @@ const double kMinReal = 3;
 const List<RundownSeg> kRundown = [
   RundownSeg(
       nm: 'STATION IDENT',
-      quota: 8,
+      quota: 120,
       line: 'Colour bars and the national anthem. Nobody is watching yet.'),
   RundownSeg(
       nm: 'THE LATE MOVIE',
-      quota: 55,
+      quota: 1.6e3,
       line:
           'Something in black and white. The reel is not the one you threaded.'),
   RundownSeg(
       nm: 'OVERNIGHT NEWS',
-      quota: 380,
+      quota: 22e3,
       line: 'The autocue is running stories that have not happened.'),
   RundownSeg(
       nm: 'THE DEAD HOUR',
-      quota: 2600,
+      quota: 300e3,
       line: '03:00. Nothing is scheduled. Something transmits anyway.'),
   RundownSeg(
       nm: 'TEST TRANSMISSION',
-      quota: 20e3,
+      quota: 4.2e6,
       line: 'A tone and a card. The card is not the one in the vault.'),
   RundownSeg(
       nm: 'THE CHOIR HOUR',
-      quota: 160e3,
+      quota: 60e6,
       line: 'They were the night shift once. They still sign in.'),
   RundownSeg(
       nm: 'SIGN-OFF PREP',
-      quota: 1.2e6,
+      quota: 900e6,
       line: 'Almost morning. Hold it together and you get to leave.'),
 ];
 
@@ -740,7 +728,7 @@ const List<Anom> kAnoms = [
     method:
         'He requires a valid station ident to close the audit. Broadcast the sign-off PATTERN and he files and departs.',
     wrongNote:
-        'He steals subscribers, not signal. Left alone he takes a great deal.',
+        'He restates the segment output, not the bank. The quota bar walks backward while he files.',
   ),
   Anom(
     id: 'call',

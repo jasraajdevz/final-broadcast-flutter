@@ -94,8 +94,8 @@ void main() {
           s.seen[k] = true;
         }
         s.sig = 1234567;
-        s.subs = 4321;
-        s.lifetimeSubs = 90000;
+        s.segSig = 4321;
+        s.lifetimeSig = 900000;
         runtime = AnomalyRuntime(s);
       });
 

@@ -495,10 +495,10 @@ class AnomalyRuntime extends ChangeNotifier {
         s.toast('SHE GIVES IT BACK — +${fmt(back)} SIG', ToastKind.good);
       }
       s.sig += bonus;
-      // Banishing is the FAST way to make quota.
-      final vg = math.max(3.0, segOf(s).quota * (fast ? 0.16 : 0.09));
-      s.subs += vg;
-      s.lifetimeSubs += vg;
+      // Banishing is the FAST way to make quota — the bonus counts as output
+      // broadcast, so a clean kill is worth a real slice of the segment.
+      s.segSig += bonus;
+      s.lifetimeSig += bonus;
       banishFx = 1;
       s.dread = math.max(0, s.dread - 6);
       if (!silent) audio.banishStinger(fast);
@@ -585,10 +585,12 @@ class AnomalyRuntime extends ChangeNotifier {
     s.stats.streak = 0;
     final half = (s.ups['lead'] ?? false) ? 0.5 : 1.0;
     final halo = s.ups['halo'] ?? false;
-    var lostSig = 0.0, lostSub = 0.0;
+    var lostSig = 0.0, lostSeg = 0.0;
     if (def.id == 'niel') {
-      lostSub = halo ? 0 : s.subs * 0.28 * half;
-      s.subs -= lostSub;
+      // He restates the segment's output — the quota bar visibly walks backward,
+      // which is his whole point. HALO protects the filing.
+      lostSeg = halo ? 0 : s.segSig * 0.30 * half;
+      s.segSig -= lostSeg;
       lostSig = s.sig * 0.10 * half;
       s.sig -= lostSig;
     } else if (def.id == 'card') {
@@ -603,15 +605,13 @@ class AnomalyRuntime extends ChangeNotifier {
     } else {
       lostSig = s.sig * 0.32 * half;
       s.sig -= lostSig;
-      lostSub = halo ? 0 : s.subs * 0.08 * half;
-      s.subs -= lostSub;
     }
     s.sig = math.max(0, s.sig);
-    s.subs = math.max(0, s.subs);
+    s.segSig = math.max(0, s.segSig);
     s.dread = math.min(100, s.dread + 26);
     s.toast(
-        '✖ ${def.nm} GOT THROUGH — −${fmt(lostSig)} SIG'
-        '${lostSub > 1 ? " / −${fmt(lostSub)} SUBS" : ""}',
+        'X ${def.nm} GOT THROUGH — -${fmt(lostSig)} SIG'
+        '${lostSeg > 1 ? " / -${fmt(lostSeg)} OUTPUT" : ""}',
         ToastKind.bad);
     scheduleNext();
     if (s.dread >= 100) signalLost();
@@ -743,7 +743,7 @@ class AnomalyRuntime extends ChangeNotifier {
   void signOff() {
     endScreen = EndScreen.none;
     endScreenModel = null;
-    // rpGain() must be read BEFORE lifetimeSubs is cleared.
+    // rpGain() must be read BEFORE lifetimeSig is cleared.
     final g = rpGain(s) + s.dawnBonus;
     s.dawnBonus = 0;
     s.rp += g;
@@ -843,7 +843,6 @@ class AnomalyRuntime extends ChangeNotifier {
   void _simulate(double dt) {
     // --- economy ---
     final sr = sigRate(s, this);
-    final ur = subRate(s, this);
     // THE TEST CARD GIRL: income goes into her lap instead of the bank. Nothing
     // is destroyed — the bank never falls — it just stops arriving.
     final a0 = active;
@@ -853,9 +852,11 @@ class AnomalyRuntime extends ChangeNotifier {
     } else {
       s.sig += sr * dt;
     }
-    final dsub = ur * dt;
-    s.subs += dsub;
-    s.lifetimeSubs += dsub;
+    // Quotas are met by TRANSMITTING. Output counts even while the Test Card
+    // Girl is holding the bank, because it did go out — she just kept it.
+    final out = sr * dt;
+    s.segSig += out;
+    s.lifetimeSig += out;
     s.airtime += dt;
 
     // --- the shift clock ---

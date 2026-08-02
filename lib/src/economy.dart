@@ -80,9 +80,6 @@ bool buyUpgrade(GameState s, Upgrade u) {
 // Multipliers
 // ---------------------------------------------------------------------------
 
-/// JS subMult().
-double subMult(GameState s) =>
-    1 + math.pow(math.max(0, s.subs), 0.42) * 0.05;
 
 /// JS rpMult().
 double rpMult(GameState s) => 1 + s.rp * 0.08;
@@ -92,7 +89,7 @@ double sponsorMult(GameState s) => s.sponsorEnd > 0 ? 3 : 1;
 
 /// JS sigMult().
 double sigMult(GameState s) {
-  var m = subMult(s) * rpMult(s) * sponsorMult(s);
+  var m = rpMult(s) * sponsorMult(s);
   if (s.ups['preheat'] ?? false) m *= 1.3;
   if (s.ups['comp'] ?? false) m *= 2.2;
   return m;
@@ -126,21 +123,9 @@ double sigRate(GameState s, AnomalyRuntime a) {
   return base * sigMult(s);
 }
 
-/// JS subRate().
-double subRate(GameState s, AnomalyRuntime a) {
-  var base = 0.0;
-  for (final p in kProducers) {
-    if (prodLive(a, p.id)) base += (s.prod[p.id] ?? 0) * p.reach;
-  }
-  var m = rpMult(s) * sponsorMult(s);
-  if (s.ups['halide'] ?? false) m *= 1.6;
-  m *= 1 + math.min(1.5, s.stats.streak * 0.03);
-  return base * m;
-}
 
 /// JS rpGain().
-int rpGain(GameState s) =>
-    math.pow(s.lifetimeSubs / 1e4, 0.5).floor();
+int rpGain(GameState s) => math.pow(s.lifetimeSig / 2.5e5, 0.5).floor();
 
 /// JS tuneYield() — striking the set. The bootstrap and the thing to do
 /// between anomalies.
@@ -211,7 +196,7 @@ int segIndex(GameState s) =>
 RundownSeg segOf(GameState s) => kRundown[segIndex(s)];
 
 /// JS quotaMet().
-bool quotaMet(GameState s) => s.subs >= segOf(s).quota;
+bool quotaMet(GameState s) => s.segSig >= segOf(s).quota;
 
 /// JS shiftClock() — "23:00" .. "05:59".
 String shiftClock(GameState s) {

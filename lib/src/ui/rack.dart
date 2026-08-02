@@ -228,7 +228,7 @@ class _RackState extends State<Rack> {
         afford: s.sig >= c,
         desc: p.ds,
         statLeft: '+${fmt(p.sig * n * sigMult(s))} sig/s',
-        statRight: '+${fmt(p.reach * n)} reach',
+        statRight: 'x$n',
         qty: '$owned',
         onTap: () => _buy(p, n),
       );
@@ -305,14 +305,14 @@ class _RackState extends State<Rack> {
           text: TextSpan(style: note, children: <InlineSpan>[
             const TextSpan(
                 text: 'Ending the broadcast wipes your transmitters and '
-                    'signal, and converts lifetime subscribers into '),
+                    'signal, and converts lifetime output into '),
             TextSpan(
                 text: 'RATINGS POINTS',
                 style: b.copyWith(color: K.amber)),
             TextSpan(
                 text: ' — a permanent ×${(1 + s.rp * 0.08).toStringAsFixed(2)}'
-                    ' to everything, forever.\n\nLifetime subscribers: '),
-            TextSpan(text: fmt(s.lifetimeSubs), style: b),
+                    ' to everything, forever.\n\nLifetime output: '),
+            TextSpan(text: fmt(s.lifetimeSig), style: b),
             const TextSpan(text: '\nSign off now for: '),
             TextSpan(
                 text: '${fmt(g)} RP', style: b.copyWith(color: K.green)),
