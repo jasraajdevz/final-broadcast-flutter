@@ -77,6 +77,13 @@ void main() {
     await tester.pumpWidget(const FinalBroadcastApp());
     await tester.pump(const Duration(milliseconds: 16));
 
+    // A first run meets the LINE-UP CARD before the front desk. It has to be
+    // passable in one tap without touching audio, or it is a wall.
+    expect(find.text('HARDWARE CHECK'), findsOneWidget);
+    await tester.tap(find.text('SKIP THE CHECK'));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.text('HARDWARE CHECK'), findsNothing);
+
     await tester.tap(find.text('SIGN ON'));
     await tester.pump(const Duration(milliseconds: 16));
 

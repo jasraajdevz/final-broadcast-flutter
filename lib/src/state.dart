@@ -293,6 +293,10 @@ class GameState extends ChangeNotifier {
   /// Permanent station upgrades bought with RATINGS POINTS, by node id.
   /// Survives sign-off — that is the entire point of it.
   final Map<String, int> meta = <String, int>{};
+
+  /// Has the operator been through the line-up card? Asked ONCE, then never
+  /// again — a wall between a player and the game is worse than a bad mix.
+  bool hardwareChecked = false;
   int rp = 0;
   double lifetimeSig = 0;
 
@@ -417,6 +421,7 @@ class GameState extends ChangeNotifier {
       'manPage': manPage,
       'toolCharges': toolCharges,
       'meta': meta,
+      'hardwareChecked': hardwareChecked,
       'dawnBonus': dawnBonus,
     };
   }
@@ -469,6 +474,7 @@ class GameState extends ChangeNotifier {
     started = _bool(o['started'], started);
     tab = _str(o['tab'], tab);
     manPage = _str(o['manPage'], manPage);
+    hardwareChecked = _bool(o['hardwareChecked'], hardwareChecked);
     final mt = o['meta'];
     if (mt is Map) {
       meta.clear();

@@ -22,11 +22,13 @@ class HomeScreen extends StatelessWidget {
     required this.s,
     required this.onSignOn,
     required this.onManual,
+    required this.onSetup,
   });
 
   final GameState s;
   final VoidCallback onSignOn;
   final VoidCallback onManual;
+  final VoidCallback onSetup;
 
   bool get _returning => s.started && (s.night > 1 || s.survived > 0);
 
@@ -87,7 +89,13 @@ class HomeScreen extends StatelessWidget {
                       : 'READ IT FIRST  ·  KEY M',
                   onTap: onManual,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 8),
+                _Tertiary(
+                  ui: s.ui,
+                  label: 'AUDIO / SCREEN CHECK',
+                  onTap: onSetup,
+                ),
+                const SizedBox(height: 16),
                 Text(
                   _returning
                       ? 'The eight keys under the tube are the only thing that '
@@ -334,6 +342,28 @@ class _Secondary extends StatelessWidget {
             Text(sub, style: t.at(9.5, K.skeySub, ls: 1.5)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A quiet third option. The hardware check has to be reachable forever —
+/// people plug headphones in halfway through a session.
+class _Tertiary extends StatelessWidget {
+  const _Tertiary({required this.ui, required this.label, required this.onTap});
+  final double ui;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    return Pressable(
+      onTap: onTap,
+      builder: (_, hover, __) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+        child: Text(label,
+            style: t.at(10, hover ? K.ink : K.lbl, ls: 2.5)),
       ),
     );
   }

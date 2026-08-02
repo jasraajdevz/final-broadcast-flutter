@@ -197,3 +197,87 @@ int? nextProducerMark(int owned) {
 /// BUY MAX can vault several at once.
 List<int> marksCrossed(int before, int after) =>
     kProducerMarks.where((m) => before < m && after >= m).toList();
+
+// ---------------------------------------------------------------------------
+// THE CANTEEN
+//
+// DREAD was a one-way ratchet: it went up when things went wrong and bled off
+// on a timer you could not influence. There was nothing to DO about a bad
+// night except survive it, which is why a bad night felt like a lost one.
+//
+// The canteen is the sink for that. It is deliberately food and not equipment
+// — a station vending machine at 3am, bought with SIGNAL, which means every
+// purchase is output you chose not to bank. Prices are quoted in seconds of
+// your own raw output so a coffee costs the same *effort* on night 1 and 40.
+// ---------------------------------------------------------------------------
+
+class CanteenItem {
+  const CanteenItem({
+    required this.id,
+    required this.nm,
+    required this.ds,
+    required this.dread,
+    required this.seconds,
+    this.calm = 0,
+    this.night = 1,
+  });
+
+  final String id;
+  final String nm;
+  final String ds;
+
+  /// DREAD removed immediately.
+  final double dread;
+
+  /// Price, in seconds of the station's current raw output.
+  final double seconds;
+
+  /// Guaranteed quiet granted with it, if any.
+  final double calm;
+
+  /// First night it appears in the machine.
+  final int night;
+}
+
+const List<CanteenItem> kCanteen = <CanteenItem>[
+  CanteenItem(
+    id: 'coffee',
+    nm: 'BLACK COFFEE',
+    ds: 'The urn has been on since the afternoon shift. -12 DREAD.',
+    dread: 12,
+    seconds: 8,
+  ),
+  CanteenItem(
+    id: 'sandwich',
+    nm: 'CANTEEN SANDWICH',
+    ds: 'Nobody knows whose it was. -22 DREAD, and four seconds to eat it.',
+    dread: 22,
+    seconds: 20,
+    calm: 4,
+  ),
+  CanteenItem(
+    id: 'cigarette',
+    nm: 'SOMEONE ELSE\'S CIGARETTE',
+    ds: 'Left in the pack by the door. -30 DREAD. You do not smoke.',
+    dread: 30,
+    seconds: 34,
+    calm: 6,
+    night: 2,
+  ),
+  CanteenItem(
+    id: 'pills',
+    nm: 'THE TIN IN THE DESK',
+    ds: 'Prescribed to an operator who left in 1987. -55 DREAD.',
+    dread: 55,
+    seconds: 70,
+    calm: 3,
+    night: 3,
+  ),
+];
+
+final Map<String, CanteenItem> kCanteenBy = <String, CanteenItem>{
+  for (final c in kCanteen) c.id: c,
+};
+
+/// Whether the machine is stocking this yet.
+bool canteenUnlocked(GameState s, CanteenItem c) => s.night >= c.night;

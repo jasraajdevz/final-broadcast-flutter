@@ -4,6 +4,8 @@
 // producer ladder is always shown, locked tiers included with their % bar —
 // the JS comment is explicit that hiding them hid most of the game.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../anomalies.dart';
@@ -277,9 +279,47 @@ class _RackState extends State<Rack> {
 
   // --- HARDWARE ------------------------------------------------------------
 
+  /// THE CANTEEN. DREAD used to be a one-way ratchet with nothing you could do
+  /// about it, so a bad night just had to be endured. Signal buys it back.
+  List<Widget> _canteen() {
+    final out = <Widget>[
+      RackHead('CANTEEN   ·   DREAD ${s.dread.round()}/100', ui: s.ui),
+    ];
+    final raw = sigRateRaw(s);
+    for (final c in kCanteen) {
+      if (!canteenUnlocked(s, c)) continue;
+      final price = math.max(30.0, raw * c.seconds);
+      final afford = s.sig >= price && s.dread > 1;
+      out.add(_Item(
+        ui: s.ui,
+        name: c.nm,
+        cost: fmt(price),
+        afford: afford,
+        desc: c.ds,
+        statLeft: '-${c.dread.round()} DREAD',
+        statRight: c.calm > 0 ? '+${c.calm.round()}s QUIET' : '',
+        onTap: !afford
+            ? null
+            : () {
+                audio.init();
+                s.sig -= price;
+                s.dread = math.max(0, s.dread - c.dread);
+                if (c.calm > 0) runtime.grantCalm(c.calm);
+                audio.env('sine', 300, 0.22, 0.10, 220);
+                s.toast('${c.nm} — DREAD ${s.dread.round()}', ToastKind.good);
+                s.save();
+                s.bump();
+              },
+      ));
+    }
+    return out;
+  }
+
   List<Widget> _hardware() {
     final t = Sty(s.ui);
     final out = <Widget>[
+      ..._canteen(),
+      const SizedBox(height: 10),
       RackHead('STATION EQUIPMENT · ONE-TIME', ui: s.ui),
     ];
     var any = false;

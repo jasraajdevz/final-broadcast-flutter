@@ -42,7 +42,12 @@ class StatusBar extends StatelessWidget {
     }
 
     final sg = segOf(s);
-    final quotaP = sg.quota <= 0 ? 1.0 : math.min(1.0, s.segSig / sg.quota);
+    // TONIGHT's quota, not the printed table. quotaScale() has escalated these
+    // night over night since it was added; the HUD was still reading the
+    // night-one figure, so from night 2 on the bar filled and the clock stayed
+    // held anyway with nothing on screen explaining why.
+    final quota = segQuota(s);
+    final quotaP = quota <= 0 ? 1.0 : math.min(1.0, s.segSig / quota);
 
     return Container(
       decoration: vgrad(
@@ -91,7 +96,7 @@ class StatusBar extends StatelessWidget {
             minWidth: 118,
             maxWidth: 175,
             label: 'QUOTA',
-            value: '${fmt(math.min(s.segSig, sg.quota))} / ${fmt(sg.quota)}',
+            value: '${fmt(math.min(s.segSig, quota))} / ${fmt(quota)}',
             valueColor: K.green,
             valueSize: 17,
             below: Padding(

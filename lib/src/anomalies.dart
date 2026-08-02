@@ -57,6 +57,13 @@ abstract class GameAudio {
   void resume();
   void setVol(double v);
 
+  /// Master stereo position, -1 (hard left) .. 1 (hard right).
+  ///
+  /// This game's tells arrive in ONE EAR before they arrive on the tube, which
+  /// is why the hardware check exists and why the bed drifts. It is a mechanic,
+  /// not decoration.
+  void pan(double p);
+
   /// Per-frame update of the ambient bed (drips, whispers, heartbeat, ducking).
   void tick(double dt);
 
@@ -121,6 +128,8 @@ class NullAudio implements GameAudio {
   void resume() {}
   @override
   void setVol(double v) {}
+  @override
+  void pan(double p) {}
   @override
   void tick(double dt) {}
   @override
@@ -457,6 +466,9 @@ class AnomalyRuntime extends ChangeNotifier {
   /// inflow, so the field is pressure rather than wallpaper. Defensively
   /// clamped on read; leaving it at 0 simply removes the inflow.
   double lurkPressure = 0;
+
+  /// Phase clock for the binaural drift.
+  double _drift = 0;
 
   // --- the kill ---
 
@@ -1862,6 +1874,15 @@ class AnomalyRuntime extends ChangeNotifier {
       if (warn <= 0) manifest();
     } else {
       // Between anomalies the heart is only there if the night has gone badly.
+      // BINAURAL DRIFT. The complaint was that the game leans on one loud
+      // panic and has nothing underneath it. The room now MOVES: a slow
+      // wander that widens with dread, so long before anything reaches the
+      // tube the space around you stops sitting still. Amplitude is small on
+      // purpose — if you notice it consciously it has already failed.
+      _drift += dt;
+      final double wander =
+          math.sin(_drift * 0.21) * 0.30 + math.sin(_drift * 0.083) * 0.22;
+      audio.pan(wander * (0.35 + s.dread / 100 * 0.65));
       audio.setHeart(44 + s.dread * 0.36,
           s.dread > 55 ? (s.dread - 55) / 45 * 0.13 : 0);
       // The gap timer is FROZEN inside a protection window. This is the whole

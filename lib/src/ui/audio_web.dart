@@ -84,6 +84,10 @@ extension type _Comp._(JSObject _) implements _Node {
   external _Param get release;
 }
 
+extension type _Panner._(JSObject _) implements _Node {
+  external _Param get pan;
+}
+
 extension type _Buffer._(JSObject _) implements JSObject {
   external void copyToChannel(JSFloat32Array source, int channelNumber);
 }
@@ -108,6 +112,7 @@ extension type _Ctx._(JSObject _) implements JSObject {
   external _Biquad createBiquadFilter();
   external _Shaper createWaveShaper();
   external _Comp createDynamicsCompressor();
+  external _Panner createStereoPanner();
   external _Buffer createBuffer(
       int numberOfChannels, int length, double sampleRate);
   external _BufSrc createBufferSource();
@@ -144,6 +149,7 @@ class WebAudio implements GameAudio {
   // never read again; a connected WebAudio node stays alive on its own, so
   // those two are locals here.
   _Gain? _master;
+  _Panner? _panner;
   _Gain? _staticG;
   _Gain? _droneG;
   _Gain? _roomG;
@@ -194,7 +200,14 @@ class WebAudio implements GameAudio {
     lim.ratio.setValueAtTime(14, t);
     lim.attack.setValueAtTime(0.004, t);
     lim.release.setValueAtTime(0.22, t);
-    master.connect(lim);
+    // Master stereo panner. The bed, the drone and every one-shot go through
+    // it, so a drift is heard as the ROOM moving rather than as one sound
+    // moving — which is the difference between unsettling and gimmicky.
+    final panner = c.createStereoPanner();
+    panner.pan.value = 0;
+    _panner = panner;
+    master.connect(panner);
+    panner.connect(lim);
     lim.connect(c.destination);
 
     // looping noise bed. The one-pole coefficient 0.05 puts its corner at
@@ -286,6 +299,13 @@ class WebAudio implements GameAudio {
   void setVol(double v) {
     _vol = v;
     _master?.gain.value = v;
+  }
+
+  @override
+  void pan(double p) {
+    final pn = _panner;
+    if (pn == null) return;
+    pn.pan.value = p.clamp(-1.0, 1.0);
   }
 
   // -------------------------------------------------------------------------

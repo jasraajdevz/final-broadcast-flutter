@@ -35,8 +35,10 @@ import 'src/ui/rack.dart';
 import 'src/paint/booth.dart';
 import 'src/paint/entities.dart' show drawAnom;
 import 'src/ui/scene_slot.dart';
+import 'src/ui/setup_screen.dart';
 import 'src/ui/status_bar.dart';
 import 'src/ui/toasts.dart';
+import 'src/ui/wings.dart';
 import 'src/ui/ui_kit.dart';
 
 void main() {
@@ -106,6 +108,13 @@ class _GameRootState extends State<GameRoot>
   /// syncUI() ran at ~11Hz in the HTML; the status bar, the rack and the
   /// manual repaint off this rather than off every frame.
   final ValueNotifier<int> _uiPulse = ValueNotifier<int>(0);
+
+  /// Re-opened from the home screen; shown unconditionally on a first run.
+  bool _showSetup = false;
+
+  /// Set by _wings() each layout pass. The in-room directive strip is the
+  /// fallback for when the viewport had no width to spare.
+  bool _wingsShown = false;
 
   /// Bumped only when a modal appears or disappears, so the outer Stack does
   /// not rebuild 60 times a second.
@@ -363,6 +372,11 @@ class _GameRootState extends State<GameRoot>
         final dy = (h - kCabH * scale) / 2;
         final portrait = h > w;
         final tight = math.min(w, h) < 560;
+        // Settle this before _cabinet() is built: the Positioned holding the
+        // cabinet is constructed ahead of _wings() in the child list, so a
+        // flag written inside _wings() would be one frame stale and the room
+        // would briefly show the fallback strip AND the wing.
+        _wingsShown = runtime.signedOn && wingWidthFor(dx, scale) > 0;
         return Stack(
           children: <Widget>[
             const Positioned.fill(
@@ -397,12 +411,66 @@ class _GameRootState extends State<GameRoot>
                 ),
               ),
             ),
+            // THE WINGS. On anything wider than 16:9 the leftover width used
+            // to be black bars. It now carries the meters and the night order,
+            // which is also what decrowds the cabinet: the things that had no
+            // room in 940px live out here instead of fighting for it.
+            ..._wings(dx, dy, scale),
             // only nag when rotating actually helps
             if (portrait && tight) const Positioned.fill(child: RotateNag()),
           ],
         );
       },
     );
+  }
+
+  /// The side panels, at the cabinet's own scale so type sizes match. They
+  /// vanish entirely below [kWingMin] logical px — a 16:9 player must be
+  /// playing the same game, so nothing load-bearing may live out here.
+  List<Widget> _wings(double dx, double dy, double scale) {
+    if (!runtime.signedOn) return const <Widget>[];
+    final double wLogical = wingWidthFor(dx, scale);
+    if (wLogical <= 0) return const <Widget>[];
+    final double wPx = wLogical * scale;
+    final double hPx = kCabH * scale;
+
+    // The wings live in the OUTER stack, above the DefaultTextStyle and the
+    // transparent Material that _cabinet() installs — so without these two
+    // every line of wing copy renders with the missing-Material underline.
+    Widget wrap(Widget child) => FittedBox(
+          fit: BoxFit.fill,
+          child: SizedBox(
+            width: wLogical,
+            height: kCabH,
+            child: DefaultTextStyle(
+              style: mono(14, K.ink),
+              child: Material(type: MaterialType.transparency, child: child),
+            ),
+          ),
+        );
+
+    return <Widget>[
+      Positioned(
+        left: dx - wPx,
+        top: dy,
+        width: wPx,
+        height: hPx,
+        child: AnimatedBuilder(
+          animation: _uiListen,
+          builder: (_, _) => wrap(MeterWing(s: s, runtime: runtime)),
+        ),
+      ),
+      Positioned(
+        left: dx + kCabW * scale,
+        top: dy,
+        width: wPx,
+        height: hPx,
+        child: AnimatedBuilder(
+          animation: _uiListen,
+          builder: (_, _) => wrap(OrderWing(s: s, runtime: runtime)),
+        ),
+      ),
+    ];
   }
 
   Widget _cabinet() {
@@ -433,6 +501,21 @@ class _GameRootState extends State<GameRoot>
                   ),
                 ),
               ),
+
+              // The RIGHT NOW line lives in the wing when there is one. With
+              // no spare width it gets a strip in the room instead, because it
+              // is the one part of the wing that changes how the game plays.
+              if (runtime.signedOn && !_wingsShown)
+                Positioned(
+                  left: 0,
+                  top: kStatusRect.height,
+                  width: kRoom.width,
+                  height: 24,
+                  child: AnimatedBuilder(
+                    animation: _uiListen,
+                    builder: (_, _) => DirectiveStrip(s: s, runtime: runtime),
+                  ),
+                ),
 
               // --- status strip ---
               Positioned(
@@ -536,7 +619,19 @@ class _GameRootState extends State<GameRoot>
                       s: s,
                       onSignOn: _signOn,
                       onManual: _openManual,
+                      onSetup: () => setState(() => _showSetup = true),
                     )),
+              // THE LINE-UP CARD sits on top of the home screen, because a
+              // player on laptop speakers is playing a different, worse game
+              // and there is no way for them to find that out in-fiction.
+              if (!runtime.signedOn && (!s.hardwareChecked || _showSetup))
+                Positioned.fill(
+                  child: SetupScreen(
+                    s: s,
+                    runtime: runtime,
+                    onDone: () => setState(() => _showSetup = false),
+                  ),
+                ),
             ],
             ),
           ),
