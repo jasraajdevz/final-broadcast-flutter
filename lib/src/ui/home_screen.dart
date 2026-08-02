@@ -13,6 +13,7 @@ import 'package:flutter/widgets.dart';
 
 import '../consts.dart';
 import '../meta.dart';
+import '../nights.dart';
 import '../state.dart';
 import 'ui_kit.dart';
 
@@ -71,7 +72,13 @@ class HomeScreen extends StatelessWidget {
                 else
                   _Brief(ui: s.ui),
 
-                const SizedBox(height: 22),
+                const SizedBox(height: 16),
+                // TONIGHT'S CARD. The answer to "night 6 is night 1 with
+                // bigger numbers": every night after the first has a name and
+                // a shape, and you know both before you sign on.
+                if (s.night > 1) _Card(ui: s.ui, night: s.night),
+                if (s.night > 1) const SizedBox(height: 16),
+                if (s.night <= 1) const SizedBox(height: 6),
                 _Big(
                   ui: s.ui,
                   label: _returning ? 'TAKE THE NIGHT SHIFT' : 'SIGN ON',
@@ -364,6 +371,42 @@ class _Tertiary extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
         child: Text(label,
             style: t.at(10, hover ? K.ink : K.lbl, ls: 2.5)),
+      ),
+    );
+  }
+}
+
+/// Tonight's standing conditions, on the front desk.
+class _Card extends StatelessWidget {
+  const _Card({required this.ui, required this.night});
+  final double ui;
+  final int night;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    final c = cardForNight(night);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 660),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 11, 16, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF120D05),
+          border: Border.all(color: K.amberDim),
+        ),
+        child: Column(
+          children: <Widget>[
+            Text('TONIGHT', style: t.at(9, K.lbl, ls: 4)),
+            const SizedBox(height: 4),
+            Text(c.nm,
+                textAlign: TextAlign.center,
+                style: t.at(17, K.amber, ls: 4, w: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text(c.ds,
+                textAlign: TextAlign.center,
+                style: t.at(11.5, K.bootBody, h: 1.7)),
+          ],
+        ),
       ),
     );
   }

@@ -105,6 +105,28 @@ class Booth {
         );
       g.drawRect(kRoom, wp);
     }
+    // THE SAVE. A clean kill blows the tube out white; a save rings the whole
+    // ROOM instead — a cold ring closing inward, so peripheral vision catches
+    // it even when you are staring at the bezel. Drawn under the blackout so
+    // a save into a scare still reads as two events.
+    if (runtime.clutchFx > 0.004) {
+      final double k = runtime.clutchFx;
+      final double r = kRoom.width * (0.30 + 0.42 * (1 - k));
+      final ui.Paint cp = ui.Paint()
+        ..blendMode = ui.BlendMode.plus
+        ..shader = ui.Gradient.radial(
+          ui.Offset(kScr.center.dx, kScr.center.dy),
+          r,
+          <ui.Color>[
+            rgba(90, 220, 255, 0),
+            rgba(90, 220, 255, k * 0.30),
+            rgba(90, 220, 255, 0),
+          ],
+          <double>[0.0, 0.82, 1.0],
+        );
+      g.drawRect(kRoom, cp);
+      fillRect(g, 0, 0, kRoom.width, kRoom.height, rgba(120, 210, 255, k * 0.05));
+    }
     // BLACKOUT beat — the room's lights go. Drawn before the flash so a scare
     // that blacks out and then hits still reads as two separate events.
     final double dark = runtime.blackoutAlpha;

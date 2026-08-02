@@ -224,6 +224,10 @@ class Stats {
   int wrong = 0;
   int scared = 0;
   int perfect = 0;
+
+  /// Saves landed in the last sliver of the window. The stat a player brags
+  /// about, and the one the sign-off sheet leads with.
+  int clutch = 0;
   int streak = 0;
   int bestStreak = 0;
   int ads = 0;
@@ -233,6 +237,7 @@ class Stats {
         'wrong': wrong,
         'scared': scared,
         'perfect': perfect,
+        'clutch': clutch,
         'streak': streak,
         'bestStreak': bestStreak,
         'ads': ads,
@@ -243,6 +248,7 @@ class Stats {
     wrong = _int(o['wrong'], wrong);
     scared = _int(o['scared'], scared);
     perfect = _int(o['perfect'], perfect);
+    clutch = _int(o['clutch'], clutch);
     streak = _int(o['streak'], streak);
     bestStreak = _int(o['bestStreak'], bestStreak);
     ads = _int(o['ads'], ads);

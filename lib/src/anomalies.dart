@@ -38,6 +38,7 @@ import 'package:flutter/foundation.dart';
 
 import 'consts.dart';
 import 'economy.dart';
+import 'nights.dart';
 import 'meta.dart';
 import 'encounter.dart';
 import 'state.dart';
@@ -93,6 +94,11 @@ abstract class GameAudio {
   /// Something gave, and something is still there.
   void relay();
 
+  /// A save landed in the last sliver of the window. Deliberately not a bigger
+  /// [banishStinger]: it is a different EVENT — the intake of breath after the
+  /// near-miss — and it plays over the stinger, not instead of it.
+  void clutchSting();
+
   /// A streak of [lost] consecutive banishes just ended. Play the loss of it,
   /// not just the scare on top.
   void streakBroken(int lost);
@@ -122,6 +128,8 @@ abstract class GameAudio {
 /// with no sound stack at all.
 class NullAudio implements GameAudio {
   const NullAudio();
+  @override
+  void clutchSting() {}
   @override
   void init() {}
   @override
@@ -410,6 +418,10 @@ const double kHitstopHit = 0.045;
 /// Frozen seconds on a partial — the TWO-STAGE flinch, half a COUPLED pair.
 const double kHitstopPartial = 0.035;
 
+/// A save landed in the last 14% of the window. Longer than a clean kill on
+/// purpose: the near-loss is the moment worth feeling, and worth clipping.
+const double kHitstopClutch = 0.115;
+
 /// Shake on a clean kill. For scale: a wrong key is 11, a tool is 16, the
 /// LUNGE jumpscare is 34. Being RIGHT has to out-punch being wrong.
 const double kShakeClean = 26;
@@ -449,6 +461,9 @@ class AnomalyRuntime extends ChangeNotifier {
   Anom? scareDef;
   double banishFx = 0;
   double wrongFx = 0;
+
+  /// 1 -> 0 after a last-second save. Read by the painters for the flare.
+  double clutchFx = 0;
 
   /// Which counter was pressed in error, so the painters can flash THAT key
   /// rather than the whole deck. Cleared with [wrongFx].
@@ -1038,7 +1053,7 @@ class AnomalyRuntime extends ChangeNotifier {
     // has always read.
     shake = math.max(shake, kShakeWrong);
     glitch = math.max(glitch, 1);
-    s.dread = math.min(100, s.dread + 3);
+    s.dread = math.min(100, s.dread + 3 * cardOf(s).dread);
     // The first fumble of every night names the manual. The measured blind run
     // went five minutes without ever being told what the deck was for.
     if (nightWrongs == 1) {
@@ -1107,15 +1122,23 @@ class AnomalyRuntime extends ChangeNotifier {
     // between two frames, which is why being RIGHT used to produce 0px of shake
     // while being WRONG produced 6. It now leaves a body for the painters to
     // blow out, and stops the world for a moment on the way.
+    // THE CLUTCH SAVE. A kill landed with 0.4s left and a kill landed with 4s
+    // left were the same event: same shake, same sting, same toast. That is
+    // the "last second loop" the game was missing — the moment worth clipping
+    // is the one you nearly lost, and it has to be LOUDER than a clean kill,
+    // not quieter.
+    final bool clutch = success && a.t > a.window * 0.86;
     if (success) {
       final clean = a.t < a.window * 0.4;
       dying = a;
       dyingT = 0;
       dyingSpan = silent ? kDyingSpanQuiet : kDyingSpan;
       if (!silent) {
-        hitstop = math.max(hitstop, clean ? kHitstopClean : kHitstopPartial);
-        shake = math.max(shake, clean ? 10.0 : 6.5);
-        flash = math.max(flash, clean ? 0.34 : 0.2);
+        hitstop = math.max(
+            hitstop, clutch ? kHitstopClutch : (clean ? kHitstopClean : kHitstopPartial));
+        shake = math.max(shake, clutch ? 13.0 : (clean ? 10.0 : 6.5));
+        flash = math.max(flash, clutch ? 0.42 : (clean ? 0.34 : 0.2));
+        if (clutch) clutchFx = 1;
       }
     }
     glitch = 0;
@@ -1135,6 +1158,10 @@ class AnomalyRuntime extends ChangeNotifier {
       // NOTE: computed AFTER active=null, so sigRate() here is unmuted.
       var bonus = math.max(sigRateRaw(s) * (fast ? 18 : 9),
           tuneYield(s, this) * (fast ? 26 : 14));
+      bonus *= cardOf(s).banishPay;
+      // A save pays like a clean kill. It is harder than a clean kill; it was
+      // paying the partial rate purely because the timer had run down.
+      if (clutch) bonus *= 1.6;
       if (a.held > 0) {
         final back = a.held * (fast ? 1.45 : 1.2);
         bonus += back;
@@ -1147,11 +1174,16 @@ class AnomalyRuntime extends ChangeNotifier {
       s.lifetimeSig += bonus;
       banishFx = 1;
       s.dread = math.max(0, s.dread - 6);
-      if (!silent) audio.banishStinger(fast, s.stats.streak);
+      if (clutch) {
+        s.stats.clutch++;
+        if (!silent) audio.clutchSting();
+      }
+      if (!silent) audio.banishStinger(fast || clutch, s.stats.streak);
       s.toast(
-          '${fast ? "CLEAN KILL — " : "BANISHED — "}${a.def.nm}  +${fmt(bonus)} SIG'
+          '${clutch ? "LAST SECOND — " : (fast ? "CLEAN KILL — " : "BANISHED — ")}'
+          '${a.def.nm}  +${fmt(bonus)} SIG'
           '${s.stats.streak > 2 ? "   ×${s.stats.streak} STREAK" : ""}',
-          ToastKind.good);
+          clutch ? ToastKind.gold : ToastKind.good);
 
       // --- the ALL CLEAR ---
       // The whole point of the deck: if you got it right, you are SAFE, and
@@ -1210,7 +1242,7 @@ class AnomalyRuntime extends ChangeNotifier {
         final budget = 9 * sabK();
         final pay = math.min(budget - a.dreadPaid, budget / 7);
         if (pay > 0) {
-          s.dread = math.min(100, s.dread + pay);
+          s.dread = math.min(100, s.dread + pay * cardOf(s).dread);
           a.dreadPaid += pay;
         }
         audio.ring();
@@ -1459,7 +1491,7 @@ class AnomalyRuntime extends ChangeNotifier {
     }
     s.sig = math.max(0, s.sig);
     s.segSig = math.max(0, s.segSig);
-    s.dread = math.min(100, s.dread + 26);
+    s.dread = math.min(100, s.dread + 26 * cardOf(s).dread);
     s.toast(
         'X ${def.nm} '
         '${beat == ScareBeat.falseClear ? "NEVER LEFT" : "GOT THROUGH"}'
@@ -1624,13 +1656,15 @@ class AnomalyRuntime extends ChangeNotifier {
           'YOU MADE IT TO 06:00.',
           ' Night ${s.night} survived — ${s.stats.banished} banished, '
               '${s.stats.scared} got through, best streak '
-              '${s.stats.bestStreak}.',
+              '${s.stats.bestStreak}'
+              '${s.stats.clutch > 0 ? ", ${s.stats.clutch} on the buzzer" : ""}.',
         ]),
         EndPara(<String>[
           'Sign the log and hand over. Bank ',
           '${fmt(g)} ratings points',
-          ' (permanent ×$mult to everything) and open NIGHT ${s.night + 1}, '
-              'which starts at 23:00 and is worse.',
+          ' (permanent ×$mult to everything) and open NIGHT ${s.night + 1}: ',
+          cardForNight(s.night + 1).nm,
+          '. It starts at 23:00.',
         ]),
         EndPara(<String>['Nights survived: ${s.survived}'], ParaStyle.fine),
       ],
@@ -1740,6 +1774,7 @@ class AnomalyRuntime extends ChangeNotifier {
     flash = math.max(0, flash - dt * 3.2);
     // The false clear holds its green wash until the beat takes it away.
     if (!falseClear) banishFx = math.max(0, banishFx - dt * 2.4);
+    clutchFx = math.max(0, clutchFx - dt * 1.6);
     wrongFx = math.max(0, wrongFx - dt * 3);
     blackout = math.max(0, blackout - dt);
     if (scare > 0) {
@@ -1814,7 +1849,7 @@ class AnomalyRuntime extends ChangeNotifier {
             1200, advice[_stallAdvice % advice.length], ToastKind.gold);
         _stallAdvice++;
       }
-      s.dread = math.min(100, s.dread + dt * 0.9);
+      s.dread = math.min(100, s.dread + dt * 0.9 * cardOf(s).dread);
     } else {
       if (s.stalled) {
         s.stalled = false;
@@ -1862,7 +1897,8 @@ class AnomalyRuntime extends ChangeNotifier {
     final a = active;
     if (a != null) {
       a.t += dt;
-      s.dread = math.min(100, s.dread + dt * (1.2 + depth(s) * 0.02));
+      s.dread = math.min(
+          100, s.dread + dt * (1.2 + depth(s) * 0.02) * cardOf(s).dread);
       final p = a.t / a.window;
       audio.setStatic(a.def.id == 'dead' ? 0.005 : 0.08 + p * 0.22);
       // 54 -> 172bpm; p*p back-loads the panic

@@ -21,6 +21,7 @@ import 'package:flutter/widgets.dart';
 import '../anomalies.dart';
 import '../consts.dart';
 import '../economy.dart';
+import '../nights.dart';
 import '../objective.dart';
 import '../state.dart';
 import 'ui_kit.dart';
@@ -154,6 +155,20 @@ class OrderWing extends StatelessWidget {
           held: !quotaMet(s),
         ),
 
+        // TONIGHT'S CONDITIONS. Live, because a card that changes the
+        // window or the gap has to be re-readable mid-shift.
+        if (s.night > 1) ...<Widget>[
+          const SizedBox(height: 12),
+          _Rule(),
+          const SizedBox(height: 8),
+          Text('CONDITIONS', style: t.at(9, K.lbl, ls: 2.5)),
+          const SizedBox(height: 3),
+          Text(cardOf(s).nm,
+              style: t.at(11, K.amber, ls: 1.5, w: FontWeight.bold)),
+          const SizedBox(height: 2),
+          Text(cardOf(s).ds, style: t.at(9.5, K.bootBody, h: 1.5)),
+        ],
+
         const SizedBox(height: 14),
         _Rule(),
         const SizedBox(height: 8),
@@ -208,6 +223,7 @@ class OrderWing extends StatelessWidget {
           runSpacing: 4,
           children: <Widget>[
             _Tiny(ui: s.ui, k: 'STREAK', v: '${s.stats.streak}'),
+            _Tiny(ui: s.ui, k: 'SAVES', v: '${s.stats.clutch}'),
             _Tiny(ui: s.ui, k: 'BANISHED', v: fmt(s.stats.banished)),
             _Tiny(ui: s.ui, k: 'RP TONIGHT', v: fmt(rpGain(s))),
           ],

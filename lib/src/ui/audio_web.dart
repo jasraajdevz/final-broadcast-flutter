@@ -822,6 +822,75 @@ class WebAudio implements GameAudio {
   /// There are eight relays in the desk, they are not tuned to each other and
   /// they never were, so consecutive closes step around a small pitch ring and
   /// jitter on top of it. Nothing here is ever exactly the same twice.
+  /// THE SAVE. A held breath let out: the room's bed ducks hard for a beat,
+  /// a rising third resolves, and a single ferrite tick lands late enough to
+  /// read as "that was close" rather than "well done". It plays OVER the
+  /// banish stinger, so a save is audibly a different event from a clean kill.
+  @override
+  void clutchSting() {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null) return;
+    final t = c.currentTime;
+
+    // pull the room out from under it for a third of a second
+    duck(0.34, 320);
+
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+
+    // the breath: noise through a sweeping bandpass, in and gone
+    final n = _noise(t, 0.42);
+    if (n != null) {
+      final bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(300, t);
+      bp.frequency.exponentialRampToValueAtTime(1900, t + 0.30);
+      bp.q.value = 3.2;
+      final ng = c.createGain();
+      ng.gain.setValueAtTime(0.0001, t);
+      ng.gain.exponentialRampToValueAtTime(0.10, t + 0.05);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+      n.connect(bp);
+      bp.connect(ng);
+      ng.connect(out);
+    }
+
+    // the resolve: a minor third that walks up to a major one
+    for (var i = 0; i < 2; i++) {
+      final o = c.createOscillator();
+      o.type = 'triangle';
+      final f0 = i == 0 ? 330.0 : 392.0;
+      final f1 = i == 0 ? 330.0 : 440.0;
+      o.frequency.setValueAtTime(f0, t + 0.06);
+      o.frequency.exponentialRampToValueAtTime(f1, t + 0.34);
+      final g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t + 0.06);
+      g.gain.exponentialRampToValueAtTime(i == 0 ? 0.075 : 0.055, t + 0.11);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
+      o.connect(g);
+      g.connect(out);
+      o.start(t + 0.06);
+      o.stop(t + 0.66);
+    }
+
+    // the late tick — the sound of the margin you did not have
+    final k = c.createOscillator();
+    k.type = 'square';
+    k.frequency.setValueAtTime(2100, t + 0.40);
+    k.frequency.exponentialRampToValueAtTime(700, t + 0.45);
+    final kg = c.createGain();
+    kg.gain.setValueAtTime(0.0001, t + 0.40);
+    kg.gain.exponentialRampToValueAtTime(0.07, t + 0.405);
+    kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.47);
+    k.connect(kg);
+    kg.connect(out);
+    k.start(t + 0.40);
+    k.stop(t + 0.48);
+
+    _kill(out, 0.7);
+  }
+
   @override
   void relay() {
     final c = _c, master = _master;

@@ -20,6 +20,7 @@ import 'dart:math' as math;
 import 'anomalies.dart';
 import 'consts.dart';
 import 'encounter.dart';
+import 'nights.dart';
 import 'meta.dart';
 import 'state.dart';
 
@@ -136,6 +137,7 @@ double sigMult(GameState s) {
   // clock did nothing at all.
   if ((s.ups['halide'] ?? false) && !quotaMet(s)) m *= 1.6;
   m *= metaOutputMult(s); // NIGHT SHIFT PAY, permanent
+  m *= cardOf(s).output; // tonight's standing conditions
   return m;
 }
 
@@ -168,7 +170,8 @@ double sigRate(GameState s, AnomalyRuntime a) {
 }
 
 /// JS rpGain().
-int rpGain(GameState s) => math.pow(s.lifetimeSig / 2.5e5, 0.5).floor();
+int rpGain(GameState s) =>
+    (math.pow(s.lifetimeSig / 2.5e5, 0.5) * cardOf(s).rp).floor();
 
 /// JS tuneYield() — striking the set. The bootstrap and the thing to do
 /// between anomalies.
@@ -267,7 +270,7 @@ double anomIntervalMean(GameState s, int nightIndex) {
   // quota used to cut the gap by a quarter down to 6.5s, which is how a bad
   // segment turned into a dead run.
   if (s.stalled) base = math.max(15.0, base * 0.9);
-  return base * openingEase(nightIndex);
+  return base * openingEase(nightIndex) * cardOf(s).gap;
 }
 
 /// Seconds until the next telegraph, jittered but never surged. Randomised on
@@ -313,6 +316,7 @@ double banishWindow(GameState s) {
   w *= 1 - kWindowNightSqueeze * nightPressure(s);
   if (s.ups['ferrite'] ?? false) w += 1.2;
   w += metaWindowBonus(s); // FERRITE STOCK, permanent
+  w *= cardOf(s).window;
   return math.max(kWindowFloor, w);
 }
 
@@ -441,7 +445,8 @@ const double kStallRepeat = 8.5;
 double dreadFloor(GameState s) {
   final seg = segIndex(s).toDouble();
   final base = seg * 2.4;
-  return math.min(kDreadFloorCap, base * (1 + 1.5 * nightPressure(s)));
+  return math.min(
+      kDreadFloorCap, base * (1 + 1.5 * nightPressure(s)) * cardOf(s).dread);
 }
 
 // --- the revive -------------------------------------------------------------
@@ -478,7 +483,8 @@ RundownSeg segOf(GameState s) => kRundown[segIndex(s)];
 ///
 /// Night one is exactly the printed number, so the tutorial shift is the game
 /// as documented.
-double quotaScale(GameState s) => 1 + 0.55 * nightPressure(s);
+double quotaScale(GameState s) =>
+    (1 + 0.55 * nightPressure(s)) * cardOf(s).quota;
 
 /// Tonight's quota for segment [i].
 double quotaOf(GameState s, int i) {
