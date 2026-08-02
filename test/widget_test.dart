@@ -180,7 +180,7 @@ void main() {
         runtime.signalLost();
         await stage(tester, EndSheet(s: s, runtime: runtime),
             width: 1280, height: 720);
-        expect(find.text('◼ SIGNAL LOST'), findsOneWidget);
+        expect(find.text('## SIGNAL LOST'), findsOneWidget);
         expect(find.textContaining('EMERGENCY SPONSOR'), findsOneWidget);
       });
 

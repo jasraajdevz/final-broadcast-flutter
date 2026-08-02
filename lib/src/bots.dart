@@ -599,7 +599,10 @@ class BotRuntime extends ChangeNotifier {
     final need = seg.quota - s.segSig;
     if (need <= 0) return;
 
-    var pull = s.sig * mgrPull(lvl) * dt;
+    // Capped by INCOME, not by the bank. At 8-14% of BANK per second the float
+    // equilibrated at ~7 seconds of income and no tier was ever affordable
+    // again; measured 600K -> 250K with the next tier permanently out of reach.
+    var pull = math.min(s.sig * mgrPull(lvl), sigRate(s, runtime) * 0.6) * dt;
     pull = math.min(pull, need / eff);
     pull = math.min(pull, left / eff);
     pull = math.min(pull, s.sig);
@@ -655,7 +658,13 @@ class BotRuntime extends ChangeNotifier {
     _librCd = librEvery(lvl);
     final c = kCounterBy[a.def.counter];
     s.toast('THE LIBRARIAN PULLS ${c?.nm ?? a.def.counter}', ToastKind.good);
-    runtime.pressCounter(a.def.counter);
+    // NOT pressCounter — that pays the full banish and let a maxed Librarian
+    // play whole nights unattended. assistBanish clears the tube and pays the
+    // signal, but earns no lifetime output, no streak and no calm.
+    runtime.assistBanish();
+    // And it costs something: the vault robot working the floor is its own
+    // kind of wrong, and it closes the dread loop that used to sit at zero.
+    s.dread = math.min(100, s.dread + 4);
   }
 
   // -------------------------------------------------------------------------

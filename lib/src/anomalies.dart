@@ -515,6 +515,24 @@ class AnomalyRuntime extends ChangeNotifier {
     gapSpan = nextAt;
   }
 
+  /// A banish the PLAYER did not perform. Clears the tube and pays the signal
+  /// so a bot can still save you, but credits no lifetime output, no streak and
+  /// no calm — automation must not be able to earn your prestige for you.
+  /// Measured before this existed: a maxed Librarian, zero key presses, banked
+  /// 37 RP a night on its own.
+  void assistBanish() {
+    final a = active;
+    if (a == null) return;
+    final before = s.lifetimeSig;
+    final streak = s.stats.streak;
+    final calmWas = calm, calmSpanWas = calmSpan;
+    resolve(true, true);
+    s.lifetimeSig = before;
+    s.stats.streak = streak;
+    calm = calmWas;
+    calmSpan = calmSpanWas;
+  }
+
   /// Opens the guaranteed-quiet window a correct answer just bought.
   ///
   /// Never shortens an existing window — a rapid second banish can only ever
@@ -1356,6 +1374,10 @@ class AnomalyRuntime extends ChangeNotifier {
       }
       s.shiftMin += dt / kMinReal;
       if (segIndex(s) != seg0 && s.shiftMin < kShiftMinutes) {
+        // A quota measures what you broadcast DURING its segment. Without this
+        // reset the thresholds silently became cumulative, which is not what
+        // the HUD ("BROADCAST / THIS SEGMENT") or the Nielsen's restatement say.
+        s.segSig = 0;
         final sg = segOf(s);
         s.toast('▶ ${shiftClock(s)}  ${sg.nm}', ToastKind.gold);
         s.toasts.pushDelayed(1100, sg.line, ToastKind.gold);
@@ -1416,6 +1438,10 @@ class AnomalyRuntime extends ChangeNotifier {
           aftermathSpan = 0;
         }
       } else if (calm > 0) {
+        // Calm BLOCKS a manifest; it must not also pause the countdown, or the
+        // protection is additive to the gap and the effective spacing nearly
+        // doubles. Measured before this: a whole night peaked at 3.2 dread.
+        nextAt -= dt;
         calm -= dt;
         if (calm <= 0) {
           calm = 0;

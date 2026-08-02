@@ -284,7 +284,7 @@ class _GameRootState extends State<GameRoot>
       }
       return KeyEventResult.handled;
     }
-    if (ch != null && kToolKeys.contains(ch)) {
+    if (ch != null && kToolKeys.contains(ch) && !_manualOpen) {
       runtime.audio.init();
       runtime.audio.resume();
       tools.pressKey(ch, purchase: HardwareKeyboard.instance.isShiftPressed);

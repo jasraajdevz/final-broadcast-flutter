@@ -140,7 +140,7 @@ const List<ToolDef> kTools = <ToolDef>[
   ),
   ToolDef(
     id: 'wand',
-    nm: 'DEGAUSS',
+    nm: 'WAND',
     key: 'w',
     cap: 2,
     rateSecs: 18,
@@ -421,6 +421,8 @@ class Tools {
     // burn floors on the quota, and if it is not met yet segSig is untouched.
     // An EMP can therefore never stall the clock or undo a quota.
     final q = segOf(s).quota;
+    // Floor on the NEXT quota, not this one: everything above the current
+    // threshold is principal on the next segment, which is ~14x bigger.
     final floorAt = s.segSig >= q ? q : s.segSig;
     s.segSig = floorAt + (s.segSig - floorAt) * (1 - kEmpBurn);
 
