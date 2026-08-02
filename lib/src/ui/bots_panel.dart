@@ -33,6 +33,27 @@ List<Widget> botsRackRows(GameState s, AnomalyRuntime runtime) {
         style: t.at(13, K.noteInk, h: 1.5),
       ),
     ),
+    // RIG DEPTH, stated once at the top, because a ceiling the player cannot
+    // see is indistinguishable from a bug.
+    Padding(
+      padding: const EdgeInsets.only(left: 2, right: 2, bottom: 8),
+      child: RichText(
+        text: TextSpan(
+          style: t.at(13, K.noteInk, h: 1.5),
+          children: <InlineSpan>[
+            TextSpan(
+                text: 'RIG DEPTH ${rigDepth(s)}',
+                style: t.at(13, K.amber, h: 1.5, w: FontWeight.bold)),
+            TextSpan(
+              text: '  —  the three machines that could work the desk without '
+                  'you (${_deepNames()}) will not rig deeper than this '
+                  'tonight, however rich you are. Depth is bought with nights '
+                  'you took all the way to 06:00, and with ratings.',
+            ),
+          ],
+        ),
+      ),
+    ),
   ];
 
   for (final b in kBots) {
@@ -79,6 +100,9 @@ List<Widget> botsRackRows(GameState s, AnomalyRuntime runtime) {
 
   return out;
 }
+
+String _deepNames() =>
+    kBots.where((b) => b.deep).map((b) => b.nm).join(', ');
 
 /// The AUTO tab as a standalone scrollable panel.
 class BotsPanel extends StatelessWidget {
@@ -135,25 +159,29 @@ class _BotRow extends StatelessWidget {
     final lvl = bots.levelOf(def);
     final unlocked = bots.unlocked(def);
     final maxed = bots.maxed(def);
+    // Rigged as deep as tonight allows, but the machine has levels left. Reads
+    // as "come back tomorrow", not as "finished".
+    final capped = !maxed && bots.atRigCap(def);
     final cost = bots.costFor(def);
-    final afford = unlocked && !maxed && s.sig >= cost;
+    final afford = unlocked && !maxed && !capped && s.sig >= cost;
     final on = bots.enabled(def);
     final running = lvl > 0 && on;
 
     final String costText = !unlocked
         ? 'SEALED'
-        : (maxed ? 'RIGGED' : fmt(cost));
+        : (maxed ? 'RIGGED' : (capped ? 'RIG LIMIT' : fmt(cost)));
 
     // The line you own, and the line you would be buying.
     final String? nowLine =
         lvl > 0 ? 'LVL $lvl  ·  ${bots.effectAt(def, lvl)}' : null;
-    final String? nextLine = maxed
+    final String? nextLine = (maxed || capped)
         ? null
         : 'LVL ${lvl + 1}  ·  ${bots.effectAt(def, lvl + 1)}';
+    final String? rigNote = bots.rigNoteOf(def);
     final String? risk = bots.riskOf(def);
     final String status = bots.statusOf(def);
 
-    final VoidCallback? onTap = (!unlocked || maxed) ? null : _buy;
+    final VoidCallback? onTap = (!unlocked || maxed || capped) ? null : _buy;
 
     final Widget row = Pressable(
       onTap: onTap,
@@ -209,7 +237,7 @@ class _BotRow extends StatelessWidget {
                                 15,
                                 !unlocked
                                     ? K.manUnk
-                                    : (maxed
+                                    : (maxed || capped
                                         ? K.itemStat
                                         : (afford ? K.green : K.amber))),
                           ),
@@ -240,6 +268,14 @@ class _BotRow extends StatelessWidget {
                               13, nowLine == null ? K.itemStat : K.headInk,
                               h: 1.35),
                         ),
+                      ),
+
+                    // --- the ceiling tonight, when that is what is stopping you ---
+                    if (rigNote != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(rigNote,
+                            style: t.at(13, K.amber, h: 1.35)),
                       ),
 
                     // --- how it fails ---
@@ -284,7 +320,7 @@ class _BotRow extends StatelessWidget {
                                     ls: 1),
                               ),
                             ),
-                            if (!maxed && !afford)
+                            if (!maxed && !capped && !afford)
                               Text('${bots.percentToward(def)}%',
                                   maxLines: 1,
                                   softWrap: false,

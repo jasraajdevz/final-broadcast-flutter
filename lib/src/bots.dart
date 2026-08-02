@@ -29,6 +29,30 @@
 //
 // Bots survive sign-off, like the one-time hardware in the HARDWARE tab. They
 // are installed equipment, not stock.
+//
+// ---------------------------------------------------------------------------
+// RIG DEPTH — the one thing in this file that changes night over night
+//
+// Unlock predicates used to be a mixture of lifetime counters and ONE night
+// INDEX (`s.night >= 2`), which is not a measure of anything: signing off after
+// ninety seconds of night one increments it. So the rack was effectively
+// complete the moment you could afford it, and night nine was night one with
+// bigger numbers.
+//
+// The three machines that can carry a shift on their own — THE STOREMAN, who
+// spends your float, THE NIGHT MANAGER, who can pay a quota for you, and THE
+// LIBRARIAN, who can press a key for you — are now capped by RIG DEPTH, which
+// is bought with NIGHTS YOU ACTUALLY FINISHED (`s.survived`) and with banked
+// ratings, not with the night counter. On night one every one of them is a
+// level-1 machine no matter how rich you are; the ceiling lifts as the station
+// learns you are coming back.
+//
+// This is a cap on BUYING only. `levelOf` is never clamped down — a level you
+// have already paid for is yours forever, and a save that arrives above the
+// cap keeps every level in it.
+//
+// Nothing here can make a run unwinnable. Every bot is a machine that does a
+// job you can already do by hand.
 
 import 'dart:math' as math;
 
@@ -59,6 +83,62 @@ double botFailChance(double dread) {
 }
 
 // ---------------------------------------------------------------------------
+// The prestige meta layer, read defensively.
+// ---------------------------------------------------------------------------
+
+/// A permanent, ratings-bought level, read out of the save WITHOUT this file
+/// owning any of it.
+///
+/// The prestige workstream owns the shop that writes these; this is only the
+/// reader, so the rack degrades to exactly its old behaviour (every level 0)
+/// if nothing has been bought or if the shop is not wired yet. The convention
+/// is the same one the bots' own levels use: an int under `meta.<id>` in
+/// `s.prod`, with a bare `true` under `meta.<id>` in `s.ups` accepted as
+/// level 1 for one-shot purchases.
+int metaLevel(GameState s, String id) {
+  final n = s.prod['meta.$id'] ?? 0;
+  if (n > 0) return n;
+  return (s.ups['meta.$id'] ?? false) ? 1 : 0;
+}
+
+/// The meta level that buys rack quality. Named once, here, so there is a
+/// single string to agree on.
+const String kMetaRackId = 'rack';
+
+/// How deep the rack may be rigged tonight — the ceiling on the three machines
+/// that could otherwise play the shift for you. See the RIG DEPTH note at the
+/// top of the file.
+///
+/// Nights FINISHED, not nights started: `s.survived` only moves at 06:00.
+/// Ratings count too, so a player who prestiges instead of surviving still
+/// climbs, just slower.
+int rigDepth(GameState s) {
+  var d = 1 + s.survived;
+  if (s.rp >= 1) d++;
+  if (s.rp >= 12) d++;
+  d += metaLevel(s, kMetaRackId);
+  return d < 1 ? 1 : d;
+}
+
+/// The dread failure curve as it applies to THIS station. Ratings can steady
+/// the rack's hands, but never past a floor: a rack that stops jamming at 100
+/// dread is a rack that deletes the horror, so the relief is capped at 0.12 and
+/// a maxed meta still misfires better than one time in three at 100.
+double botFailChanceFor(GameState s) {
+  final soft = math.min(0.12, metaLevel(s, kMetaRackId) * 0.04);
+  final c = botFailChance(s.dread) - soft;
+  return c < 0 ? 0 : c;
+}
+
+/// Dread at which THE NIGHT MANAGER leaves the building.
+double mgrGoneAt(GameState s) =>
+    kMgrGoneAt + math.min(6.0, metaLevel(s, kMetaRackId) * 2.0);
+
+/// Dread at which the vault browns out and THE LIBRARIAN stops.
+double librBrownoutAt(GameState s) =>
+    kLibrBrownoutAt + math.min(8.0, metaLevel(s, kMetaRackId) * 3.0);
+
+// ---------------------------------------------------------------------------
 // Definitions
 // ---------------------------------------------------------------------------
 
@@ -74,6 +154,7 @@ class BotDef {
     required this.maxLvl,
     required this.req,
     required this.reqNote,
+    this.deep = false,
   });
 
   final String id;
@@ -90,6 +171,10 @@ class BotDef {
   /// Unlock predicate. Locked rows are still SHOWN, greyed, with [reqNote].
   final BotReq req;
   final String reqNote;
+
+  /// True for the machines that could carry a shift on their own. Their level
+  /// is additionally capped by [rigDepth] — see the note at the top.
+  final bool deep;
 }
 
 /// Six of them. Ordered by price, which is also roughly the order you need
@@ -136,6 +221,7 @@ final List<BotDef> kBots = <BotDef>[
     cost: 1.8e5,
     mul: 4.6,
     maxLvl: 4,
+    deep: true,
     req: (s) => s.stats.banished >= 6,
     reqNote: 'BANISH 6',
   ),
@@ -147,8 +233,11 @@ final List<BotDef> kBots = <BotDef>[
     cost: 2.2e6,
     mul: 5.0,
     maxLvl: 3,
-    req: (s) => s.night >= 2 || s.rp >= 1,
-    reqNote: 'SURVIVE OR SIGN OFF ONE NIGHT',
+    deep: true,
+    // Was `s.night >= 2`, which signing off ninety seconds into night one
+    // satisfies. Nights you FINISHED, or ratings you actually banked.
+    req: (s) => s.survived >= 1 || s.rp >= 1,
+    reqNote: 'TAKE A NIGHT TO 06:00, OR BANK A RATINGS POINT',
   ),
   BotDef(
     id: 'libr',
@@ -159,8 +248,11 @@ final List<BotDef> kBots = <BotDef>[
     cost: 2.6e7,
     mul: 5.6,
     maxLvl: 3,
-    req: (s) => s.stats.banished >= 15,
-    reqNote: 'BANISH 15',
+    deep: true,
+    // The one machine that can press a key for you. It takes a finished night
+    // on top of the tape count — the vault does not open for a first-nighter.
+    req: (s) => s.stats.banished >= 15 && (s.survived >= 1 || s.rp >= 3),
+    reqNote: 'BANISH 15 — AND FINISH A NIGHT',
   ),
 ];
 
@@ -318,16 +410,37 @@ class BotRuntime extends ChangeNotifier {
 
   bool maxed(BotDef b) => levelOf(b) >= b.maxLvl;
 
-  /// Cost of the NEXT level. Infinity when maxed, so `s.sig >= costOf` is
-  /// always false there.
+  /// The deepest this machine may be rigged TONIGHT. Only the three that could
+  /// carry a shift on their own are capped; the rest are always their own
+  /// maxLvl. See the RIG DEPTH note at the top of the file.
+  int rigCapOf(BotDef b) {
+    if (!b.deep) return b.maxLvl;
+    final d = rigDepth(s);
+    return d < b.maxLvl ? d : b.maxLvl;
+  }
+
+  /// True when the rack is as deep as tonight allows but the machine itself has
+  /// levels left. This is the state that says "come back tomorrow", and it is
+  /// deliberately distinct from [maxed], which says "this is finished".
+  bool atRigCap(BotDef b) => levelOf(b) >= rigCapOf(b);
+
+  /// Cost of the NEXT level. Infinity when maxed OR when tonight's rig depth
+  /// will not carry another level, so `s.sig >= costFor` is always false there.
   double costFor(BotDef b) {
     final lvl = levelOf(b);
-    if (lvl >= b.maxLvl) return double.infinity;
+    if (lvl >= b.maxLvl || lvl >= rigCapOf(b)) return double.infinity;
     return b.cost * math.pow(b.mul, lvl);
   }
 
   bool canBuy(BotDef b) =>
-      unlocked(b) && !maxed(b) && s.sig >= costFor(b);
+      unlocked(b) && !maxed(b) && !atRigCap(b) && s.sig >= costFor(b);
+
+  /// What it would take to rig this one deeper than tonight allows. Null when
+  /// depth is not what is stopping you.
+  String? rigNoteOf(BotDef b) {
+    if (!b.deep || maxed(b) || !atRigCap(b)) return null;
+    return 'RIG DEPTH ${rigDepth(s)} — TAKE A NIGHT TO 06:00 TO GO DEEPER';
+  }
 
   /// Spends and installs. Returns false and changes nothing if it cannot.
   bool buy(BotDef b) {
@@ -466,7 +579,7 @@ class BotRuntime extends ChangeNotifier {
     while (_armAcc >= 1 && guard < 6) {
       _armAcc -= 1;
       guard++;
-      if (rand() < botFailChance(s.dread)) {
+      if (rand() < botFailChanceFor(s)) {
         _armSkipped++;
         continue;
       }
@@ -509,7 +622,7 @@ class BotRuntime extends ChangeNotifier {
     final lvl = levelOf(b);
     if (lvl <= 0 || !enabled(b)) return;
 
-    if (rand() < botFailChance(s.dread)) {
+    if (rand() < botFailChanceFor(s)) {
       _eyeBlind++;
       s.toast('CAMERA 2 IS NOTHING BUT SNOW', ToastKind.bad);
       return;
@@ -581,7 +694,7 @@ class BotRuntime extends ChangeNotifier {
       return;
     }
 
-    if (s.dread >= kMgrGoneAt) {
+    if (s.dread >= mgrGoneAt(s)) {
       if (_mgrOnAir) {
         _mgrOnAir = false;
         s.toast('THE NIGHT MANAGER IS NOT AT HIS DESK', ToastKind.bad);
@@ -593,7 +706,7 @@ class BotRuntime extends ChangeNotifier {
       _mgrPause -= dt;
       return;
     }
-    if (rand() < botFailChance(s.dread) * dt * 0.9) {
+    if (rand() < botFailChanceFor(s) * dt * 0.9) {
       _mgrPause = rr(1.8, 3.6);
       return;
     }
@@ -645,12 +758,12 @@ class BotRuntime extends ChangeNotifier {
     if (a.masked && a.stage == 0) return;
     if (!beaten(a.def.id)) return;
     if (_librCd > 0) return;
-    if (s.dread >= kLibrBrownoutAt) return;
+    if (s.dread >= librBrownoutAt(s)) return;
     if (a.p < librAt(lvl)) return;
 
     _librHandled = a;
 
-    if (rand() < botFailChance(s.dread)) {
+    if (rand() < botFailChanceFor(s)) {
       // It JAMS. It never pulls the wrong tape — a bot must not be able to
       // press a wrong key on your behalf — but you have lost the cooldown and
       // whatever is left of the window is yours.
@@ -712,7 +825,7 @@ class BotRuntime extends ChangeNotifier {
     final lvl = levelOf(b);
     if (lvl <= 0) return unlocked(b) ? 'NOT PATCHED' : 'SEALED';
     if (!enabled(b)) return 'OFF';
-    final fail = botFailChance(s.dread);
+    final fail = botFailChanceFor(s);
     switch (b.id) {
       case 'arm':
         if (fail > 0.28) return 'STUTTERING';
@@ -727,12 +840,12 @@ class BotRuntime extends ChangeNotifier {
         if (s.dread >= 70) return 'DOOR STICKS';
         return 'NEXT ${_storeCd.ceil()}s · $_storeBought FILED';
       case 'mgr':
-        if (s.dread >= kMgrGoneAt) return 'NOT AT HIS DESK';
+        if (s.dread >= mgrGoneAt(s)) return 'NOT AT HIS DESK';
         if (_mgrOnAir) return 'ON THE AIR';
         if (_mgrPause > 0) return 'ON THE PHONE';
         return s.stalled ? 'WALKING DOWN' : 'AT HIS DESK';
       case 'libr':
-        if (s.dread >= kLibrBrownoutAt) return 'VAULT BROWNOUT';
+        if (s.dread >= librBrownoutAt(s)) return 'VAULT BROWNOUT';
         if (_librCd > 0) return 'REWIND ${_librCd.ceil()}s';
         return 'READY · $beatenCount/${kAnoms.length} BEATEN';
     }
@@ -753,10 +866,10 @@ class BotRuntime extends ChangeNotifier {
         return 'SPENDS YOUR FLOAT — SWITCH HIM OFF TO SAVE   ·   '
             'REFUSES TO OPEN ABOVE 70 DREAD';
       case 'mgr':
-        return 'LEAVES THE BUILDING ABOVE ${kMgrGoneAt.round()} DREAD';
+        return 'LEAVES THE BUILDING ABOVE ${mgrGoneAt(s).round()} DREAD';
       case 'libr':
         return 'JAMS ABOVE 40 DREAD · DEAD ABOVE '
-            '${kLibrBrownoutAt.round()} · ONLY WHAT YOU HAVE BEATEN';
+            '${librBrownoutAt(s).round()} · ONLY WHAT YOU HAVE BEATEN';
     }
     return null;
   }

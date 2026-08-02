@@ -6,9 +6,11 @@
 // load-bearing against the save format and the rack's sticker prices.
 //
 // The PACING half (the "Difficulty" section below) has been deliberately
-// retuned away from the original; see the block comment there for why and by
+// retuned away from the original; see the block comments there for why and by
 // how much. Everything the anomaly runtime needs to promise the player a safe
-// window after a correct answer also lives there.
+// window after a correct answer also lives there, and so does every
+// night-over-night escalation, all of which read one dial: `nightPressure()`
+// from encounter.dart.
 //
 // Everything is a top-level function taking the state explicitly. Functions
 // whose JS original read the global `A` take the AnomalyRuntime as well.
@@ -17,6 +19,7 @@ import 'dart:math' as math;
 
 import 'anomalies.dart';
 import 'consts.dart';
+import 'encounter.dart';
 import 'state.dart';
 
 // ---------------------------------------------------------------------------
@@ -82,13 +85,42 @@ bool buyUpgrade(GameState s, Upgrade u) {
   return true;
 }
 
+/// Spends RATINGS POINTS. The prestige counter was written in exactly one place
+/// and decremented nowhere, which made it a score rather than a budget; this is
+/// the debit side, for whoever spends it. Returns false and changes nothing
+/// when the player cannot afford it.
+bool spendRp(GameState s, int n) {
+  if (n <= 0 || s.rp < n) return false;
+  s.rp -= n;
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Multipliers
 // ---------------------------------------------------------------------------
 
+// The original rpMult was `1 + rp*0.08` — dead linear, so prestige compounded
+// without limit: 50 RP was x5, 200 RP was x17, 1000 RP was x81, and by then no
+// quota in the rundown meant anything. The replacement is sub-linear, and pays
+// the EARLY prestiges better than the original did:
+//
+//   rp    1 -> x1.26  (was 1.08)      rp   50 -> x3.86  (was  5.00)
+//   rp    5 -> x1.70  (was 1.40)      rp  200 -> x7.62  (was 17.00)
+//   rp   12 -> x2.20  (was 1.96)      rp 1000 -> x18.7  (was 81.00)
 
-/// JS rpMult().
-double rpMult(GameState s) => 1 + s.rp * 0.08;
+/// Coefficient on the sub-linear prestige curve.
+const double kRpMultK = 0.26;
+
+/// Exponent on the sub-linear prestige curve.
+const double kRpMultExp = 0.62;
+
+/// The permanent multiplier a given RP total is worth. Exposed separately from
+/// [rpMult] so the end-of-run sheets can quote what a bank WOULD be worth.
+double rpMultAt(int rp) =>
+    rp <= 0 ? 1.0 : 1 + kRpMultK * math.pow(rp.toDouble(), kRpMultExp);
+
+/// JS rpMult(), made sub-linear.
+double rpMult(GameState s) => rpMultAt(s.rp);
 
 /// JS sponsorMult().
 double sponsorMult(GameState s) => s.sponsorEnd > 0 ? 3 : 1;
@@ -98,6 +130,10 @@ double sigMult(GameState s) {
   var m = rpMult(s) * sponsorMult(s);
   if (s.ups['preheat'] ?? false) m *= 1.3;
   if (s.ups['comp'] ?? false) m *= 2.2;
+  // SILVER HALIDE's rack copy promises "+60% while a quota is unmet". Nothing
+  // read the flag, so the one upgrade that exists to dig you out of a held
+  // clock did nothing at all.
+  if ((s.ups['halide'] ?? false) && !quotaMet(s)) m *= 1.6;
   return m;
 }
 
@@ -129,14 +165,16 @@ double sigRate(GameState s, AnomalyRuntime a) {
   return base * sigMult(s);
 }
 
-
 /// JS rpGain().
 int rpGain(GameState s) => math.pow(s.lifetimeSig / 2.5e5, 0.5).floor();
 
 /// JS tuneYield() — striking the set. The bootstrap and the thing to do
 /// between anomalies.
+///
+/// The RP term is sub-linear for the same reason [rpMult] is: at a flat 1.5 per
+/// point a deep career could hand-strike its way through the early rundown.
 double tuneYield(GameState s, AnomalyRuntime a) {
-  final base = 2 + s.rp * 1.5;
+  final base = 2 + 1.8 * math.pow(math.max(0, s.rp).toDouble(), 0.7);
   return (base + sigRate(s, a) * 0.28) *
       ((s.ups['preheat'] ?? false) ? 1.3 : 1) *
       sponsorMult(s);
@@ -178,10 +216,10 @@ int depth(GameState s) => s.stats.banished + s.stats.scared * 2;
 //   depth  20 -> 29.0s      depth 200 -> 21.5s
 //   depth  40 -> 26.5s      depth  inf -> 19.0s
 //
-// A 21-minute night at ~34s + 2.0s telegraph + ~7.5s window is ~24 intrusions;
-// deep in a career it tops out near ~44. The old curve was pushing 70+. The
-// late game is now tense (a fifth of the time is an emergency) rather than
-// spammy (a half of it was).
+// On top of that the NIGHT squeezes the whole curve by up to 20%, saturating,
+// so a career that has stopped moving on depth still has somewhere to go. The
+// gap is then rolled BIMODALLY — see rollGap() — which is what makes the ALL
+// CLEAR window mechanically real rather than decorative.
 
 /// The gap a fresh career gets, in seconds.
 const double kGapOpen = 34;
@@ -191,6 +229,9 @@ const double kGapFloor = 19;
 
 /// Career depth at which the gap has closed half the distance to the floor.
 const double kGapHalfDepth = 40;
+
+/// How much of the gap the worst night takes away, on top of depth.
+const double kGapNightSqueeze = 0.20;
 
 /// Per-night ease-in. A night has to have room to breathe before it bites, so
 /// the first four intrusions of a shift are spaced out on top of everything
@@ -205,13 +246,15 @@ double openingEase(int nightIndex) {
   return kNightOpening[nightIndex];
 }
 
-/// The expected gap in seconds — [anomInterval] without the jitter. Exposed so
-/// the UI can draw a carrier-stability readout that does not lie.
+/// The expected gap in seconds — [anomInterval] without the jitter, and before
+/// any surge. Exposed so the UI can draw a carrier-stability readout that does
+/// not lie.
 ///
 /// `nightIndex` is how many anomalies have already manifested this night.
 double anomIntervalMean(GameState s, int nightIndex) {
   final d = depth(s);
   var base = kGapFloor + (kGapOpen - kGapFloor) / (1 + d / kGapHalfDepth);
+  base *= 1 - kGapNightSqueeze * nightPressure(s);
   // FAILSAFE RELAY buys real quiet now, not a rounding error.
   if (s.ups['failsafe'] ?? false) base += 2.5;
   // A held clock still leans on you, but it may not spiral: being behind on
@@ -221,8 +264,8 @@ double anomIntervalMean(GameState s, int nightIndex) {
   return base * openingEase(nightIndex);
 }
 
-/// Seconds until the next telegraph. Randomised on every call — call it once
-/// per schedule, never per frame.
+/// Seconds until the next telegraph, jittered but never surged. Randomised on
+/// every call — call it once per schedule, never per frame.
 ///
 /// The jitter is tighter than the original's rr(0.78,1.25) so the pacing is
 /// legible: you can learn roughly how long you have, which is the only way the
@@ -230,32 +273,63 @@ double anomIntervalMean(GameState s, int nightIndex) {
 double anomInterval(GameState s, int nightIndex) =>
     anomIntervalMean(s, nightIndex) * rr(0.86, 1.18);
 
-/// JS banishWindow(). 7.5s -> 6.0s floor, +1.2s with FERRITE CORE.
+/// The real roll. Mostly the long legible interval; sometimes a SURGE — a quick
+/// follow-up at [kSurgeMul] of it, never sooner than [kSurgeFloor].
+///
+/// This is the whole reason the ALL CLEAR window is worth anything. Before the
+/// gap was bimodal, calm (5-24s) was always shorter than the gap (29-40s), so
+/// the guaranteed-quiet window never once blocked an arrival and the lamp was
+/// pure theatre. A surge is the thing it blocks.
+GapRoll rollGap(
+  GameState s,
+  int nightIndex, {
+  bool afterScare = false,
+  bool afterBanish = false,
+}) {
+  final full = anomInterval(s, nightIndex);
+  if (nightIndex < kSurgeGrace) return GapRoll(full, false);
+  final c = surgeChance(s, afterScare: afterScare, afterBanish: afterBanish);
+  if (rand() >= c) return GapRoll(full, false);
+  return GapRoll(math.max(kSurgeFloor, full * kSurgeMul), true);
+}
+
+/// How much of the banish window the worst night takes away.
+const double kWindowNightSqueeze = 0.10;
+
+/// No window is ever shorter than this, whatever the career looks like.
+const double kWindowFloor = 5.0;
+
+/// JS banishWindow(). 7.5s -> 6.0s floor on depth, then squeezed by the night,
+/// +1.2s with FERRITE CORE. Per-entity multipliers live in encounter.dart.
 double banishWindow(GameState s) {
   final d = depth(s);
   var w = 7.5 - math.min(1.5, d * 0.02);
+  w *= 1 - kWindowNightSqueeze * nightPressure(s);
   if (s.ups['ferrite'] ?? false) w += 1.2;
-  return w;
+  return math.max(kWindowFloor, w);
 }
 
-/// JS telegraph(), lengthened by 0.4s at both ends. PHOSPHOR MASK is still
-/// worth exactly the +0.9s its rack copy promises.
-double telegraph(GameState s) => (s.ups['phosphor'] ?? false) ? 2.9 : 2.0;
+/// The roster-wide mean telegraph. Kept as a stable, jitter-free figure for
+/// readouts and diagnostics; the real per-arrival length is `telegraphFor()` in
+/// encounter.dart, which is per-entity, jittered, and shortened by both the
+/// night and the dread bar.
+double telegraph(GameState s) => telegraphMean(s);
 
 // --- the ALL CLEAR ----------------------------------------------------------
 //
 // A correct counter has to actually make you safe, or the deck is just a slot
-// machine. Every successful banish opens a window in which NOTHING can
-// manifest, its length set by how clean the kill was and compounded by the
-// streak. Missing one resets the streak, so the compounding is earned.
+// machine. Every successful banish opens a window whose FIRST stretch — the
+// GUARD — is an absolute, tested, nothing-can-manifest guarantee, and whose
+// tail is a taper: the gap timer is live again, but an arrival inside it comes
+// in softened (longer riser, longer window, half intensity).
 //
-//   scraped it at the buzzer, streak 1 ->  5.0s
-//   instant kill, streak 1              -> 14.0s
-//   instant kill, streak 6              -> 22.5s
+//   scraped it at the buzzer, streak 1 ->  5.0s  ( 3.5 guaranteed + 1.5 taper)
+//   instant kill, streak 1              -> 14.0s ( 8.7 guaranteed + 5.3 taper)
+//   instant kill, streak 6              -> 22.5s (14.0 guaranteed + 8.5 taper)
 //   instant kill, streak 7+             -> 24.0s (cap), +2s with FAILSAFE
 //
-// Against a ~19-34s gap that is a guaranteed third-to-half of the downtime,
-// on top of the gap rather than inside it.
+// The guard is what a surge runs into. Being right buys real, felt protection;
+// it just stops being an on/off switch at the very end of the window.
 
 /// Floor of the calm window — what even a buzzer-beater buys.
 const double kCalmBase = 5;
@@ -269,7 +343,18 @@ const double kCalmStreakStep = 1.7;
 /// Cap on the streak component, so calm never swallows the night whole.
 const double kCalmStreakCap = 10;
 
-/// Length of the guaranteed-quiet window a successful banish opens.
+/// Fraction of a calm window that is an ABSOLUTE guarantee.
+const double kCalmGuardFrac = 0.62;
+
+/// Seconds of absolute guarantee even the worst banish buys.
+const double kCalmGuardMin = 3.5;
+
+/// The guaranteed-quiet head of a calm window [span] seconds long.
+double calmGuardOf(double span) => span <= 0
+    ? 0
+    : math.min(span, math.max(kCalmGuardMin, span * kCalmGuardFrac));
+
+/// Length of the quiet window a successful banish opens.
 ///
 /// * [cleanliness] 0..1 — 1 when the key was hit the instant it manifested,
 ///   0 at the last frame of the window.
@@ -295,14 +380,78 @@ double calmWindow(
 double scareRecovery(GameState s) =>
     9.0 + ((s.ups['failsafe'] ?? false) ? 2.0 : 0.0);
 
-/// JS unlockedAnoms(). tier 1 at depth 6, tier 2 at depth 16.
+/// JS unlockedAnoms(). Tier 1 at depth 6, tier 2 at depth 16 — but the NIGHT
+/// opens them too, so a fresh career on night three does not have to re-earn
+/// the roster it has already survived.
 List<Anom> unlockedAnoms(GameState s) {
   final d = depth(s);
+  final n = s.night;
   return kAnoms
       .where((a) =>
-          a.tier == 0 || (a.tier == 1 && d >= 6) || (a.tier == 2 && d >= 16))
+          a.tier == 0 ||
+          (a.tier == 1 && (d >= 6 || n >= 2)) ||
+          (a.tier == 2 && (d >= 16 || n >= 3)))
       .toList(growable: false);
 }
+
+// --- dread ------------------------------------------------------------------
+//
+// Measured before this section existed: perfect play across a whole night
+// peaked at 0.9 DREAD out of 100. The bar was a report card, not a threat. Two
+// things changed:
+//
+//   * a PER-SEGMENT FLOOR the decay cannot cross, and which dread creeps up to
+//     when it is under it. 03:00 is heavier than 23:00 whatever you do.
+//   * an ATMOSPHERIC INFLOW read from `AnomalyRuntime.lurkPressure`, which the
+//     scene writes from the things standing in the field. The window stops
+//     being scenery.
+//
+// Both are bounded well under 100, so neither can kill you on its own; they
+// exist so that the anomaly inflow lands on a bar that is already warm.
+
+/// Hard ceiling on the per-segment floor. Nothing atmospheric may push DREAD
+/// past this on its own — SIGNAL LOST always has to be something you did.
+const double kDreadFloorCap = 42;
+
+/// How fast dread creeps UP toward the floor when it is under it.
+const double kDreadFloorClimb = 0.20;
+
+/// Dread per second at full [AnomalyRuntime.lurkPressure]. Deliberately about
+/// half the idle decay rate, so a crowded field slows your recovery rather than
+/// reversing it.
+const double kLurkDread = 0.42;
+
+/// Dread per second while the clock is held on an unmet quota.
+const double kStallDread = 0.9;
+
+/// Seconds between re-statements of the held-clock toast.
+const double kStallRepeat = 8.5;
+
+/// The floor DREAD decay may not cross in the current segment.
+///
+///   night 1, 23:00 ->  0.0      night  1, 05:00 -> 14.4
+///   night 5, 05:00 -> 25.2      night 13, 05:00 -> 30.6
+double dreadFloor(GameState s) {
+  final seg = segIndex(s).toDouble();
+  final base = seg * 2.4;
+  return math.min(kDreadFloorCap, base * (1 + 1.5 * nightPressure(s)));
+}
+
+// --- the revive -------------------------------------------------------------
+//
+// The emergency sponsor used to reset dread to a flat 45 and hand out a flat
+// 45s of x3 output every time, so the fifth revive of a night was as good as
+// the first and SIGNAL LOST stopped meaning anything. It escalates now, and the
+// SIGNAL LOST sheet quotes the next one's terms before you take it.
+
+/// Where DREAD lands after the `n`-th revive of a night (1-based).
+double reviveDread(int n) => math.min(76.0, 34.0 + (n - 1) * 14.0);
+
+/// Seconds of sponsored x3 output the `n`-th revive is worth.
+double reviveSponsor(int n) => math.max(18.0, 48.0 - (n - 1) * 10.0);
+
+/// Multiplier on the forced-quiet window the `n`-th revive opens.
+double reviveGrace(int n) => math.max(0.45, 1.0 - (n - 1) * 0.18);
 
 // ---------------------------------------------------------------------------
 // The shift clock
@@ -315,8 +464,31 @@ int segIndex(GameState s) =>
 /// JS segOf().
 RundownSeg segOf(GameState s) => kRundown[segIndex(s)];
 
+/// How much harder tonight's quotas are than the printed table.
+///
+///   night 1 -> x1.00   night 3 -> x1.18   night 9 -> x1.37
+///   night 2 -> x1.11   night 5 -> x1.28   night ∞ -> x1.55
+///
+/// Night one is exactly the printed number, so the tutorial shift is the game
+/// as documented.
+double quotaScale(GameState s) => 1 + 0.55 * nightPressure(s);
+
+/// Tonight's quota for segment [i].
+double quotaOf(GameState s, int i) {
+  final j = i < 0 ? 0 : (i >= kRundown.length ? kRundown.length - 1 : i);
+  return kRundown[j].quota * quotaScale(s);
+}
+
+/// Tonight's quota for the CURRENT segment. Everything that displays or reasons
+/// about a quota should read this rather than `segOf(s).quota`, which is the
+/// printed night-one figure.
+double segQuota(GameState s) => quotaOf(s, segIndex(s));
+
 /// JS quotaMet().
-bool quotaMet(GameState s) => s.segSig >= segOf(s).quota;
+bool quotaMet(GameState s) => s.segSig >= segQuota(s);
+
+/// How much output the current segment is still short. 0 once it is met.
+double quotaShortfall(GameState s) => math.max(0, segQuota(s) - s.segSig);
 
 /// JS shiftClock() — "23:00" .. "05:59".
 String shiftClock(GameState s) {

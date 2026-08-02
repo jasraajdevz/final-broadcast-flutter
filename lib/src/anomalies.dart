@@ -13,14 +13,24 @@
 //
 // Three rules the scheduler adds on top, and the reason the runtime owns three
 // timers instead of one:
-//   * CALM — a correct counter opens a window in which nothing can manifest.
-//     It is earned, it compounds with the streak, and the UI can read it
-//     (`allClear`, `calmP`, `airState`). Getting it right must BUY something.
+//   * CALM — a correct counter opens a window whose head is GUARANTEED quiet:
+//     nothing can manifest inside `calmGuard`, full stop. It is earned, it
+//     compounds with the streak, and the UI can read it (`allClear`, `calmP`,
+//     `airState`). Getting it right must BUY something. Past the guard the
+//     window TAPERS — the gap timer is live again but an arrival inside the
+//     taper comes in softened. See economy.dart's ALL CLEAR block.
 //   * AFTERMATH — a jumpscare opens a longer forced-quiet window. A scare can
 //     therefore never chain into another one, which is the guarantee that keeps
 //     a bad night recoverable rather than a death spiral.
 //   * The two are mutually exclusive except during the FALSE CLEAR scare beat,
 //     which lights the ALL CLEAR lamp on purpose and then takes it away.
+//
+// And the reason a kill has a SHAPE. `resolve()` used to set `active = null` on
+// its first line, so the loudest moment in the game was a deletion: being right
+// produced 0px of shake, being wrong produced 6, and firing a tool produced 16.
+// A kill now has a duration (`dying` / `dyingP`), a hit-stop the sim drains
+// while `tGlobal` keeps running, and a punch that out-hits every other input in
+// the game. Being right is now the biggest thing that happens on screen.
 
 import 'dart:math' as math;
 
@@ -28,6 +38,7 @@ import 'package:flutter/foundation.dart';
 
 import 'consts.dart';
 import 'economy.dart';
+import 'encounter.dart';
 import 'state.dart';
 
 // ---------------------------------------------------------------------------
@@ -64,7 +75,25 @@ abstract class GameAudio {
   void riser(double dur);
 
   void impact();
-  void banishStinger(bool fast);
+
+  /// The kill. [fast] is a clean kill (inside 40% of the window, no fumbles);
+  /// [streak] is the run of consecutive banishes INCLUDING this one, so the
+  /// stinger can climb — a seventh kill in a row must not sound like a first.
+  void banishStinger(bool fast, int streak);
+
+  /// A partial kill: the TWO-STAGE flinch, or the first half of a COUPLED pair.
+  /// Something gave, and something is still there.
+  void relay();
+
+  /// A streak of [lost] consecutive banishes just ended. Play the loss of it,
+  /// not just the scare on top.
+  void streakBroken(int lost);
+
+  /// A run milestone worth marking. [kind] is one of "streak" (new best
+  /// streak), "banish" (every tenth banish of a career), "night" (a segment of
+  /// the rundown survived) or "clean" (a run of flawless kills).
+  void milestone(String kind, int n);
+
   void reject();
   void click();
   void tune(double p);
@@ -119,7 +148,13 @@ class NullAudio implements GameAudio {
   @override
   void impact() {}
   @override
-  void banishStinger(bool fast) {}
+  void banishStinger(bool fast, int streak) {}
+  @override
+  void relay() {}
+  @override
+  void streakBroken(int lost) {}
+  @override
+  void milestone(String kind, int n) {}
   @override
   void reject() {}
   @override
@@ -163,6 +198,10 @@ class ActiveAnom {
     required this.masked,
     required this.stage,
     required this.intensity,
+    required this.seed,
+    this.cold = false,
+    this.mod = EncounterMod.none,
+    this.partner,
   });
 
   final Anom def;
@@ -170,8 +209,10 @@ class ActiveAnom {
   /// Seconds it has been on the tube.
   double t = 0;
 
-  /// Seconds available to banish it.
-  final double window;
+  /// Seconds available to banish it. NOT final: the TWO-STAGE modifier refills
+  /// it when the first correct press lands, which is the whole reason a split
+  /// can never make a visit unwinnable.
+  double window;
 
   /// Arrived wearing someone else's face (depth >= 28, 22% chance).
   final bool masked;
@@ -179,8 +220,31 @@ class ActiveAnom {
   /// 0 = masked and not yet stripped, 1 = present and sabotaging.
   int stage;
 
-  /// 1 normally, 0.5 on a first sighting.
+  /// 1 normally, 0.5 on a first sighting, 0.7 when it arrived inside the taper
+  /// of an ALL CLEAR window.
   final double intensity;
+
+  /// 0..1, stable for the whole visit and different every time. The painters
+  /// thread it into the composition so the second sighting of an entity is not
+  /// pixel-for-pixel the eighth. Costs no new art.
+  final double seed;
+
+  /// Arrived with NO telegraph at all. Paid for with a much longer [window].
+  final bool cold;
+
+  /// The extra rule this visit is carrying.
+  final EncounterMod mod;
+
+  /// COUPLED only: the second signature sharing the body. Its counter is a
+  /// valid key for this visit, in either order with [def]'s own.
+  final Anom? partner;
+
+  /// TWO-STAGE: 0 = untouched, 1 = already split once.
+  int modStage = 0;
+
+  /// COUPLED: which halves have been answered.
+  bool selfDown = false;
+  bool partnerDown = false;
 
   /// THE TEST CARD GIRL — signal diverted into her lap.
   double held = 0;
@@ -205,6 +269,35 @@ class ActiveAnom {
 
   /// 1 when the counter was hit the instant it manifested, 0 at the last frame.
   double get cleanliness => clampD(1 - p, 0, 1);
+
+  /// Every counter id that is still outstanding on this visit. Never empty
+  /// while the thing is alive, and ALWAYS contains [def]'s own counter until it
+  /// has actually been pressed — the invariant that stops a modifier from
+  /// disabling the key that banishes its own entity.
+  List<String> get liveKeys {
+    if (masked && stage == 0) return const <String>['cut'];
+    final out = <String>[];
+    if (mod == EncounterMod.coupled) {
+      if (!selfDown) out.add(def.counter);
+      final pc = partner?.counter;
+      if (pc != null && !partnerDown) out.add(pc);
+      return out;
+    }
+    out.add(def.counter);
+    return out;
+  }
+
+  /// True when [cid] does something useful right now.
+  bool accepts(String cid) => liveKeys.contains(cid);
+
+  /// How many more correct presses this visit needs.
+  int get pressesLeft {
+    if (mod == EncounterMod.coupled) {
+      return (selfDown ? 0 : 1) + (partnerDown || partner == null ? 0 : 1);
+    }
+    if (mod == EncounterMod.twoStage) return modStage == 0 ? 2 : 1;
+    return 1;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +381,36 @@ class EndScreenModel {
 typedef PlayAdFn = void Function(String label, void Function() done);
 
 // ---------------------------------------------------------------------------
+// The kill
+// ---------------------------------------------------------------------------
+
+/// Seconds a banished thing stays on the tube, coming apart.
+const double kDyingSpan = 0.35;
+
+/// The same, for a kill nobody earned (a bot assist, the MIRROR). Shorter,
+/// because it is not the player's moment.
+const double kDyingSpanQuiet = 0.18;
+
+/// Frozen seconds on a clean kill — inside 40% of the window, no fumbles.
+const double kHitstopClean = 0.07;
+
+/// Frozen seconds on any other successful banish.
+const double kHitstopHit = 0.045;
+
+/// Frozen seconds on a partial — the TWO-STAGE flinch, half a COUPLED pair.
+const double kHitstopPartial = 0.035;
+
+/// Shake on a clean kill. For scale: a wrong key is 11, a tool is 16, the
+/// LUNGE jumpscare is 34. Being RIGHT has to out-punch being wrong.
+const double kShakeClean = 26;
+
+/// Shake on any other successful banish.
+const double kShakeHit = 18;
+
+/// Shake on a wrong key. Was 6, which read as nothing at all.
+const double kShakeWrong = 11;
+
+// ---------------------------------------------------------------------------
 // AnomalyRuntime — the JS `A` object plus the simulation loop
 // ---------------------------------------------------------------------------
 
@@ -316,7 +439,56 @@ class AnomalyRuntime extends ChangeNotifier {
   Anom? scareDef;
   double banishFx = 0;
   double wrongFx = 0;
+
+  /// Which counter was pressed in error, so the painters can flash THAT key
+  /// rather than the whole deck. Cleared with [wrongFx].
+  String? wrongFxKey;
   bool lost = false;
+
+  /// Set by the shell (WS5) while a modal owns the screen — the manual, mostly.
+  /// The simulation freezes completely: no clock, no economy, no scheduler, no
+  /// dread, no anomaly progress. `tGlobal` keeps running so the room still
+  /// breathes behind the sheet.
+  bool paused = false;
+
+  /// 0..1, written by the window scene every frame from the things standing in
+  /// the field (`WindowScene.lurk` / `lurkClose`). Feeds an atmospheric DREAD
+  /// inflow, so the field is pressure rather than wallpaper. Defensively
+  /// clamped on read; leaving it at 0 simply removes the inflow.
+  double lurkPressure = 0;
+
+  // --- the kill ---
+
+  /// The thing that just died, still on the tube for [dyingSpan] seconds. A
+  /// deletion cannot have a shape; a corpse can.
+  ActiveAnom? dying;
+
+  /// Seconds into the death.
+  double dyingT = 0;
+
+  /// Total seconds the death takes.
+  double dyingSpan = kDyingSpan;
+
+  /// Seconds of frozen simulation left. `tick()` drains it against the frame
+  /// delta and hands `_simulate` whatever is left, while `tGlobal` keeps
+  /// advancing — so the picture keeps moving and the WORLD stops. This is the
+  /// impact frame the climactic input never had.
+  double hitstop = 0;
+
+  /// Seconds of ABSOLUTE quiet left inside the current calm window. Nothing may
+  /// telegraph or manifest while this is above zero. This is the promise.
+  double calmGuard = 0;
+
+  /// The full length [calmGuard] was granted at.
+  double calmGuardSpan = 0;
+
+  /// True when the roll that armed [nextAt] was a SURGE — a quick follow-up.
+  /// Read-only for the UI; the carrier readout may hint, but must not say when.
+  bool surgeIncoming = false;
+
+  /// The next arrival was scheduled inside the taper of an ALL CLEAR window and
+  /// comes in softened: longer riser, longer window, reduced intensity.
+  bool softNext = false;
 
   // -------------------------------------------------------------------------
   // Pacing and safety
@@ -344,6 +516,22 @@ class AnomalyRuntime extends ChangeNotifier {
   /// Anomalies that have manifested since SIGN ON, or since the last sign-off.
   /// Feeds `openingEase()` so the first few of a night are spaced right out.
   int nightAnoms = 0;
+
+  /// Wrong keys pressed this night. The FIRST one of every night names the
+  /// manual, because the measured blind run pressed nothing at all for five
+  /// minutes and was never once told what the deck was for.
+  int nightWrongs = 0;
+
+  /// True when the last thing to leave the tube got through. Feeds the surge
+  /// roll — blood in the water.
+  bool lastWasScare = false;
+
+  /// Seconds until the held-clock toast restates itself. A stall used to
+  /// announce itself exactly once, into silence, with no figure attached.
+  double _stallSay = 0;
+
+  /// Which piece of advice the stall toast gives next.
+  int _stallAdvice = 0;
 
   // -------------------------------------------------------------------------
   // Scare channels the painters read
@@ -413,7 +601,10 @@ class AnomalyRuntime extends ChangeNotifier {
     final a = active;
     if (!(s.ups['cam2'] ?? false) || a == null) return null;
     if (a.masked && a.stage == 0) return null;
-    return kCounterBy[a.def.counter];
+    // On a COUPLED visit it reads whichever half is still outstanding.
+    final live = a.liveKeys;
+    if (live.isEmpty) return null;
+    return kCounterBy[live.first];
   }
 
   // -------------------------------------------------------------------------
@@ -433,15 +624,48 @@ class AnomalyRuntime extends ChangeNotifier {
   // Read-side API — everything the status bar and the painters need
   // -------------------------------------------------------------------------
 
-  /// True while the booth is under the guaranteed-quiet window earned by a
-  /// correct counter. Nothing can manifest. Show it.
+  /// True while the booth is inside the window earned by a correct counter.
+  /// Covers BOTH halves of it — see [calmGuaranteed] for the part that is an
+  /// absolute promise and [calmTapering] for the part that is only a lean.
   bool get allClear => calm > 0 && active == null && warn <= 0 && !lost;
+
+  /// True while NOTHING can manifest, full stop. This is the promise a correct
+  /// answer buys, and `sim_test.dart` asserts it across whole nights.
+  bool get calmGuaranteed => calmGuard > 0 && active == null && !lost;
+
+  /// True in the tail of a calm window: the gap is live again, but anything
+  /// that arrives now arrives softened.
+  bool get calmTapering => calm > 0 && calmGuard <= 0 && active == null;
 
   /// 0..1 of the calm window left, for a draining meter.
   double get calmP => calmSpan <= 0 ? 0 : clampD(calm / calmSpan, 0, 1);
 
+  /// 0..1 of the GUARANTEED head left, for a second, brighter meter inside the
+  /// first one.
+  double get calmGuardP =>
+      calmGuardSpan <= 0 ? 0 : clampD(calmGuard / calmGuardSpan, 0, 1);
+
   /// Whole seconds of calm left, for a countdown.
   int get calmSeconds => calm <= 0 ? 0 : calm.ceil();
+
+  /// Whole seconds of GUARANTEED calm left.
+  int get calmGuardSeconds => calmGuard <= 0 ? 0 : calmGuard.ceil();
+
+  /// 0..1 through the death of the last thing you killed. 0 at the instant of
+  /// the kill, 1 when the corpse is gone. Painters: this is the dissolve.
+  double get dyingP =>
+      dying == null || dyingSpan <= 0 ? 0 : clampD(dyingT / dyingSpan, 0, 1);
+
+  /// True on the frames the world is frozen for the impact.
+  bool get frozen => hitstop > 0;
+
+  /// Every counter id that would do something right now: the live entity's
+  /// outstanding keys, or "cut" against a mask. Empty when nothing is on the
+  /// tube. The deck may light these; it must never HIDE the digits.
+  List<String> get liveKeys => active?.liveKeys ?? const <String>[];
+
+  /// The modifier on the live visit, for a badge on the deck.
+  EncounterMod get activeMod => active?.mod ?? EncounterMod.none;
 
   /// The streak the current calm window was compounded from.
   int get calmStreak => s.stats.streak;
@@ -468,9 +692,24 @@ class AnomalyRuntime extends ChangeNotifier {
   double get threatP {
     if (lost || !signedOn) return 0;
     if (active != null || warn > 0) return 1;
-    if (calm > 0 || aftermath > 0) return 0;
+    if (calmGuard > 0 || aftermath > 0) return 0;
     if (gapSpan <= 0) return 0;
     return clampD(1 - nextAt / gapSpan, 0, 1);
+  }
+
+  /// 0..1 — how far into the career this shift is. The one number every
+  /// night-over-night escalation reads; a HUD that wants to show the player
+  /// that the job is getting worse should show this.
+  double get pressure => nightPressure(s);
+
+  /// A word for [pressure], for a readout that has one line to say it in.
+  String get pressureLabel {
+    final p = pressure;
+    if (p < 0.10) return 'ROUTINE';
+    if (p < 0.28) return 'ELEVATED';
+    if (p < 0.45) return 'HEAVY';
+    if (p < 0.62) return 'SEVERE';
+    return 'TERMINAL';
   }
 
   /// One word for the state of the booth.
@@ -496,7 +735,12 @@ class AnomalyRuntime extends ChangeNotifier {
       case AirState.warning:
         return '!! DISTURBANCE';
       case AirState.allClear:
-        return 'ALL CLEAR ${calmSeconds}s';
+        // Two different promises, said in two different ways. The guaranteed
+        // head counts down in seconds; the taper says only that it is fading,
+        // because in the taper the booth is no longer certain.
+        return calmGuard > 0
+            ? 'ALL CLEAR ${calmGuardSeconds}s'
+            : 'CLEAR — FADING';
       case AirState.recovering:
         return 'RECOVERING ${recoverSeconds}s';
       case AirState.onAir:
@@ -508,11 +752,15 @@ class AnomalyRuntime extends ChangeNotifier {
   // Scheduler
   // -------------------------------------------------------------------------
 
-  /// Rolls the next gap. The gap timer does NOT start running until both
-  /// protection windows have expired — see [_simulate].
-  void scheduleNext() {
-    nextAt = anomInterval(s, nightAnoms);
-    gapSpan = nextAt;
+  /// Rolls the next gap, bimodally: mostly the long legible interval, sometimes
+  /// a SURGE. The gap timer runs during a calm window but cannot FIRE inside
+  /// the guaranteed head — see [_simulate].
+  void scheduleNext({bool afterScare = false, bool afterBanish = false}) {
+    final roll = rollGap(s, nightAnoms,
+        afterScare: afterScare, afterBanish: afterBanish);
+    nextAt = roll.seconds;
+    gapSpan = roll.seconds;
+    surgeIncoming = roll.surge;
   }
 
   /// A banish the PLAYER did not perform. Clears the tube and pays the signal
@@ -526,14 +774,19 @@ class AnomalyRuntime extends ChangeNotifier {
     final before = s.lifetimeSig;
     final streak = s.stats.streak;
     final calmWas = calm, calmSpanWas = calmSpan;
+    final guardWas = calmGuard, guardSpanWas = calmGuardSpan;
     resolve(true, true);
     s.lifetimeSig = before;
     s.stats.streak = streak;
     calm = calmWas;
     calmSpan = calmSpanWas;
+    calmGuard = guardWas;
+    calmGuardSpan = guardSpanWas;
   }
 
-  /// Opens the guaranteed-quiet window a correct answer just bought.
+  /// Opens the quiet window a correct answer just bought: a GUARANTEED head in
+  /// which nothing can manifest, then a taper in which the gap is live again
+  /// but an arrival comes in softened.
   ///
   /// Never shortens an existing window — a rapid second banish can only ever
   /// add safety — and always clears the post-scare recovery, because earned
@@ -546,37 +799,102 @@ class AnomalyRuntime extends ChangeNotifier {
       calm = seconds;
       calmSpan = seconds;
     }
+    final g = calmGuardOf(calm);
+    if (g > calmGuard) {
+      calmGuard = g;
+      calmGuardSpan = g;
+    }
   }
 
   void beginWarn() {
     // Belt and braces: the caller already checked, but nothing may telegraph
-    // inside a protection window under any circumstances.
-    if (calm > 0 || aftermath > 0 || lost) return;
+    // inside the GUARANTEED head of a calm window under any circumstances.
+    if (calmGuard > 0 || aftermath > 0 || lost) return;
     final pool = unlockedAnoms(s);
-    warnDef = pick(pool);
-    warn = telegraph(s);
+    final def = pick(pool);
+    warnDef = def;
+
+    // --- the cold open ---
+    // No riser at all. Rises with dread and with the night, never on a debut,
+    // never in the opening minutes of a shift, and paid back with a much
+    // longer window when it fires.
+    if (rand() < coldOpenChance(s, def, nightAnoms)) {
+      warn = 0;
+      manifest(cold: true);
+      return;
+    }
+
+    warn = telegraphFor(s, def);
+    // An arrival inside the taper of an ALL CLEAR window comes in gently.
+    if (softNext) warn *= 1.35;
     audio.warn();
     audio.riser(warn);
-    s.toast('!! CARRIER DISTURBANCE', ToastKind.bad);
+    // The tell is per-entity flavour that HINTS at what is coming without
+    // naming it, and only once you have met the thing. Learning the eight
+    // tells is the skill ceiling; a debut still gets the generic warning.
+    s.toast(tellFor(s, def), ToastKind.bad);
   }
 
-  void manifest() {
+  void manifest({bool cold = false}) {
     final Anom def = warnDef ?? pick<Anom>(unlockedAnoms(s));
+    final bool soft = softNext;
+    softNext = false;
     warnDef = null;
     warn = 0;
     calm = 0;
     calmSpan = 0;
+    calmGuard = 0;
+    calmGuardSpan = 0;
     nightAnoms++;
     final d = depth(s);
     final masked = d >= 28 && rand() < 0.22;
     final first = !(s.seen[def.id] ?? false);
+
+    // --- the modifier ---
+    // Never on a debut, never on top of a mask. COUPLED only ever picks a
+    // partner the player has already catalogued, so it can never ask for a key
+    // there was no way to know.
+    final pool = unlockedAnoms(s);
+    var mod = rollMod(s,
+        first: first,
+        masked: masked,
+        hasPartner: hasCouplePartner(s, pool, def));
+    Anom? partner;
+    if (mod == EncounterMod.coupled) {
+      partner = pickPartner(s, pool, def);
+      if (partner == null) mod = EncounterMod.twoStage;
+    }
+
+    var w = banishWindow(s) * profileOf(def.id).windowMul;
+    if (first) w *= 1.25;
+    if (masked) w += 1.2;
+    if (cold) w *= kColdOpenWindowMul;
+    if (soft) w *= 1.25;
+    if (mod == EncounterMod.twoStage) w *= kTwoStageWindowMul;
+    if (mod == EncounterMod.coupled) w *= kCoupledWindowMul;
+
     active = ActiveAnom(
       def: def,
-      window: banishWindow(s) * (first ? 1.25 : 1) + (masked ? 1.2 : 0),
+      window: w,
       masked: masked,
       stage: masked ? 0 : 1,
-      intensity: first ? 0.5 : 1,
+      intensity: first ? 0.5 : (soft ? 0.7 : 1),
+      seed: rand(),
+      cold: cold,
+      mod: mod,
+      partner: partner,
     );
+    if (cold) s.toast(coldTellFor(s, def), ToastKind.bad);
+    if (mod == EncounterMod.twoStage) {
+      s.toast('TWO-STAGE SIGNATURE — ONE HIT WILL NOT DO IT', ToastKind.bad);
+    } else if (mod == EncounterMod.coupled && partner != null) {
+      final a = kCounterBy[def.counter], b = kCounterBy[partner.counter];
+      s.toast(
+          'COUPLED CARRIER — TWO KEYS: '
+          '${a?.nm ?? def.counter} ${a?.key ?? ""} + '
+          '${b?.nm ?? partner.counter} ${b?.key ?? ""}',
+          ToastKind.bad);
+    }
     if (first) {
       s.seen[def.id] = true;
       s.toast('NEW ENTRY LOGGED — ${def.nm}', ToastKind.gold);
@@ -638,7 +956,39 @@ class AnomalyRuntime extends ChangeNotifier {
       wrongPress(cid);
       return;
     }
+    // --- COUPLED: two signatures, two keys, either order ---
+    if (a.mod == EncounterMod.coupled && a.partner != null) {
+      final own = a.def.counter;
+      final other = a.partner!.counter;
+      if (cid == own && !a.selfDown) {
+        a.selfDown = true;
+      } else if (cid == other && !a.partnerDown) {
+        a.partnerDown = true;
+      } else {
+        wrongPress(cid);
+        return;
+      }
+      flashKey(cid, true);
+      if (a.selfDown && a.partnerDown) {
+        resolve(true, false);
+        return;
+      }
+      _partialHit(a, 'HALF OF IT IS GONE');
+      return;
+    }
+
     if (cid == a.def.counter) {
+      // --- TWO-STAGE: the same key, twice ---
+      if (a.mod == EncounterMod.twoStage && a.modStage == 0) {
+        a.modStage = 1;
+        // Refilled, not merely extended: a split can never make a visit
+        // unwinnable, however late the first press landed.
+        a.window += banishWindow(s) * kTwoStageRefill;
+        flashKey(cid, true);
+        final c = kCounterBy[a.def.counter];
+        _partialHit(a, 'IT SPLITS — ${c?.nm ?? ""} AGAIN, KEY ${c?.key ?? ""}');
+        return;
+      }
       flashKey(cid, true);
       resolve(true, false);
     } else {
@@ -646,16 +996,44 @@ class AnomalyRuntime extends ChangeNotifier {
     }
   }
 
+  /// A correct press that did not finish the job. Real impact, real feedback,
+  /// and a little of the clock back — but the thing is still on the tube.
+  void _partialHit(ActiveAnom a, String msg) {
+    a.t = math.max(0, a.t - 0.35);
+    hitstop = math.max(hitstop, kHitstopPartial);
+    shake = math.max(shake, 15);
+    banishFx = math.max(banishFx, 0.6);
+    glitch = 1;
+    audio.relay();
+    audio.env('square', 340, 0.12, 0.10, 660);
+    s.toast(msg, ToastKind.bad);
+    notifyListeners();
+  }
+
   void wrongPress(String cid) {
     flashKey(cid, false);
     audio.reject();
     s.stats.wrong++;
+    nightWrongs++;
     wrongFx = 1;
+    wrongFxKey = cid;
     final pen = (s.ups['autocue'] ?? false) ? 0.45 : 0.9;
     active?.wrongs++;
     active?.t += pen;
-    shake = math.max(shake, 6);
+    // A wrong key used to be 6px of shake and a channel nothing read. It now
+    // punches the picture as well, through `glitch`, which the tube painter
+    // has always read.
+    shake = math.max(shake, kShakeWrong);
+    glitch = math.max(glitch, 1);
     s.dread = math.min(100, s.dread + 3);
+    // The first fumble of every night names the manual. The measured blind run
+    // went five minutes without ever being told what the deck was for.
+    if (nightWrongs == 1) {
+      final c = kCounterBy[cid];
+      s.toast('${c?.nm ?? "THAT"} DOES NOTHING TO THIS ONE', ToastKind.bad);
+      s.toasts.pushDelayed(
+          700, 'PRESS M — THE MANUAL NAMES THE KEY', ToastKind.gold);
+    }
     notifyListeners();
   }
 
@@ -705,6 +1083,21 @@ class AnomalyRuntime extends ChangeNotifier {
     if (a == null) return;
     final hadMute = a.mute.isNotEmpty;
     active = null;
+    // THE KILL GETS A DURATION. `active = null` on its own deletes the thing
+    // between two frames, which is why being RIGHT used to produce 0px of shake
+    // while being WRONG produced 6. It now leaves a body for the painters to
+    // blow out, and stops the world for a moment on the way.
+    if (success) {
+      final clean = a.t < a.window * 0.4;
+      dying = a;
+      dyingT = 0;
+      dyingSpan = silent ? kDyingSpanQuiet : kDyingSpan;
+      if (!silent) {
+        hitstop = math.max(hitstop, clean ? kHitstopClean : kHitstopPartial);
+        shake = math.max(shake, clean ? 10.0 : 6.5);
+        flash = math.max(flash, clean ? 0.34 : 0.2);
+      }
+    }
     glitch = 0;
     audio.setStatic(0.03);
     audio.setDrone(0, 42);
@@ -734,7 +1127,7 @@ class AnomalyRuntime extends ChangeNotifier {
       s.lifetimeSig += bonus;
       banishFx = 1;
       s.dread = math.max(0, s.dread - 6);
-      if (!silent) audio.banishStinger(fast);
+      if (!silent) audio.banishStinger(fast, s.stats.streak);
       s.toast(
           '${fast ? "CLEAN KILL — " : "BANISHED — "}${a.def.nm}  +${fmt(bonus)} SIG'
           '${s.stats.streak > 2 ? "   ×${s.stats.streak} STREAK" : ""}',
@@ -918,7 +1311,7 @@ class AnomalyRuntime extends ChangeNotifier {
         audio.setStatic(0.03);
         audio.setDrone(0, 42);
         audio.setHeart(52, 0.04);
-        audio.banishStinger(false);
+        audio.banishStinger(false, s.stats.streak);
         audio.good();
         s.toast('BANISHED — ${def.nm}', ToastKind.good);
         _atScare(serial, 560, () {
@@ -1068,6 +1461,9 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// Wipes every scare channel and cancels any beat still in flight.
   void _clearScareFx() {
+    dying = null;
+    dyingT = 0;
+    hitstop = 0;
     _scareSerial++;
     scare = 0;
     scareDef = null;
@@ -1307,6 +1703,16 @@ class AnomalyRuntime extends ChangeNotifier {
 
     s.tune.tick(dt, tGlobal);
 
+    // The corpse fades on its own clock; the hit-stop drains in real time so it
+    // cannot be extended by a second kill landing inside it.
+    if (dying != null) {
+      dyingT += dt;
+      if (dyingT >= dyingSpan) {
+        dying = null;
+        dyingT = 0;
+      }
+    }
+    hitstop = math.max(0, hitstop - dt);
     shake = math.max(0, shake - dt * 36);
     flash = math.max(0, flash - dt * 3.2);
     // The false clear holds its green wash until the beat takes it away.
@@ -1363,8 +1769,27 @@ class AnomalyRuntime extends ChangeNotifier {
     if (s.shiftMin % 60 >= 59 && !quotaMet(s)) {
       if (!s.stalled) {
         s.stalled = true;
-        s.toast('⧗ CLOCK HELD — ${segOf(s).nm} IS SHORT OF VIEWERS',
+        _stallSay = 0;
+        _stallAdvice = 0;
+      }
+      // A held clock used to announce itself exactly once, into silence, with
+      // no figure attached — a traced blind night ends frozen at 23:59 with
+      // nothing on screen naming the action that would unfreeze it. It now
+      // restates the exact shortfall and cycles through what to do about it.
+      _stallSay -= dt;
+      if (_stallSay <= 0) {
+        _stallSay = 19;
+        final short = math.max(0.0, segOf(s).quota - s.segSig);
+        s.toast('CLOCK HELD — ${fmt(short)} MORE OUTPUT NEEDED THIS SEGMENT',
             ToastKind.bad);
+        const advice = <String>[
+          'STRIKE THE TUBE — EVERY HIT COUNTS TOWARD THE QUOTA',
+          'BANISH SOMETHING — A CLEAN KILL PAYS STRAIGHT INTO OUTPUT',
+          'BUY A TRANSMITTER — THE RACK IS ON YOUR RIGHT',
+        ];
+        s.toasts.pushDelayed(
+            1200, advice[_stallAdvice % advice.length], ToastKind.gold);
+        _stallAdvice++;
       }
       s.dread = math.min(100, s.dread + dt * 0.9);
     } else {
@@ -1452,6 +1877,17 @@ class AnomalyRuntime extends ChangeNotifier {
       } else {
         nextAt -= dt;
         if (nextAt <= 0) beginWarn();
+      }
+      // The GUARANTEED head of the window drains on its own clock, outside the
+      // calm branch — it is granted on every banish and beginWarn() hard-returns
+      // while it is up, so failing to drain it here stopped the game dead after
+      // the player's first kill. Measured: 1 manifest per 21-minute night.
+      if (calmGuard > 0) {
+        calmGuard -= dt;
+        if (calmGuard <= 0) {
+          calmGuard = 0;
+          calmGuardSpan = 0;
+        }
       }
     }
     if (s.dread >= 100 && active == null && !lost) signalLost();

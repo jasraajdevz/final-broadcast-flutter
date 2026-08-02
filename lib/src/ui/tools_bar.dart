@@ -18,6 +18,13 @@
 //   SPLICE -> >BARS      (the counter it read off the tape)
 //   MIRROR -> ARMED      (standing against the glass, pulsing)
 //
+// SEALED CHIPS. Only the FLARE is on the desk on night one; the other four are
+// requisitioned one per night (see the note at the top of tools.dart). A sealed
+// chip is still drawn in its own slot, at full width, with its KEY CAP STILL
+// LEGIBLE — the rail never changes shape, so a control never moves under the
+// player's hand — and shows NIGHT n where the price would be. It reads as a
+// thing that is coming, not as a thing that is missing.
+//
 // The hairline along the bottom is the stock room filling the next free charge.
 
 import 'dart:math' as math;
@@ -87,6 +94,8 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Sty(s.ui);
+    if (!tools.unlocked(def)) return _sealed(t);
+
     final have = tools.chargesOf(def.id);
     final full = have >= def.cap;
     final price = tools.priceOf(def);
@@ -205,6 +214,66 @@ class _Chip extends StatelessWidget {
               _buy(t, full, afford),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// A tool the stock room has not signed out yet. Same slot, same width, same
+  /// key cap — only the ink and the right-hand readout change, so nothing on
+  /// the rail ever moves when one lands.
+  Widget _sealed(Sty t) {
+    final left = tools.nightsUntil(def);
+    return Pressable(
+      tooltip: '${def.ds}\n\n'
+          'SEALED — THE STOCK ROOM SIGNS THIS OUT ON NIGHT ${def.night}.\n'
+          'KEY ${def.keyCap} WILL BE LIVE THEN. '
+          '${left == 1 ? "ONE MORE NIGHT." : "$left MORE NIGHTS."}',
+      onTap: () => tools.fire(def.id),
+      builder: (_, hover, _) => Container(
+        decoration: BoxDecoration(
+          color: K.black,
+          border: Border.all(color: hover ? K.itemBorder : K.edge),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: Row(
+          children: <Widget>[
+            _cap(t, false),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                def.nm,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                style: t.at(11.5, K.manUnk, ls: 1),
+              ),
+            ),
+            const SizedBox(width: 3),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'NIGHT ${def.night}',
+                  maxLines: 1,
+                  softWrap: false,
+                  style: t.at(10.5, K.manUnk, ls: 0.5),
+                ),
+              ),
+            ),
+            const SizedBox(width: 3),
+            SizedBox(
+              width: _kBuyW,
+              child: Text(
+                '·',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                softWrap: false,
+                style: t.at(10, K.edge, ls: 0),
+              ),
+            ),
+          ],
         ),
       ),
     );

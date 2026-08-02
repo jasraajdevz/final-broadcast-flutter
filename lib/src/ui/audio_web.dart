@@ -168,6 +168,9 @@ class WebAudio implements GameAudio {
   double _hbPh = 0.88;
   double _ev = 7;
 
+  /// Which of the eight desk relays closes next. See [relay].
+  int _relayN = 0;
+
   // -------------------------------------------------------------------------
   // init / lifecycle
   // -------------------------------------------------------------------------
@@ -771,23 +774,394 @@ class WebAudio implements GameAudio {
     duck(0.35, 260);
   }
 
+  // -------------------------------------------------------------------------
+  // THE EIGHT EMERGENCY KEYS
+  //
+  // Every counter press used to route to click() — env('square',900,...), the
+  // same 45ms blip a rack tab makes. The climactic input in the game sounded
+  // like a spreadsheet, and because it was the same blip for a right answer, a
+  // wrong answer and a menu tab, the deck had no voice of its own.
+  //
+  // A 1968 emergency key is not a beep. It is a coil pulling an armature into a
+  // contact, and there are three things in that sound, in this order:
+  //   1. the ARMATURE — a low thump with a very fast decay. Almost no pitch,
+  //      all weight. This is what makes the press feel like it cost something.
+  //   2. the CONTACT — a filtered-noise transient, ~25ms, bright and metallic.
+  //      This is the part that actually reaches a laptop speaker.
+  //   3. the COIL — a mains-flavoured buzz decaying as the field collapses,
+  //      then a quieter second contact as the armature seats.
+  // Total 0.19s, so eight of them in a row still read as eight distinct presses
+  // rather than a smear.
+  // -------------------------------------------------------------------------
+
+  /// One contact closing under a coil. Something latched; something is still
+  /// live. Used for a partial kill — the two-stage flinch, the first half of a
+  /// coupled pair — and it is the voice the eight emergency keys want, because
+  /// that is literally the hardware under them.
+  ///
+  /// There are eight relays in the desk, they are not tuned to each other and
+  /// they never were, so consecutive closes step around a small pitch ring and
+  /// jitter on top of it. Nothing here is ever exactly the same twice.
   @override
-  void banishStinger(bool fast) {
+  void relay() {
     final c = _c, master = _master;
     if (!_on || c == null || master == null) return;
     final t = c.currentTime;
     final out = c.createGain();
     out.gain.value = 1;
     out.connect(master);
-    // pull the room out and bring it back: the relief
-    duck(0.15, fast ? 320 : 240);
+
+    final d = _relayN++ & 7;
+    final tone = math.pow(1.0293, d).toDouble() * rr(0.985, 1.015);
+
+    // 1. the armature
+    final o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(112 * tone, t);
+    o.frequency.exponentialRampToValueAtTime(38, t + 0.06);
+    final g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.34, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    final sh = _shaper(2.4);
+    if (sh != null) {
+      o.connect(sh);
+      sh.connect(g);
+    } else {
+      o.connect(g);
+    }
+    g.connect(out);
+    o.start(t);
+    o.stop(t + 0.11);
+
+    // 2. the contact, closing
+    final n = _noise(t, 0.05);
+    if (n != null) {
+      final bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.q.value = 5.5;
+      bp.frequency.setValueAtTime(3200 * tone, t);
+      bp.frequency.exponentialRampToValueAtTime(1450 * tone, t + 0.03);
+      final ng = c.createGain();
+      ng.gain.setValueAtTime(1.05, t);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.026);
+      n.connect(bp);
+      bp.connect(ng);
+      ng.connect(out);
+    }
+
+    // 3. the coil, and the armature seating 45ms later
+    final coil = c.createOscillator();
+    coil.type = 'square';
+    coil.frequency.setValueAtTime(119 * tone, t);
+    coil.frequency.linearRampToValueAtTime(103 * tone, t + 0.13);
+    final clp = c.createBiquadFilter();
+    clp.type = 'lowpass';
+    clp.frequency.value = 940;
+    clp.q.value = 1.2;
+    final cg = c.createGain();
+    cg.gain.setValueAtTime(0.0001, t);
+    cg.gain.exponentialRampToValueAtTime(0.055, t + 0.01);
+    cg.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    coil.connect(clp);
+    clp.connect(cg);
+    cg.connect(out);
+    coil.start(t);
+    coil.stop(t + 0.16);
+
+    final seat = _noise(t + 0.045, 0.03);
+    if (seat != null) {
+      final sb = c.createBiquadFilter();
+      sb.type = 'bandpass';
+      sb.q.value = 8;
+      sb.frequency.value = 2300 * tone;
+      final sg2 = c.createGain();
+      sg2.gain.setValueAtTime(0.34, t + 0.045);
+      sg2.gain.exponentialRampToValueAtTime(0.0001, t + 0.068);
+      seat.connect(sb);
+      sb.connect(sg2);
+      sg2.connect(out);
+    }
+
+    _kill(out, 0.32);
+  }
+
+  /// A run of [lost] correct answers ending. Every other cue in the game sweeps
+  /// UP; this one falls, and the taller the run was the further it has to fall,
+  /// so the loss is proportional to what was lost. It lands on a soft floor
+  /// thud rather than fading out — a fall with no impact has no shape.
+  @override
+  void streakBroken(int lost) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null) return;
+    final t = c.currentTime;
+    final n = lost < 0 ? 0 : (lost > 8 ? 8 : lost);
+    final d = 0.50 + n * 0.045;
+    final f0 = 300.0 + n * 38;
+    final f1 = 78.0;
+
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+    duck(0.45, ((d + 0.2) * 1000).round());
+
+    // the glissando: three saws a few cents apart through a closing lowpass
+    final lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.q.value = 3.5;
+    lp.frequency.setValueAtTime(2700, t);
+    lp.frequency.exponentialRampToValueAtTime(300, t + d);
+    final og = c.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.16 + n * 0.012, t + 0.03);
+    og.gain.exponentialRampToValueAtTime(0.012, t + d);
+    for (final det in const <double>[0, 11, -14]) {
+      final o = c.createOscillator();
+      o.type = 'sawtooth';
+      o.detune.value = det;
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(f1, t + d);
+      o.connect(lp);
+      o.start(t);
+      o.stop(t + d + 0.05);
+    }
+    lp.connect(og);
+    og.connect(out);
+
+    // the air going down with it
+    final ns = _noise(t, d + 0.1);
+    if (ns != null) {
+      final bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.q.value = 2.2;
+      bp.frequency.setValueAtTime(2600, t);
+      bp.frequency.exponentialRampToValueAtTime(180, t + d);
+      final ng = c.createGain();
+      ng.gain.setValueAtTime(0.20, t);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      ns.connect(bp);
+      bp.connect(ng);
+      ng.connect(out);
+    }
+
+    // the floor
+    final a = t + d * 0.94;
+    final th = c.createOscillator();
+    th.type = 'sine';
+    th.frequency.setValueAtTime(96, a);
+    th.frequency.exponentialRampToValueAtTime(30, a + 0.24);
+    final tg = c.createGain();
+    tg.gain.setValueAtTime(0.0001, a);
+    tg.gain.exponentialRampToValueAtTime(0.22 + n * 0.014, a + 0.01);
+    tg.gain.exponentialRampToValueAtTime(0.0001, a + 0.34);
+    final tsh = _shaper(2.0);
+    if (tsh != null) {
+      th.connect(tsh);
+      tsh.connect(tg);
+    } else {
+      th.connect(tg);
+    }
+    tg.connect(out);
+    th.start(a);
+    th.stop(a + 0.38);
+
+    _kill(out, d + 0.8);
+  }
+
+  /// A mark worth stopping for. Four kinds, and they are four DIFFERENT sounds
+  /// on purpose — a milestone the player cannot tell apart from the last one is
+  /// a milestone that stops meaning anything by the fourth hour:
+  ///
+  ///   "streak" — a new best run. A station ident: a major triad rising, moved
+  ///              up a whole tone per rung of [n], so a record is audibly higher
+  ///              than the record before it.
+  ///   "banish" — every tenth kill of a career. Low, slow, two notes a fifth
+  ///              apart with a long tail. This is a plaque on a wall, not a
+  ///              firework.
+  ///   "night"  — a segment of the rundown behind you. The 1kHz time pips a
+  ///              real station put out on the hour, [n] of them, and the last
+  ///              one long. The clock is the thing that is escalating; let the
+  ///              clock speak with the clock's own voice.
+  ///   "clean"  — a run of flawless kills. Bright, tight, over in 300ms: a
+  ///              flourish, not a ceremony, because it happens mid-fight.
+  @override
+  void milestone(String kind, int n) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null) return;
+    switch (kind) {
+      case 'night':
+        _pips(n);
+      case 'banish':
+        _plaque(n);
+      case 'clean':
+        _flourish(n);
+      default:
+        _ident(n);
+    }
+  }
+
+  /// "streak" — the station ident.
+  void _ident(int n) {
+    final c = _c, master = _master;
+    if (c == null || master == null) return;
+    final t = c.currentTime;
+    final rung = n <= 0 ? 0 : (n > 6 ? 6 : n - 1);
+    final k = math.pow(2.0, rung * 2 / 12.0).toDouble();
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+    duck(0.62, 340);
+
+    const notes = <double>[392, 523, 659];
+    for (var i = 0; i < notes.length; i++) {
+      final f = notes[i] * k;
+      final a = t + i * 0.085;
+      const dur = 0.85;
+      final o = c.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      final o2 = c.createOscillator();
+      o2.type = 'sine';
+      o2.frequency.value = f * 3.01;
+      final g2 = c.createGain();
+      g2.gain.setValueAtTime(0.0001, a);
+      g2.gain.exponentialRampToValueAtTime(0.15 / (1 + i * 0.22), a + 0.01);
+      g2.gain.exponentialRampToValueAtTime(0.0001, a + dur);
+      final og2 = c.createGain();
+      og2.gain.value = 0.34;
+      o.connect(g2);
+      o2.connect(og2);
+      og2.connect(g2);
+      g2.connect(out);
+      o.start(a);
+      o.stop(a + dur + 0.05);
+      o2.start(a);
+      o2.stop(a + dur + 0.05);
+    }
+
+    // the transmitter itself coming up under the chime
     final sub = c.createOscillator();
     sub.type = 'sine';
-    sub.frequency.setValueAtTime(160, t);
+    sub.frequency.setValueAtTime(64, t);
+    sub.frequency.exponentialRampToValueAtTime(98, t + 0.4);
+    final sg = c.createGain();
+    sg.gain.setValueAtTime(0.0001, t);
+    sg.gain.exponentialRampToValueAtTime(0.18, t + 0.05);
+    sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    final ssh = _shaper(1.9);
+    if (ssh != null) {
+      sub.connect(ssh);
+      ssh.connect(sg);
+    } else {
+      sub.connect(sg);
+    }
+    sg.connect(out);
+    sub.start(t);
+    sub.stop(t + 0.75);
+
+    _kill(out, 1.5);
+  }
+
+  /// "banish" — the career plaque. Deliberately the slowest cue in the game.
+  void _plaque(int n) {
+    final c = _c, master = _master;
+    if (c == null || master == null) return;
+    final t = c.currentTime;
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+    duck(0.55, 900);
+    // one whole tone up per hundred kills, so a career has a shape too
+    final k = math.pow(2.0, math.min(4, n ~/ 100) * 2 / 12.0).toDouble();
+    for (final v in <List<double>>[
+      <double>[147 * k, 0],
+      <double>[220 * k, 0.34],
+    ]) {
+      final f = v[0], a = t + v[1];
+      final o = c.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      final o2 = c.createOscillator();
+      o2.type = 'sine';
+      o2.frequency.value = f * 2;
+      final o2g = c.createGain();
+      o2g.gain.value = 0.4;
+      final g = c.createGain();
+      g.gain.setValueAtTime(0.0001, a);
+      g.gain.exponentialRampToValueAtTime(0.17, a + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, a + 1.5);
+      final sh = _shaper(1.5);
+      o.connect(g);
+      o2.connect(o2g);
+      o2g.connect(g);
+      if (sh != null) {
+        g.connect(sh);
+        sh.connect(out);
+      } else {
+        g.connect(out);
+      }
+      o.start(a);
+      o.stop(a + 1.6);
+      o2.start(a);
+      o2.stop(a + 1.6);
+    }
+    _kill(out, 2.4);
+  }
+
+  /// "night" — the hour going, in the station's own time pips.
+  void _pips(int n) {
+    if (_c == null) return;
+    final count = n < 1 ? 1 : (n > 6 ? 6 : n);
+    duck(0.5, 200 * count + 700);
+    for (var i = 0; i < count; i++) {
+      final last = i == count - 1;
+      _later(i * 200, () {
+        // 1000Hz, five short and one long — the real thing, exactly.
+        env('sine', 1000, last ? 0.52 : 0.10, 0.085, 1000);
+        if (last) env('sine', 500, 0.6, 0.03, 500);
+      });
+    }
+  }
+
+  /// "clean" — a flourish, over before you have finished thinking about it.
+  void _flourish(int n) {
+    if (_c == null) return;
+    final k = math.pow(2.0, math.min(5, n <= 0 ? 0 : n - 1) / 12.0).toDouble();
+    for (var i = 0; i < 3; i++) {
+      final f = <double>[1046, 1318, 1568][i] * k;
+      _later(i * 38, () {
+        env('triangle', f, 0.16, 0.075, f);
+        env('sine', f * 2, 0.09, 0.022, f * 2);
+      });
+    }
+    burst(0.06, 0.09, 3200, 6400);
+  }
+
+  /// The relief. [streak] is the run of consecutive banishes INCLUDING this
+  /// one: it transposes the whole figure up in whole tones and adds a note on
+  /// top, so a long run audibly CLIMBS instead of replaying the same two bars
+  /// twenty times. A seventh kill does not sound like a first.
+  @override
+  void banishStinger(bool fast, int streak) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null) return;
+    final t = c.currentTime;
+    final tier = streak - 1;
+    final tr = tier < 0 ? 0 : (tier > 4 ? 4 : tier);
+    final k = math.pow(2.0, tr * 2 / 12.0).toDouble();
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+    // pull the room out and bring it back: the relief. The higher the run, the
+    // longer the room stays out of the way.
+    duck(0.15, (fast ? 320 : 240) + tr * 45);
+    final sub = c.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(160 * (1 + tr * 0.05), t);
     sub.frequency.exponentialRampToValueAtTime(40, t + 0.5);
     final sg = c.createGain();
     sg.gain.setValueAtTime(0.0001, t);
-    sg.gain.exponentialRampToValueAtTime(0.30, t + 0.02);
+    sg.gain.exponentialRampToValueAtTime(0.30 + tr * 0.02, t + 0.02);
     sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
     final ssh = _shaper(1.8);
     if (ssh != null) {
@@ -814,9 +1188,17 @@ class WebAudio implements GameAudio {
       nf.connect(ng);
       ng.connect(out);
     }
-    final notes = fast
+    final base = fast
         ? const <double>[784, 1176, 1568, 2352]
         : const <double>[588, 882, 1176];
+    final notes = <double>[for (final f in base) f * k];
+    // Past a three-run the figure grows a note rather than just moving up, so
+    // the climb is in the shape and not only in the pitch. Capped so a maxed
+    // streak never turns the reward into a whistle.
+    if (tr >= 3) {
+      final top = notes.last * 1.5;
+      notes.add(top > 3600 ? 3600 : top);
+    }
     for (var i = 0; i < notes.length; i++) {
       final f = notes[i];
       final a = t + i * 0.055;
@@ -1130,12 +1512,27 @@ class WebAudio implements GameAudio {
   @override
   void click() => env('square', 900, 0.045, 0.09, 420);
 
+  /// Eight rungs, not a slide. A continuous `520 + p*180` made a rack of manual
+  /// strikes read as one siren going up and down, which is the sound of a knob
+  /// being turned rather than a set being hit. Quantising the heat onto a fixed
+  /// ladder makes a burst of strikes come out as a RISING FIGURE — the same
+  /// eight notes every time, so the player can hear how hard they are working
+  /// and hear it reset. The ladder is a major pentatonic so no two adjacent
+  /// rungs can sound like a mistake.
+  static const List<double> _tuneRungs = <double>[
+    440, 494, 554, 659, 740, 831, 988, 1109,
+  ];
+
   /// Knocking the set: a dull thunk plus a squeal of carrier finding its lock.
   @override
   void tune(double p) {
-    final f = 520 + p * 180;
+    final q = p.isNaN ? 0.0 : (p < 0 ? 0.0 : (p > 1 ? 1.0 : p));
+    final i = (q * (_tuneRungs.length - 1)).round();
+    final f = _tuneRungs[i];
     env('triangle', f, 0.09, 0.10, f * 1.7);
     env('sine', f * 2.4, 0.06, 0.05, f * 3.1);
+    // the thunk stays where it was: it is the set, and the set does not change
+    // pitch because you hit it faster
     burst(0.05, 0.05, 2600, 700);
   }
 

@@ -102,4 +102,31 @@ void main() {
     expect(sawReset, isTrue,
         reason: 'segSig must reset when the segment advances');
   });
+
+  test('the night keeps spawning after the player starts winning', () {
+    // The guaranteed head of an ALL CLEAR window hard-blocks beginWarn(). It is
+    // granted on every banish, so if it ever stops draining the game silently
+    // stops dead after the first kill — measured at the time: 1 manifest per
+    // 21-minute night, no error, no test failure.
+    final s = _seeded();
+    final r = AnomalyRuntime(s);
+    r.startBroadcast();
+
+    var t = 0.0, manifests = 0;
+    var wasActive = false;
+    const dt = 1 / 60.0;
+    while (t < 21 * 60 && !r.lost) {
+      r.tick(dt);
+      t += dt;
+      final now = r.active != null;
+      if (now && !wasActive) manifests++;
+      wasActive = now;
+      // play well: always answer correctly, so calm is granted constantly
+      final a = r.active;
+      if (a != null && a.stage == 1 && a.p > 0.3) r.pressCounter(a.def.counter);
+    }
+    expect(manifests, greaterThan(12),
+        reason: 'a well-played night must not run out of anomalies');
+    expect(s.stats.banished, greaterThan(10));
+  });
 }

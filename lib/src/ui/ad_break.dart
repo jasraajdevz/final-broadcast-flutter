@@ -38,17 +38,53 @@ class AdController {
       canSkip ? 'CONTINUE' : 'SKIP IN ${(kAdSkipAt - t).ceil()}';
 
   /// JS playAd(done, label).
+  ///
+  /// The cue used to be three bare square blips — the same voice as a rack tab,
+  /// which is the wrong voice for the one moment the station stops being yours.
+  /// This is a CUT TO TAPE, and a 1987 station cutting to tape makes a specific
+  /// noise: the room is yanked away, the splice goes through the gate, the
+  /// telecine takes up, and only then does the ident ring.
   void play(String adLabel, void Function() done) {
     ad = pick(kAds);
     label = adLabel;
     t = 0;
     _done = done;
     runtime.adPlaying = true;
-    runtime.audio.env('square', 523, 0.12, 0.08, 523);
-    Timer(const Duration(milliseconds: 140),
-        () => runtime.audio.env('square', 659, 0.12, 0.08, 659));
-    Timer(const Duration(milliseconds: 280),
-        () => runtime.audio.env('square', 784, 0.3, 0.08, 784));
+    _cutToTape();
+  }
+
+  void _cutToTape() {
+    final a = runtime.audio;
+    // the room goes, hard, and stays gone for the length of the ident
+    a.duck(0.18, 1100);
+    // the splice through the gate, then the telecine taking up
+    a.burst(0.06, 0.30, 5400, 900);
+    a.thump(0.24, 74);
+    // the ident: a major triad with a tail on it, over a low pad. Same three
+    // notes the old cue used, given a body so it reads as a station and not as
+    // a menu.
+    const notes = <double>[523, 659, 784];
+    for (var i = 0; i < notes.length; i++) {
+      final f = notes[i];
+      final dur = i == notes.length - 1 ? 1.05 : 0.55;
+      Timer(Duration(milliseconds: 90 + i * 150), () {
+        a.env('triangle', f, dur, 0.105, f);
+        a.env('sine', f * 2, dur * 0.7, 0.042, f * 2);
+      });
+    }
+    Timer(const Duration(milliseconds: 90),
+        () => a.env('sawtooth', 131, 1.25, 0.05, 131, 2));
+  }
+
+  /// Coming back off tape. The return used to be silent, so a spot ended by
+  /// going quiet — indistinguishable from the audio having died. One transient
+  /// and the room comes back up on its own as the duck releases.
+  void _cutBack() {
+    final a = runtime.audio;
+    a.duck(0.30, 240);
+    a.burst(0.05, 0.26, 4800, 700);
+    a.env('square', 392, 0.10, 0.055, 262);
+    a.thump(0.16, 62);
   }
 
   /// JS adTick(dt) — called from the main loop while a spot is up.
@@ -66,6 +102,7 @@ class AdController {
     _done = null;
     runtime.adPlaying = false;
     s.stats.ads++;
+    _cutBack();
     d?.call();
   }
 

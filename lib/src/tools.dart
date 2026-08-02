@@ -34,9 +34,30 @@
 //            `t >= window - 0.2`, and dt is clamped to 0.1 upstream, so the
 //            runtime can never reach `window` before this check runs.
 //
-// Charges are session-scoped: state.dart is not ours, so nothing here is
-// written to the save blob. That is a deliberate side effect and a good one —
-// you cannot bank a shelf of panic buttons across sessions.
+// ---------------------------------------------------------------------------
+// REQUISITION — why you do not get all five on night one
+//
+// A blind first five minutes was traced and the opening was unreadable: eight
+// emergency keys, five tool chips, six rack rows and a manual, all live at
+// t=0, with nothing on screen saying which of the nineteen controls was the
+// one that mattered. It is the eight keys. Everything else is noise until you
+// know that.
+//
+// So the rail opens with ONE tool — the FLARE, whose entire payload is "stops
+// the clock so you can think of the key", i.e. a control that points at the
+// core loop instead of competing with it — and the other four are requisitioned
+// one per night. A locked chip is still SHOWN, still keeps its key cap legible,
+// and says which night it arrives, because hiding a control is how you get a
+// player who never finds it. The night it lands, the stock room prints a
+// REQUISITION toast and puts one charge in it, so the unlock is a thing that
+// happens TO you rather than a row that quietly stops being grey.
+//
+// This cannot make a run unwinnable: every tool is a panic button, none of them
+// is required to banish anything, and the eight keys are complete from the
+// first second of night one.
+//
+// Charges are mirrored into the save blob (GameState.toolCharges) on every
+// mutation, so a charge bought at second 3 survives a reload at second 5.
 
 import 'dart:math' as math;
 
@@ -96,6 +117,7 @@ class ToolDef {
     required this.rateSecs,
     required this.taps,
     required this.needsTarget,
+    required this.night,
     required this.ds,
   });
 
@@ -120,6 +142,10 @@ class ToolDef {
   /// True if it needs something on the tube. Only the MIRROR does not.
   final bool needsTarget;
 
+  /// The night this one is requisitioned onto the desk. 1 means it is there
+  /// from the first second. See the REQUISITION note at the top of the file.
+  final int night;
+
   final String ds;
 
   String get keyCap => key.toUpperCase();
@@ -134,6 +160,7 @@ const List<ToolDef> kTools = <ToolDef>[
     rateSecs: 12,
     taps: 22,
     needsTarget: true,
+    night: 1,
     ds: 'FLARE GUN — fire it into the tube. Whatever is in there is stunned: '
         'the banish window stops dead for 2.2s and it stops taking from you. '
         'It does not banish anything. Buys you the time to think of the key.',
@@ -146,6 +173,7 @@ const List<ToolDef> kTools = <ToolDef>[
     rateSecs: 18,
     taps: 32,
     needsTarget: true,
+    night: 3,
     ds: 'DEGAUSSING WAND — a hard magnetic wipe across the desk. Strips a mask, '
         'puts the transmitters back on air, makes her hand the pile back, and '
         'stops the lines ringing. It does not banish anything.',
@@ -158,9 +186,14 @@ const List<ToolDef> kTools = <ToolDef>[
     rateSecs: 15,
     taps: 26,
     needsTarget: true,
+    night: 2,
+    // The copy used to promise it "names the one key that kills this thing".
+    // The behaviour was narrowed to two candidates when SECOND CAMERA (2.2e10)
+    // took over naming the key outright, and this string was never updated —
+    // so the tool read as broken every time it fired. It narrows. Say so.
     ds: 'SPLICER — cuts the frame it entered on out of the tape and reads it. '
-        'Strips a mask and names the one key that kills this thing. You still '
-        'have to press it.',
+        'Strips a mask and narrows the kill down to TWO emergency keys, one of '
+        'which is right. It never tells you which. You still have to choose.',
   ),
   ToolDef(
     id: 'emp',
@@ -170,6 +203,7 @@ const List<ToolDef> kTools = <ToolDef>[
     rateSecs: 30,
     taps: 55,
     needsTarget: true,
+    night: 4,
     ds: 'EMP CHARGE — buys 4.5s back on the window and takes the whole rack off '
         'air until the intrusion clears. Costs 45% of the bank and most of your '
         'surplus output. It cannot cost you a quota you have already met.',
@@ -182,6 +216,7 @@ const List<ToolDef> kTools = <ToolDef>[
     rateSecs: 40,
     taps: 70,
     needsTarget: false,
+    night: 5,
     ds: 'MIRROR — stand it against the glass and leave it. The next thing that '
         'runs the clock out sees itself and goes instead of you. No jumpscare, '
         'nothing stolen — and no payout either. Insurance, not a kill.',
@@ -206,9 +241,9 @@ class Tools {
     }
     final saved = runtime.s.toolCharges;
     if (saved.isEmpty) {
-      // Enough to see them work once, not enough to lean on.
-      _charge['flare'] = 1;
-      _charge['splice'] = 1;
+      // Two of the ONE tool that exists on night one. Enough to learn what a
+      // freeze buys you, and to learn that it does not banish anything.
+      _charge['flare'] = 2;
     } else {
       for (final d in kTools) {
         _charge[d.id] = (saved[d.id] ?? 0).clamp(0, d.cap);
@@ -275,6 +310,21 @@ class Tools {
   /// Tools only work on a live shift.
   bool get ready => runtime.signedOn && !runtime.lost && !runtime.adPlaying;
 
+  /// True once the stock room has requisitioned this one onto the desk. A
+  /// locked tool is still drawn, still keeps its key cap legible and still
+  /// says which night it arrives — see the REQUISITION note at the top.
+  bool unlocked(ToolDef d) => s.night >= d.night;
+
+  /// Nights left until [d] lands, or 0 if it is already here.
+  int nightsUntil(ToolDef d) {
+    final n = d.night - s.night;
+    return n < 0 ? 0 : n;
+  }
+
+  /// The tools that are on the desk right now, in table order.
+  List<ToolDef> get available =>
+      <ToolDef>[for (final d in kTools) if (unlocked(d)) d];
+
   /// Cost of one more charge, in SIGNAL. Priced off the player's own output so
   /// it is exactly as scarce on night nine as it was on night one.
   double priceOf(ToolDef d) {
@@ -309,6 +359,10 @@ class Tools {
   bool buy(String id) {
     final d = kToolBy[id];
     if (d == null || !runtime.signedOn) return false;
+    if (!unlocked(d)) {
+      _sealed(d);
+      return false;
+    }
     if (isFull(d)) {
       _deny('${d.nm} — RACK IS FULL');
       return false;
@@ -332,6 +386,10 @@ class Tools {
     final d = kToolBy[id];
     if (d == null) return false;
     if (!ready || _lock > 0) return false;
+    if (!unlocked(d)) {
+      _sealed(d);
+      return false;
+    }
     if (chargesOf(d.id) <= 0) {
       _deny('${d.nm} — NO CHARGE '
           '(SHIFT+${d.keyCap} BUYS ONE, ${fmt(priceOf(d))} SIG)');
@@ -487,10 +545,12 @@ class Tools {
 
     // A new night wipes the run; nothing mid-intrusion should survive it.
     if (s.night != _night) {
+      final was = _night;
       _night = s.night;
       _stun = 0;
       _revealOn = null;
       _revealCid = null;
+      if (s.night > was) _requisition(was);
     }
 
     final ActiveAnom? a = runtime.active;
@@ -565,12 +625,36 @@ class Tools {
 
   // --- plumbing ----------------------------------------------------------
 
+  /// Everything the stock room signed out between night [was] and tonight. One
+  /// toast and one charge each, staggered so a player who skipped several
+  /// nights at once still reads them one at a time.
+  void _requisition(int was) {
+    var delay = 900;
+    for (final d in kTools) {
+      if (d.night <= was || d.night > s.night) continue;
+      if (chargesOf(d.id) < d.cap) {
+        _charge[d.id] = chargesOf(d.id) + 1;
+        _flash[d.id] = 1;
+      }
+      s.toasts.pushDelayed(
+          delay,
+          'REQUISITION APPROVED — ${d.nm} IS ON THE DESK  ·  KEY ${d.keyCap}',
+          ToastKind.gold);
+      s.toasts.pushDelayed(delay + 1500, d.ds, ToastKind.plain);
+      delay += 3400;
+    }
+    _persist();
+  }
+
   /// Gives one charge to the emptiest tool. Ties break in table order, so the
-  /// FLARE — the workhorse — fills first.
+  /// FLARE — the workhorse — fills first. A tool the stock room has not signed
+  /// out yet is skipped: a free charge burnt on a sealed chip is a free charge
+  /// the player never sees.
   void _restock(String why) {
     ToolDef? best;
     var bestP = 2.0;
     for (final d in kTools) {
+      if (!unlocked(d)) continue;
       final have = chargesOf(d.id);
       if (have >= d.cap) continue;
       final p = have / d.cap;
@@ -589,5 +673,16 @@ class Tools {
   void _deny(String msg) {
     runtime.audio.reject();
     s.toast(msg, ToastKind.bad);
+  }
+
+  /// Reaching for something that is not yours yet. Deliberately NOT the reject
+  /// buzz — you did not make a mistake, the stock room simply has not signed
+  /// it out, and punishing curiosity in the opening five minutes is how the
+  /// deck got a reputation for being confusing.
+  void _sealed(ToolDef d) {
+    runtime.audio.env('square', 190, 0.09, 0.06, 150);
+    s.toast(
+        '${d.nm} — SEALED. THE STOCK ROOM SIGNS IT OUT ON NIGHT ${d.night}.',
+        ToastKind.plain);
   }
 }
