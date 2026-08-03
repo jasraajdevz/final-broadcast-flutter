@@ -22,6 +22,7 @@ import 'checks.dart';
 import 'consts.dart';
 import 'encounter.dart';
 import 'nights.dart';
+import 'record.dart';
 import 'meta.dart';
 import 'state.dart';
 
@@ -175,7 +176,9 @@ double sigRate(GameState s, AnomalyRuntime a) {
 
 /// JS rpGain().
 int rpGain(GameState s) =>
-    (math.pow(s.lifetimeSig / 2.5e5, 0.5) * cardOf(s).rp).floor();
+    // the account is settled at the end of the arrangement, not during it
+    (math.pow(s.lifetimeSig / 2.5e5, 0.5) * cardOf(s).rp * recordRpMul(s))
+        .floor();
 
 /// JS tuneYield() — striking the set. The bootstrap and the thing to do
 /// between anomalies.
@@ -290,7 +293,15 @@ double anomIntervalMean(GameState s, int nightIndex) {
   // quota used to cut the gap by a quarter down to 6.5s, which is how a bad
   // segment turned into a dead run.
   if (s.stalled) base = math.max(15.0, base * 0.9);
-  return base * openingEase(nightIndex) * cardOf(s).gap;
+  // The night got 2.6x shorter and the gaps did not, so a session went from
+  // roughly forty intrusions to a dozen — and on a long-gap card like A QUIET
+  // NIGHT, to five. A short night is only worth having if it is DENSER; a
+  // shorter, emptier night is just less game.
+  //
+  // Not scaled by the full time factor: that would be frantic. Two thirds
+  // keeps the real-time rhythm recognisable while restoring the count.
+  return base * kGapTimeScale * openingEase(nightIndex) * cardOf(s).gap *
+      recordGapMul(s); // the lid remembers being lifted
 }
 
 /// Seconds until the next telegraph, jittered but never surged. Randomised on
@@ -337,6 +348,7 @@ double banishWindow(GameState s) {
   if (s.ups['ferrite'] ?? false) w += 1.2;
   w += metaWindowBonus(s); // FERRITE STOCK, permanent
   w *= cardOf(s).window;
+  w *= recordWindowMul(s); // a set that has been beaten holds its picture worse
   return math.max(kWindowFloor, w);
 }
 
@@ -532,7 +544,11 @@ double quotaScale(GameState s) =>
 /// Tonight's quota for segment [i].
 double quotaOf(GameState s, int i) {
   final j = i < 0 ? 0 : (i >= kRundown.length ? kRundown.length - 1 : i);
-  return kRundown[j].quota * quotaScale(s);
+  // The ramp is compressed toward the opening figure rather than the whole
+  // table being scaled — see kQuotaRamp for the measurements that forced it.
+  final double q0 = kRundown[0].quota;
+  final double shaped = q0 * math.pow(kRundown[j].quota / q0, kQuotaRamp);
+  return shaped * quotaScale(s);
 }
 
 /// Tonight's quota for the CURRENT segment. Everything that displays or reasons

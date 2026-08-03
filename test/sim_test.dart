@@ -12,7 +12,12 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/state.dart';
 
-GameState _seeded() {
+/// Seeded, because these are whole-night sims and an unseeded generator makes
+/// them coin-flips: a guard written against one run fails on another with no
+/// code change between them, which is worse than no guard because it teaches
+/// you to ignore red. This file has drifted three times now.
+GameState _seeded([int seed = 20260803]) {
+  seedRandom(seed);
   final s = GameState();
   for (final p in kProducers) {
     s.prod[p.id] = 0;

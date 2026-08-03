@@ -20,6 +20,7 @@
 // arrival of the fact that the roster has your name on it and always has.
 
 import 'state.dart';
+import 'record.dart';
 import 'wallclock.dart';
 
 enum DocKind {
@@ -387,6 +388,16 @@ StationDoc personalFile(GameState s) {
       ..write(_plural(s.revives, 'time', 'times'))
       ..writeln('. It was offered, and it was accepted.');
   }
+  // What the station has decided, in the personnel register. This is the
+  // psychological half: not "you did a bad thing", but a third party having
+  // formed a settled view of you and filing it without comment.
+  final rec = recordLine(s);
+  if (rec != null) {
+    b
+      ..writeln()
+      ..writeln(rec);
+  }
+
   // ONE line about the room the reader is actually sitting in, and only when
   // there is something true enough to say. Buried in the middle of a personnel
   // record it reads as an oversight rather than as a trick — which is the only

@@ -117,7 +117,10 @@ class EndSheet extends StatelessWidget {
                       hoverBackground: win ? UX.winAcceptBg : UX.acceptHover,
                       border: win ? UX.bootBtnBorder : K.lostBorder,
                       ink: win ? K.green : UX.acceptInk,
-                      onTap: runtime.signOff,
+                      // straight back on air. Three acts between wanting
+                      // another night and having one is where "one more"
+                      // goes to die.
+                      onTap: win ? runtime.signOffAndBack : runtime.signOff,
                     ),
                   ),
                 ],

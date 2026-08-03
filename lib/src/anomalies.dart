@@ -41,6 +41,7 @@ import 'career.dart';
 import 'checks.dart';
 import 'economy.dart';
 import 'nights.dart';
+import 'record.dart';
 import 'wallclock.dart';
 import 'paint/blood.dart';
 import 'meta.dart';
@@ -1425,6 +1426,7 @@ class AnomalyRuntime extends ChangeNotifier {
     if (act != null && act.stage >= 1) {
       act.blows++;
       act.sinceStagger++;
+      addMark(s, Mark.panic);
       // push the window back, up to a hard ceiling per visit
       final double room = kMaxBought - act.bought;
       if (room > 0) {
@@ -1503,6 +1505,7 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// THE LID COMES OFF.
   void dropCarrier() {
+    addMark(s, Mark.hand);
     carrierHolding = false;
     carrierHold = 0;
     carrierDrops++;
@@ -1693,7 +1696,22 @@ class AnomalyRuntime extends ChangeNotifier {
       s.dread = math.max(0, s.dread - 6);
       if (clutch) {
         s.stats.clutch++;
+        // THE NEAR MISS IS THE HOOK. "Short misses and the feeling of a little
+        // more" is exactly what a clutch save is, and it was scored in silence
+        // and filed in a stat nobody reads. It now announces the margin — the
+        // actual milliseconds you had left — because a number that small is
+        // the thing a player screenshots and the thing that makes them start
+        // another night.
+        final int ms = ((a.window - a.t) * 1000).round().clamp(0, 99999);
+        s.lastClutchMs = ms;
+        if (ms < s.bestClutchMs || s.bestClutchMs == 0) s.bestClutchMs = ms;
         if (!silent) audio.clutchSting();
+        s.toasts.pushDelayed(
+            420,
+            ms <= s.bestClutchMs
+                ? 'CLOSEST YET — ${ms}ms LEFT'
+                : '${ms}ms LEFT',
+            ToastKind.gold);
       }
       if (!silent) audio.banishStinger(fast || clutch, s.stats.streak);
       s.toast(
@@ -2343,6 +2361,7 @@ class AnomalyRuntime extends ChangeNotifier {
     notifyListeners();
     _rollAd('EMERGENCY SPONSORSHIP', () {
       s.revives++;
+      addMark(s, Mark.debt);
       // SECOND SHIFT (35 RP) bought nothing: metaFreeRevives() had no callers,
       // and revive() hardcoded the same numbers every time, so eight deaths in
       // one night returned byte-identical state while the sheet counted
@@ -2471,7 +2490,7 @@ class AnomalyRuntime extends ChangeNotifier {
           ? '☀ THE SUN CAME UP EVENTUALLY'
           : '☀ 06:00 — SIGN-OFF',
       reviveLabel: null,
-      acceptLabel: 'SIGN THE LOG — BANK ${fmt(g)} RP',
+      acceptLabel: 'SIGN THE LOG AND TAKE THE NEXT SHIFT  ·  ${fmt(g)} RP',
       body: <EndPara>[
         if (overNeed > 0)
           EndPara(<String>[
@@ -2508,6 +2527,16 @@ class AnomalyRuntime extends ChangeNotifier {
         // there is a tomorrow, and it used to close on a bare count. It now
         // says who you just outlasted, what that opened, and who is next with
         // a distance — the three things that make someone take one more shift.
+        // WHAT THE STATION HAS DECIDED ABOUT YOU. Only ever from things the
+        // operator CHOSE, and only once it is a pattern rather than an
+        // incident — being judged for bad luck is unfair, being judged for
+        // your own repeated decisions is the entire point.
+        if (verdictLine(s) != null)
+          EndPara(<String>[
+            'The file has started calling you ',
+            verdictLine(s)!,
+            '.',
+          ], ParaStyle.dim),
         ..._rosterParas(),
         EndPara(<String>['Nights survived: ${s.survived}'], ParaStyle.fine),
       ],
@@ -2516,6 +2545,18 @@ class AnomalyRuntime extends ChangeNotifier {
   }
 
   /// Prestige. Banks RP, wipes the run, starts the next night.
+  /// Sign off and go straight back on.
+  ///
+  /// "the feeling of a little more" dies at a menu. The end sheet used to drop
+  /// the operator back to the front desk, where they had to read a rank, find
+  /// a button and take a shift — three deliberate acts between wanting another
+  /// night and having one. This is the same sign-off with the next shift
+  /// already started.
+  void signOffAndBack() {
+    signOff();
+    startBroadcast();
+  }
+
   void signOff() {
     endScreen = EndScreen.none;
     endScreenModel = null;
@@ -2633,6 +2674,7 @@ class AnomalyRuntime extends ChangeNotifier {
             // A book left unsigned while something was in the room leaves a
             // mark. Nobody says whose.
             if (active != null) {
+              addMark(s, Mark.neglect);
               blood.add(0.2,
                   ox: 60 + rand() * 140, oy: 180 + rand() * 300, count: 2);
             }
@@ -2937,7 +2979,8 @@ class AnomalyRuntime extends ChangeNotifier {
     // Bleeds off much faster inside a protection window. Recovering from a
     // scare is supposed to be something you can watch happen, and the calm you
     // bought with a clean kill should visibly pay for the last one.
-    var dec = (s.ups['failsafe'] ?? false) ? 1.6 : 0.8;
+    // an hour nobody wrote down does not bleed off the way the others do
+    var dec = ((s.ups['failsafe'] ?? false) ? 1.6 : 0.8) * recordDecayMul(s);
     if (aftermath > 0) {
       dec *= 2.6;
     } else if (calm > 0) {

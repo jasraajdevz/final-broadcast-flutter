@@ -277,6 +277,13 @@ class _Ledger extends StatelessWidget {
             _Stat(ui: s.ui, k: 'BEST STREAK', v: '${s.stats.bestStreak}'),
             _Stat(ui: s.ui, k: 'CATALOGUED', v: '$logged/${kAnoms.length}'),
             _Stat(ui: s.ui, k: 'RATINGS PTS', v: fmt(s.rp), amber: true),
+            // the number a player retells
+            if (s.bestClutchMs > 0)
+              _Stat(
+                  ui: s.ui,
+                  k: 'CLOSEST CALL',
+                  v: '${s.bestClutchMs}ms',
+                  amber: true),
           ],
         ),
         // THE SPINE. Rank, standing, and the next name on the roster with a

@@ -601,7 +601,50 @@ class RundownSeg {
 }
 
 /// Real seconds per in-game minute -> ~21 minutes a night.
-const double kMinReal = 3;
+/// Real seconds per in-game minute.
+///
+/// Was 3, which made a night 21 real minutes. That single number was the
+/// biggest thing standing between this game and being addictive: "one more
+/// night" is a free thought at eight minutes and an actual commitment at
+/// twenty-one, and a run you have to schedule is a run you stop taking.
+///
+/// The idle-game framing came with that length and never earned it — most of
+/// a 21-minute shift was bookkeeping between the parts that were frightening.
+/// Shortening the night does not remove the economy, it removes the padding
+/// around it.
+const double kMinReal = 1.15; // ~8 minutes a night
+
+/// How much a night's output shrank when it got shorter, so the printed
+/// quotas still mean the same amount of WORK rather than becoming impossible.
+/// Kept explicit and derived, so changing kMinReal above can never silently
+/// leave the rundown demanding a 21-minute night's output in eight minutes.
+/// How much the RUNDOWN'S RAMP is compressed for a shorter night.
+///
+/// Scaling every quota by the same factor was the wrong fix and the numbers
+/// said so immediately. Measured on an eight-minute night, competent play:
+///
+///   segment 0   demanded 17      banked 12.4K    (trivial)
+///   segment 3   demanded 44.1K   banked 111K     (trivial)
+///   segment 4   demanded 617K    banked 447K     -> 146s to clear a 69s slot
+///   segment 5   demanded 8.82M   banked 5.69M    -> 423s to clear a 69s slot
+///
+/// The early rundown was already free and the late rundown was impossible,
+/// because the printed table ramps ~14x per segment and that only compounds
+/// inside a three-minute slot. It is the SHAPE of the curve that is wrong for
+/// a short night, not its overall size.
+///
+/// So the ramp is compressed geometrically toward the opening figure — every
+/// quota becomes q0 * (q_i/q0)^kQuotaRamp — which turns 14x per segment into
+/// about 5x while leaving the first segment exactly as printed.
+const double kQuotaRamp = 0.62;
+
+/// How much the gap between intrusions shrinks for a shorter night.
+///
+/// Deliberately less aggressive than the clock change (kMinReal went to 38% of
+/// its old value; this is 62%), because matching it exactly would make the
+/// real-time rhythm frantic. This keeps a session's intrusion COUNT healthy
+/// without turning the booth into a shooting gallery.
+const double kGapTimeScale = 0.62;
 
 const List<RundownSeg> kRundown = [
   RundownSeg(

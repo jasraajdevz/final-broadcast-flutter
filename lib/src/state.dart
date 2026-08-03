@@ -319,6 +319,16 @@ class GameState extends ChangeNotifier {
   /// again, which is what makes it an event rather than a mechanic.
   bool longNightDone = false;
 
+  /// Milliseconds left on the window of the last save, and of the best one
+  /// ever. The near miss is the thing a player retells, so the game keeps the
+  /// number rather than just a count.
+  int lastClutchMs = 0;
+  int bestClutchMs = 0;
+
+  /// What the station has decided about this operator. See record.dart —
+  /// counts of things they CHOSE to do, never of things done to them.
+  final Map<String, int> record = <String, int>{};
+
   /// Which of the previous operator's log pages have been found. Keyed by the
   /// night that hands them over, so it survives a save that predates the log.
   final Map<int, bool> log = <int, bool>{};
@@ -448,6 +458,8 @@ class GameState extends ChangeNotifier {
       'meta': meta,
       'hardwareChecked': hardwareChecked,
       'longNightDone': longNightDone,
+      'bestClutchMs': bestClutchMs,
+      'record': record,
       'log': log.map((k, v) => MapEntry(k.toString(), v)),
       'dawnBonus': dawnBonus,
     };
@@ -503,6 +515,15 @@ class GameState extends ChangeNotifier {
     manPage = _str(o['manPage'], manPage);
     hardwareChecked = _bool(o['hardwareChecked'], hardwareChecked);
     longNightDone = _bool(o['longNightDone'], longNightDone);
+    bestClutchMs = _int(o['bestClutchMs'], bestClutchMs);
+    final rec = o['record'];
+    if (rec is Map) {
+      record.clear();
+      rec.forEach((k, v) {
+        final n = _int(v, 0);
+        if (n > 0) record['$k'] = n;
+      });
+    }
     final lg = o['log'];
     if (lg is Map) {
       log.clear();
