@@ -263,6 +263,16 @@ class _GameRootState extends State<GameRoot>
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent e) {
+    // ENTER is the one key in the game that is HELD rather than tapped — a
+    // signature takes time to lay down — so it needs the key-up too.
+    if (e is KeyUpEvent) {
+      if (e.logicalKey == LogicalKeyboardKey.enter ||
+          e.logicalKey == LogicalKeyboardKey.numpadEnter) {
+        runtime.releaseCheck();
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
     // KeyRepeatEvent is a different type, so `if(e.repeat)return` is implicit.
     if (e is! KeyDownEvent) return KeyEventResult.ignored;
     final key = e.logicalKey;
@@ -287,6 +297,14 @@ class _GameRootState extends State<GameRoot>
     // Everything else still waits for SIGN ON — otherwise 1-8 would start the
     // audio graph before the player has asked for any.
     if (!runtime.signedOn) return KeyEventResult.ignored;
+
+    // ENTER signs the book. See checks.dart — one key, always the same,
+    // because the station check is an attention test, not a memory test.
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      runtime.pressCheck();
+      return KeyEventResult.handled;
+    }
 
     if (key == LogicalKeyboardKey.escape) {
       if (_manualOpen) _closeManual();

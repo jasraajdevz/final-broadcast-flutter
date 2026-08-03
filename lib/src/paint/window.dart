@@ -495,6 +495,16 @@ class WindowScene {
     // documented as "read from the window", and nothing ever wrote it — so
     // the figures outside were decoration with no cost. Crowd and proximity
     // both count, and one of them pressed against the glass counts double.
+    // THE SCAR. Once something has been through the room, the field outside
+    // does not go back: the figures hold at the glass for the rest of the
+    // night and the crowd never thins again.
+    final bool atGlass = a.hasScar(ScarKind.atTheGlass);
+    if (atGlass) {
+      for (final l in lurk) {
+        if (l.z < 0.62) l.z = math.min(0.82, l.z + dt * 0.22);
+      }
+    }
+
     double press = 0;
     for (final l in lurk) {
       press += 0.10 + l.z * 0.42; // z is 0 far .. 0.82 near
@@ -502,8 +512,9 @@ class WindowScene {
     if (lurkCloseT > 0) press += 1.1;
     a.lurkPressure = (press / 3.2).clamp(0.0, 1.0);
     final live = a.active != null;
-    final want =
-        math.max(1, 1 + (dread * 3).floor() + (live ? 1 : 0)); // never fewer
+    final want = math.max(
+        atGlass ? 3 : 1,
+        1 + (dread * 3).floor() + (live ? 1 : 0)); // never fewer
 
     lurkNext -= dt;
     if (lurkNext <= 0) {

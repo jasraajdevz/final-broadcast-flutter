@@ -18,6 +18,7 @@
 import 'dart:math' as math;
 
 import 'anomalies.dart';
+import 'checks.dart';
 import 'consts.dart';
 import 'encounter.dart';
 import 'nights.dart';
@@ -166,7 +167,10 @@ double sigRate(GameState s, AnomalyRuntime a) {
   for (final p in kProducers) {
     if (prodLive(a, p.id)) base += (s.prod[p.id] ?? 0) * p.sig * producerMarkMult(s.prod[p.id] ?? 0);
   }
-  return base * sigMult(s);
+  // A station nobody is tending drifts out of alignment. See checks.dart —
+  // the quiet used to be free, and free quiet is what a player experiences as
+  // boredom. Neglecting the book costs up to 42% of output.
+  return base * sigMult(s) * driftPenalty(a.checks);
 }
 
 /// JS rpGain().

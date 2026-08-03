@@ -149,7 +149,11 @@ void main() {
     expect(n.audio.breaths.length, greaterThan(5),
         reason: 'nothing ever breathed in the room');
     final maxNear = n.audio.breaths.reduce((a, b) => a > b ? a : b);
-    expect(maxNear, greaterThan(0.5),
+    // Was 0.5. An abandoned night now ENDS sooner — missed station checks add
+    // dread on top of everything else — so it never reaches the depth it used
+    // to before the carrier drops, and proximity is driven by depth. The
+    // assertion is that it gets close, not that the night lasts.
+    expect(maxNear, greaterThan(0.42),
         reason: 'it never got close — proximity is the whole effect');
   });
 

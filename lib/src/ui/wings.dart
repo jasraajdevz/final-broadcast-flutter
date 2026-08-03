@@ -83,6 +83,29 @@ class MeterWing extends StatelessWidget {
         ),
         const SizedBox(height: 10),
 
+        // THE BOOK. Drift is a continuous tax on a station nobody is tending,
+        // and it is the only meter here the player fixes with a key rather
+        // than with money.
+        _Meter(
+          ui: s.ui,
+          label: runtime.checks.pending
+              ? runtime.checks.active!.nm
+              : 'THE BOOK',
+          value: runtime.checks.pending
+              ? runtime.checks.p
+              : 1 - runtime.checks.drift.clamp(0.0, 1.0),
+          right: runtime.checks.pending
+              ? 'ENTER'
+              : (runtime.checks.drift > 0.02
+                  ? 'DRIFT ${(runtime.checks.drift * 100).round()}%'
+                  : 'IN HAND'),
+          fill: runtime.checks.pending
+              ? const Color(0xFFFFC24A)
+              : (runtime.checks.drift > 0.35 ? K.amber : K.greenDim),
+          warn: runtime.checks.pending || runtime.checks.drift > 0.35,
+        ),
+        const SizedBox(height: 10),
+
         _Meter(
           ui: s.ui,
           label: 'DREAD',

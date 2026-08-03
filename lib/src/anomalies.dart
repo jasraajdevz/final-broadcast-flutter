@@ -37,6 +37,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'consts.dart';
+import 'checks.dart';
 import 'economy.dart';
 import 'nights.dart';
 import 'meta.dart';
@@ -379,6 +380,39 @@ class ActiveAnom {
 /// How a jumpscare is staged. One is chosen per entity when the window runs
 /// out; each has a different shape in time, a different audio script and a
 /// different thing for the painters to do.
+/// A permanent mark a jumpscare leaves on the room for the rest of the night.
+///
+/// A scare that ends and leaves everything exactly as it was is a loud noise,
+/// and a loud noise is forgettable — you brace, it happens, you carry on. What
+/// is DISTURBING is the room not going back. These accumulate across a night,
+/// so a bad shift is visibly, permanently wrong by 04:00, and nothing ever
+/// says so out loud.
+enum ScarKind {
+  /// One of the corridor cameras keeps showing it. It does not move again.
+  camGhost,
+
+  /// The field outside will not go back. The figures stay at the glass.
+  atTheGlass,
+
+  /// Its face never fully leaves the phosphor.
+  burnIn,
+
+  /// One transmitter reads a name that is not its name.
+  wrongName,
+}
+
+class Scar {
+  Scar(this.kind, this.def, {this.slot = 0});
+
+  final ScarKind kind;
+
+  /// What left it.
+  final Anom def;
+
+  /// Which camera / which rack row, depending on [kind].
+  final int slot;
+}
+
 enum ScareBeat {
   /// It arrives at the glass. Immediate hit, hard zoom, scream on top of the
   /// impact, two thumps behind it.
@@ -529,6 +563,31 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// 1 -> 0 after a last-second save. Read by the painters for the flare.
   double clutchFx = 0;
+
+  /// THE STATION CHECKS. The job you do in the quiet, and the only thing in
+  /// the game that competes with the tube for your attention.
+  final CheckRuntime checks = CheckRuntime();
+
+  /// What tonight has left on the room. Cleared at sign-on, never inside a
+  /// night. The painters read it; nothing announces it.
+  final List<Scar> scars = <Scar>[];
+
+  bool hasScar(ScarKind k) => scars.any((s) => s.kind == k);
+
+  /// The camera a [ScarKind.camGhost] is standing in, or -1.
+  int get ghostCam {
+    for (final s in scars) {
+      if (s.kind == ScarKind.camGhost) return s.slot;
+    }
+    return -1;
+  }
+
+  Anom? get ghostDef {
+    for (final s in scars) {
+      if (s.kind == ScarKind.camGhost) return s.def;
+    }
+    return null;
+  }
 
   /// 0..1 — THE VERTICAL MAN's hold on the instruments. Every numeric readout
   /// in the rack and the status strip rolls by this much. He takes nothing;
@@ -1065,6 +1124,10 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// JS pressCounter(cid). `cid` is a Counter.id, not a key digit.
   void pressCounter(String cid) {
+    // You have one pair of hands. Reaching for a banish key takes them off the
+    // book, and an abandoned signature is worth nothing — that trade IS the
+    // mechanic. The station does not care that you were busy.
+    if (checks.signing) endSign(checks);
     audio.click();
     final a = active;
     if (a == null) {
@@ -1187,6 +1250,32 @@ class AnomalyRuntime extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// ENTER — the operator signs the book.
+  ///
+  /// One key, always the same, because the check is an ATTENTION test and not
+  /// a memory test. Pressing it when nothing was asked is a false entry, which
+  /// is what stops it being mashed.
+  void pressCheck() {
+    if (!signedOn || lost || paused) return;
+    final ev = beginSign(checks, s);
+    if (ev != null && ev.kind == CheckEventKind.falseEntry) {
+      audio.env('square', 180, 0.22, 0.07, 120);
+      shake = math.max(shake, 3);
+      s.toast('## NOBODY ASKED YOU TO SIGN ANYTHING', ToastKind.bad);
+    }
+    notifyListeners();
+  }
+
+  /// The hand comes off the book. Either you let go, or a key needed it —
+  /// pressing any banish key abandons a signature in progress, which is the
+  /// whole point: you cannot do both at once.
+  void releaseCheck() {
+    if (checks.signing) {
+      endSign(checks);
+      notifyListeners();
+    }
+  }
+
   /// The SIGN ON button.
   void startBroadcast() {
     audio.init();
@@ -1195,6 +1284,8 @@ class AnomalyRuntime extends ChangeNotifier {
     signedOn = true;
     s.started = true;
     // Coming back to the desk — mid-night or not — earns the slow opening.
+    checks.resetForNight();
+    scars.clear();
     nightAnoms = 0;
     calm = 0;
     calmSpan = 0;
@@ -1468,6 +1559,27 @@ class AnomalyRuntime extends ChangeNotifier {
     'call': ScareBeat.falseClear, // the line goes dead. The line is not dead
   };
 
+  /// Marks the room. Each kind lands at most once a night, and they are drawn
+  /// in an order that escalates: the first bad thing is a face in a corridor
+  /// you can look away from, the last one is your own equipment lying to you.
+  void _leaveScar(Anom def) {
+    final List<ScarKind> open = <ScarKind>[
+      if (!hasScar(ScarKind.camGhost)) ScarKind.camGhost,
+      if (!hasScar(ScarKind.atTheGlass)) ScarKind.atTheGlass,
+      if (!hasScar(ScarKind.burnIn)) ScarKind.burnIn,
+      if (!hasScar(ScarKind.wrongName)) ScarKind.wrongName,
+    ];
+    if (open.isEmpty) return;
+    final ScarKind k = open.first;
+    scars.add(Scar(
+      k,
+      def,
+      slot: k == ScarKind.wrongName
+          ? (rand() * kProducers.length).floor().clamp(0, kProducers.length - 1)
+          : (rand() * 4).floor().clamp(0, 3),
+    ));
+  }
+
   ScareBeat beatFor(Anom def) {
     final ScareBeat sig = kSignatureBeat[def.id] ?? ScareBeat.lunge;
     if (rand() < 0.68) return sig;
@@ -1617,6 +1729,15 @@ class AnomalyRuntime extends ChangeNotifier {
     // promise of safety over the top of the jumpscare that broke it
     calmGuard = 0;
     calmGuardSpan = 0;
+
+    // IT LEAVES SOMETHING BEHIND.
+    //
+    // A scare that ends with the room exactly as it was is a loud noise, and a
+    // loud noise is forgettable: you brace, it happens, you carry on. The room
+    // not going back is the part that sits with you. Nothing announces these —
+    // you are supposed to notice on your own, later, that a camera has had
+    // someone standing in it for twenty minutes.
+    _leaveScar(def);
 
     // the channel feed.dart and tube.dart already read: 1.5s, counting down
     scare = 1.5;
@@ -2018,6 +2139,40 @@ class AnomalyRuntime extends ChangeNotifier {
     // moment something is present even on a calm night.
     audio.setSub(math.min(
         1.0, s.dread / 100 * 0.75 + (active != null && active!.stage >= 1 ? 0.55 : 0)));
+
+    // THE STATION CHECKS. Runs on its own clock, deliberately unsynchronised
+    // with the anomaly scheduler — the collision is the interesting part.
+    if (signedOn && !lost) {
+      final done = tickSign(checks, s, dt);
+      if (done != null) {
+        audio.relay();
+        s.toast('${done.check!.nm} — SIGNED', ToastKind.good);
+      }
+      final ev = tickChecks(checks, s, dt, canRaise: scare <= 0 && !paused);
+      if (ev != null) {
+        switch (ev.kind) {
+          case CheckEventKind.raised:
+            audio.env('square', 660, 0.10, 0.055, 660);
+            _later(110, () => audio.env('square', 880, 0.10, 0.045, 880));
+            s.toast('${ev.check!.nm} — ${ev.check!.ds}   [ENTER]',
+                ToastKind.gold);
+          case CheckEventKind.signed:
+            audio.relay();
+          case CheckEventKind.missed:
+            s.dread = math.min(100, s.dread + kMissDread * cardOf(s).dread);
+            audio.env('sawtooth', 120, 0.5, 0.10, 44);
+            shake = math.max(shake, 6);
+            s.toast('## ${ev.check!.nm} — NOT SIGNED. THE STATION IS DRIFTING.',
+                ToastKind.bad);
+          case CheckEventKind.falseEntry:
+            break; // signBook() handles it; nothing is raised here
+        }
+      }
+      // drift is a continuous tax on a neglected station
+      if (checks.drift > 0) {
+        s.dread = math.min(100, s.dread + driftDread(checks) * dt);
+      }
+    }
 
     // THE ROOM STOPS. No cause, no consequence, nothing to react to — just a
     // beat where the world is not there. Never while something is on the tube

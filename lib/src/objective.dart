@@ -105,7 +105,16 @@ Directive primeDirective(GameState s, AnomalyRuntime r) {
     return const Directive('SOMETHING IS ARRIVING — HANDS ON THE KEYS',
         Urgency.urgent);
   }
-  // 3. Dread is about to take the night off you.
+  // 3. THE BOOK. It sits under a live anomaly — the tube always wins — but
+  // above everything else, because it expires and nothing else here does.
+  if (r.checks.pending) {
+    return Directive('${r.checks.active!.nm} — PRESS ENTER', Urgency.watch);
+  }
+  if (r.checks.drift > 0.45) {
+    return const Directive(
+        'THE STATION IS DRIFTING — SIGN THE BOOK WHEN IT ASKS', Urgency.watch);
+  }
+  // 4. Dread is about to take the night off you.
   if (s.dread >= 78) {
     return const Directive(
         'DREAD IS CRITICAL — BUY FROM THE CANTEEN NOW', Urgency.urgent);

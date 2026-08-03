@@ -713,6 +713,19 @@ class RoomScene {
         }
       }
 
+      // THE SCAR. A jumpscare leaves one of the corridor cameras occupied for
+      // the rest of the night. It does not move, it is never mentioned, and
+      // nothing in the UI acknowledges it — you are supposed to notice on your
+      // own, later, that someone has been standing there for twenty minutes.
+      if (runtime.ghostCam == i && runtime.warn <= 0) {
+        final double gy = m.dy + sh - 6;
+        bodySil(g, m.dx + sw * 0.5, gy, 0.62, _monSil);
+        final ui.Paint eyes = ui.Paint()..color = rgba(255, 236, 210, 0.55);
+        final double ey = gy - 64 * 0.62;
+        _fillRect(g, m.dx + sw * 0.5 - 5, ey, 3, 2, eyes);
+        _fillRect(g, m.dx + sw * 0.5 + 2, ey, 3, 2, eyes);
+      }
+
       // --- THE THING IN THE HALLWAY ---
       //
       // This used to be `i == (t * 3).toInt() % kSide.length`: the figure
