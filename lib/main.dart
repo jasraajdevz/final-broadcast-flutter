@@ -24,7 +24,7 @@ import 'src/bake.dart' show mono;
 import 'src/consts.dart';
 import 'src/economy.dart';
 import 'src/state.dart';
-import 'src/story.dart';
+import 'src/archive.dart';
 import 'src/tools.dart';
 import 'src/ui/ad_break.dart';
 import 'src/ui/boot_screen.dart';
@@ -369,11 +369,11 @@ class _GameRootState extends State<GameRoot>
   /// The page from the desk, if tonight hands one over. Read between taking
   /// the shift and the shift starting — the one moment the player is not
   /// being asked to do anything.
-  LogPage? _pendingLog;
+  StationDoc? _pendingLog;
 
   void _signOn() {
-    final page = logPageFor(s.night);
-    if (page != null && !logPageSeen(s, s.night)) {
+    final page = docForNight(s.night);
+    if (page != null && !docFound(s, s.night)) {
       s.log[s.night] = true;
       s.save();
       setState(() => _pendingLog = page);
@@ -635,6 +635,7 @@ class _GameRootState extends State<GameRoot>
                   child: LogSheet(
                     s: s,
                     page: _pendingLog!,
+                    night: s.night,
                     onDone: _closeLog,
                   ),
                 ),

@@ -1028,8 +1028,12 @@ class AnomalyRuntime extends ChangeNotifier {
     calmGuard = 0;
     calmGuardSpan = 0;
     nightAnoms++;
-    final d = depth(s);
-    final masked = d >= 28 && rand() < 0.22;
+    // MASKED CARRIER is off. It arrived wearing another entity's face and had
+    // to be CUT before it could be answered, which meant a fifth of deep-night
+    // arrivals were a mandatory two-key ritual before the actual encounter
+    // started — a delay dressed as a mechanic. The code paths stay (tools.dart
+    // strips a mask, bots skip one, liveKeys handles stage 0) so nothing has
+    // to be unpicked, and nothing rolls one any more.
     final first = !(s.seen[def.id] ?? false);
 
     // --- the modifier ---
@@ -1039,7 +1043,7 @@ class AnomalyRuntime extends ChangeNotifier {
     final pool = unlockedAnoms(s);
     var mod = rollMod(s,
         first: first,
-        masked: masked,
+        masked: false,
         hasPartner: hasCouplePartner(s, pool, def));
     Anom? partner;
     if (mod == EncounterMod.coupled) {
@@ -1049,7 +1053,6 @@ class AnomalyRuntime extends ChangeNotifier {
 
     var w = banishWindow(s) * profileOf(def.id).windowMul;
     if (first) w *= 1.25;
-    if (masked) w += 1.2;
     if (cold) w *= kColdOpenWindowMul;
     if (soft) w *= 1.25;
     if (mod == EncounterMod.twoStage) w *= kTwoStageWindowMul;
@@ -1058,8 +1061,8 @@ class AnomalyRuntime extends ChangeNotifier {
     active = ActiveAnom(
       def: def,
       window: w,
-      masked: masked,
-      stage: masked ? 0 : 1,
+      masked: false,
+      stage: 1,
       // THE NIGHT PORTER softens the night's opening arrival.
       intensity: first
           ? 0.5

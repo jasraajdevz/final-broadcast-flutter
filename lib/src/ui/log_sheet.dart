@@ -12,7 +12,7 @@ import 'package:flutter/widgets.dart';
 
 import '../consts.dart';
 import '../state.dart';
-import '../story.dart';
+import '../archive.dart';
 import 'ui_kit.dart';
 
 class LogSheet extends StatelessWidget {
@@ -20,11 +20,13 @@ class LogSheet extends StatelessWidget {
     super.key,
     required this.s,
     required this.page,
+    required this.night,
     required this.onDone,
   });
 
   final GameState s;
-  final LogPage page;
+  final StationDoc page;
+  final int night;
   final VoidCallback onDone;
 
   @override
@@ -55,8 +57,18 @@ class LogSheet extends StatelessWidget {
                 border: Border(
                     bottom: BorderSide(color: Color(0xFF4A4230))),
               ),
-              child: Text(page.head,
-                  style: t.at(11, const Color(0xFFC9B98A), ls: 2)),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(page.head,
+                        maxLines: 2,
+                        style: t.at(11, const Color(0xFFC9B98A), ls: 2)),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(page.kindLabel,
+                      style: t.at(9, const Color(0xFF7A7055), ls: 2)),
+                ],
+              ),
             ),
             Flexible(
               child: SingleChildScrollView(
@@ -66,9 +78,15 @@ class LogSheet extends StatelessWidget {
                   children: <Widget>[
                     Text(page.body,
                         style: t.at(15, const Color(0xFFD8CDAC), h: 1.95)),
+                    if (page.sign != null) ...<Widget>[
+                      const SizedBox(height: 14),
+                      Text(page.sign!,
+                          style: t.at(12, const Color(0xFFB6A87E), h: 1.7)),
+                    ],
                     const SizedBox(height: 20),
                     Text(
-                      '— found in the desk, night ${page.night}',
+                      '— recovered on night $night   ·   '
+                      '${foundCount(s)} OF $archiveTotal',
                       textAlign: TextAlign.right,
                       style: t.at(10, const Color(0xFF7A7055), ls: 1.5),
                     ),

@@ -23,7 +23,6 @@
 // previous one kept a log. You get one page a night. They were doing exactly
 // what you are doing, in this chair, and the handwriting gets worse.
 
-import 'state.dart';
 
 /// The cold open — the first thing a new operator ever reads, before the
 /// title. Deliberately short. Nobody reads a wall of prose to get to a game.
@@ -48,101 +47,7 @@ const List<String> kStakes = <String>[
   'A MISSED QUOTA thins the lid. 06:00 will not arrive while you are short.',
 ];
 
-// ---------------------------------------------------------------------------
-// THE PREVIOUS OPERATOR
-//
-// One page a night, in order, found in the desk. It is a slow reveal that the
-// person before you did this job well, for a long time, and it did not save
-// them — and that the last page is dated tonight.
-//
-// Written so that a player who never reads past page three still has a whole
-// game, and a player who reads all of them gets the floor taken out.
-// ---------------------------------------------------------------------------
-
-class LogPage {
-  const LogPage({required this.night, required this.head, required this.body});
-
-  /// The night this page turns up on.
-  final int night;
-
-  /// The dateline, in the log's own hand.
-  final String head;
-  final String body;
-}
-
-const List<LogPage> kOperatorLog = <LogPage>[
-  LogPage(
-    night: 2,
-    head: 'FROM THE DESK DRAWER — LOG OF R. HALLORAN, NIGHT OPERATOR',
-    body: 'Whoever is reading this: the rundown is a lie, the quotas are real. '
-        'Keep the needle up. It does not care what you broadcast, only that '
-        'you are broadcasting.',
-  ),
-  LogPage(
-    night: 3,
-    head: 'HALLORAN — NIGHT 214',
-    body: 'Eight of them. There have only ever been eight. I have a key for '
-        'each and I have never needed a ninth, which I used to find comforting.',
-  ),
-  LogPage(
-    night: 4,
-    head: 'HALLORAN — NIGHT 341',
-    body: 'They have started arriving in the order I think of them in. '
-        'I have stopped keeping the list in order.',
-  ),
-  LogPage(
-    night: 5,
-    head: 'HALLORAN — NIGHT 508',
-    body: 'The window in the booth does not open and has never opened. '
-        'Whatever is in the field is not getting in that way. I want to be '
-        'clear that this is the only reassuring sentence in this book.',
-  ),
-  LogPage(
-    night: 6,
-    head: 'HALLORAN — NIGHT 720',
-    body: 'Slept four hours in the chair with the carrier up. Woke to find the '
-        'log open at a page I had not written yet. The handwriting is mine.',
-  ),
-  LogPage(
-    night: 7,
-    head: 'HALLORAN — NIGHT 901',
-    body: 'It is not trying to get out. I have had this backwards for two '
-        'years. It is trying to get me to stop, which is a different thing, '
-        'and it is much more patient about it.',
-  ),
-  LogPage(
-    night: 8,
-    head: 'HALLORAN — NIGHT 1,114',
-    body: 'There is a second operator on the roster now. I have not met them. '
-        'I have not been told their name. The roster is in my handwriting.',
-  ),
-  LogPage(
-    night: 9,
-    head: 'HALLORAN — FINAL ENTRY',
-    body: 'If you are new: it is not the noise. It is the quiet after the '
-        'noise, when you have got it right and you are sitting there being '
-        'pleased with yourself. That is when it looks at you properly.',
-  ),
-  LogPage(
-    night: 10,
-    head: 'STATION MEMO — UNSIGNED',
-    body: 'R. HALLORAN did not sign off on the morning of the 1,115th night. '
-        'The carrier was up. The chair was warm. The log was open to a blank '
-        'page, and the page is the one you have been writing on.',
-  ),
-];
-
-/// The page for this night, or null on nights that have none.
-LogPage? logPageFor(int night) {
-  for (final p in kOperatorLog) {
-    if (p.night == night) return p;
-  }
-  return null;
-}
-
-/// Has the operator been handed this page yet?
-bool logPageSeen(GameState s, int night) => s.log[night] ?? false;
-
-/// The pages found so far, in order — the manual's LOG tab reads this.
-List<LogPage> logPagesFound(GameState s) =>
-    kOperatorLog.where((p) => logPageSeen(s, p.night)).toList();
+// The documents themselves now live in archive.dart: one recovered every
+// night, in a fixed authored order, with the count of what is still missing on
+// the front desk. Nine pages was a premise; a file you are 37 pages into is a
+// reason to come back.

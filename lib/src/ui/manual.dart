@@ -10,6 +10,7 @@ import 'package:flutter/widgets.dart';
 
 import '../anomalies.dart';
 import '../bake.dart' show fill;
+import '../archive.dart';
 import '../consts.dart';
 import '../state.dart';
 import 'scene_slot.dart';
@@ -157,6 +158,24 @@ class _ManualSheetState extends State<ManualSheet> {
         onTap: () => _open('k_${c.id}'),
       ));
     }
+
+    // THE FILE. A collection you cannot re-read is not a collection, it is a
+    // sequence of modals — so everything recovered from the desk is in here,
+    // in order, with the gaps visible. The gaps are the point.
+    out.add(RackHead('THE FILE  ·  ${foundCount(s)}/$archiveTotal',
+        ui: s.ui, padLeft: 12));
+    for (var i = 0; i < kArchive.length; i++) {
+      final got = docFound(s, nightForDoc(i));
+      out.add(_MRow(
+        ui: s.ui,
+        label: got ? kArchive[i].head : 'NOT RECOVERED',
+        tag: got ? kArchive[i].kindLabel : 'NIGHT ${nightForDoc(i)}',
+        on: s.manPage == 'd_$i',
+        unknown: !got,
+        onTap: got ? () => _open('d_$i') : () {},
+      ));
+    }
+
     return out;
   }
 
@@ -164,6 +183,29 @@ class _ManualSheetState extends State<ManualSheet> {
 
   List<Widget> _pageBody() {
     final t = Sty(s.ui);
+
+    if (s.manPage.startsWith('d_')) {
+      final i = int.tryParse(s.manPage.substring(2)) ?? 0;
+      final d = kArchive[i.clamp(0, kArchive.length - 1)];
+      return <Widget>[
+        Text(d.kindLabel, style: t.at(11, K.manTag, ls: 3)),
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 14),
+          child: Text(d.head, style: t.at(17, K.manH3, ls: 1.5)),
+        ),
+        Text(d.body, style: t.at(14, K.manInkOn, h: 1.95)),
+        if (d.sign != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Text(d.sign!, style: t.at(13, K.manTag, h: 1.7)),
+          ),
+        Padding(
+          padding: const EdgeInsets.only(top: 18),
+          child: Text('RECOVERED ON NIGHT ${nightForDoc(i)}',
+              style: t.at(10, K.lbl, ls: 2)),
+        ),
+      ];
+    }
 
     if (s.manPage.startsWith('k_')) {
       final c = kCounterBy[s.manPage.substring(2)] ?? kCounters[0];

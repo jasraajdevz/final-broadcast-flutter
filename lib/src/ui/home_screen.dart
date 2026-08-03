@@ -13,6 +13,7 @@ import 'package:flutter/widgets.dart';
 
 import '../consts.dart';
 import '../meta.dart';
+import '../archive.dart';
 import '../nights.dart';
 import '../story.dart';
 import '../state.dart';
@@ -253,6 +254,13 @@ class _Ledger extends StatelessWidget {
             _Stat(ui: s.ui, k: 'RATINGS PTS', v: fmt(s.rp), amber: true),
           ],
         ),
+        // THE HOOK. Not a stat — a count of what is still missing. You do not
+        // come back for the numbers, you come back because there is a page 38
+        // and you have read 37.
+        const SizedBox(height: 12),
+        Text(archiveLine(s),
+            textAlign: TextAlign.center,
+            style: Sty(s.ui).at(11, K.amber, ls: 2.5)),
         if (held.isNotEmpty) ...<Widget>[
           const SizedBox(height: 14),
           ConstrainedBox(
