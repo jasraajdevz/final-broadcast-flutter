@@ -2156,6 +2156,130 @@ class WebAudio implements GameAudio {
     _kill(out, 1.2);
   }
 
+
+  /// A WET IMPACT.
+  ///
+  /// Three layers, because a splat is not one sound: the SLAP (broadband,
+  /// gone in 30ms, through a lowpass that slams shut — that closing filter is
+  /// what the ear reads as "wet" rather than "sharp"), the BODY under it, and
+  /// a fine SPRAY tail of the droplets that carried past.
+  @override
+  void bloodImpact(double force) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final t = c.currentTime;
+    final double f = force.clamp(0.0, 1.0);
+
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+
+    // 1. the slap
+    final n = _noise(t, 0.10);
+    if (n != null) {
+      final lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.q.value = 6.5; // resonant, so the close has a "gulp" to it
+      lp.frequency.setValueAtTime(2600 + f * 1800, t);
+      lp.frequency.exponentialRampToValueAtTime(180, t + 0.055);
+      final g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.16 + f * 0.20, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.10);
+      n.connect(lp);
+      lp.connect(g);
+      g.connect(out);
+    }
+
+    // 2. the body — mass hitting glass
+    final o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(210, t);
+    o.frequency.exponentialRampToValueAtTime(52, t + 0.13);
+    final og = c.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.10 + f * 0.16, t + 0.006);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.20);
+    o.connect(og);
+    og.connect(out);
+    o.start(t);
+    o.stop(t + 0.24);
+
+    // 3. the spray that carried past
+    final sp = _noise(t + 0.02, 0.24);
+    if (sp != null) {
+      final hp = c.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 3200;
+      final sg = c.createGain();
+      sg.gain.setValueAtTime(0.0001, t + 0.02);
+      sg.gain.exponentialRampToValueAtTime(0.030 * (0.4 + f), t + 0.05);
+      sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+      sp.connect(hp);
+      hp.connect(sg);
+      sg.connect(out);
+    }
+    _kill(out, 0.4);
+  }
+
+  /// A DRIP.
+  ///
+  /// The physical thing that makes a drip sound like a drip is not the impact
+  /// — it is the air bubble entrained underneath it, which oscillates and
+  /// RISES in pitch as it collapses. Sweeping the tone downward gives you a
+  /// cartoon "boing"; sweeping it up gives you the sound everyone has heard in
+  /// a dark bathroom at four in the morning.
+  ///
+  /// Panned, because the whole point is that it comes from a specific place
+  /// you are not currently looking at.
+  @override
+  void bloodDrip(double pan, double size) {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final t = c.currentTime;
+    final double z = size.clamp(0.05, 1.0);
+
+    final pn = c.createStereoPanner();
+    pn.pan.value = pan.clamp(-1.0, 1.0);
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(pn);
+    pn.connect(master);
+
+    // the contact transient — a tiny tick, or it sounds synthesised
+    final n = _noise(t, 0.02);
+    if (n != null) {
+      final hp = c.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 2800;
+      final ng = c.createGain();
+      ng.gain.setValueAtTime(0.0001, t);
+      ng.gain.exponentialRampToValueAtTime(0.045, t + 0.002);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.022);
+      n.connect(hp);
+      hp.connect(ng);
+      ng.connect(out);
+    }
+
+    // the bubble. Bigger drop -> lower and longer.
+    final double f0 = 1550 - z * 780 + rand() * 180;
+    final o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f0, t + 0.003);
+    // UP, not down
+    o.frequency.exponentialRampToValueAtTime(f0 * 2.35, t + 0.055 + z * 0.05);
+    final g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.075 + z * 0.055, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.10 + z * 0.09);
+    o.connect(g);
+    g.connect(out);
+    o.start(t + 0.003);
+    o.stop(t + 0.24);
+
+    _kill(out, 0.35);
+  }
+
   @override
   void ring() {
     env('sine', 1000, 0.35, 0.1, 1000);

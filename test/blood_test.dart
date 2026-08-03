@@ -118,6 +118,76 @@ void main() {
     expect(r.blood.isEmpty, isTrue, reason: 'a fresh night starts clean');
   });
 
+  test('it dries, and drying is visible', () async {
+    // The single biggest realism cue available. Every mark being one flat
+    // colour is why the first pass read as paint: paint does not change, and
+    // the eye knows that. A fresh mark and a ten-minute-old one have to be
+    // obviously different or the layer is wallpaper.
+    final b = BloodLayer();
+    seedRandom(5);
+    b.add(0.9, ox: 300, oy: 200, count: 6);
+    final s = b.splats.first;
+    expect(s.dry, lessThan(0.05), reason: 'it started dry');
+    for (var i = 0; i < 60 * 240; i++) {
+      b.tick(1 / 60.0);
+    }
+    expect(s.dry, greaterThan(0.85), reason: 'it never dried');
+
+    // and the difference reaches the screen
+    ui.Image bake(BloodLayer x) {
+      final rec = ui.PictureRecorder();
+      final c = ui.Canvas(rec, kRoom);
+      drawBlood(c, x, 4.0);
+      return rec.endRecording()
+          .toImageSync(kRoom.width.toInt(), kRoom.height.toInt());
+    }
+    final fresh = BloodLayer();
+    seedRandom(5);
+    fresh.add(0.9, ox: 300, oy: 200, count: 6);
+    final af = await bake(fresh).toByteData(format: ui.ImageByteFormat.rawRgba);
+    final ad = await bake(b).toByteData(format: ui.ImageByteFormat.rawRgba);
+    final xf = af!.buffer.asUint8List(), xd = ad!.buffer.asUint8List();
+    var diff = 0;
+    for (var i = 0; i < xf.length; i++) {
+      if (xf[i] != xd[i]) diff++;
+    }
+    expect(diff, greaterThan(2000),
+        reason: 'a dried mark looks identical to a fresh one');
+  });
+
+  test('runs shed beads, and each one is a sound with a place', () {
+    final b = BloodLayer();
+    seedRandom(17);
+    // a big mark, so it is fat enough to bead at all
+    b.add(1.0, ox: 700, oy: 120, count: 10);
+    for (var i = 0; i < 60 * 200; i++) {
+      b.tick(1 / 60.0);
+    }
+    expect(b.drips, isNotEmpty, reason: 'nothing ever dripped');
+    for (final d in b.drips) {
+      final pan = (d.x / kRoom.width) * 2 - 1;
+      expect(pan, inInclusiveRange(-1.0, 1.0));
+      expect(d.size, inInclusiveRange(0.0, 1.0));
+    }
+    // marks on the right of the glass drip on the right
+    final right = b.drips.where((d) => d.x > kRoom.width * 0.6).length;
+    expect(right, greaterThan(0),
+        reason: 'a drip must carry the position of the mark that shed it');
+  });
+
+  test('a travelling run leaves a broken trail, bounded', () {
+    final b = BloodLayer();
+    seedRandom(23);
+    for (var i = 0; i < 30; i++) {
+      b.add(1.0, ox: 300, oy: 100);
+    }
+    for (var i = 0; i < 60 * 400; i++) {
+      b.tick(1 / 60.0);
+    }
+    expect(b.trail, isNotEmpty, reason: 'runs slid cleanly, like a stripe');
+    expect(b.trail.length, lessThanOrEqualTo(160));
+  });
+
   test('it actually reaches the pixels', () async {
     ui.Image bake(BloodLayer b) {
       final rec = ui.PictureRecorder();

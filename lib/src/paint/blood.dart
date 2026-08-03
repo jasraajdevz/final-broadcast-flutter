@@ -49,6 +49,22 @@ class Splat {
   /// moving the moment it lands, and something that is still moving twenty
   /// minutes later is worse than something that is not.
   double run = 0;
+
+  /// Seconds since it landed. Drives DRYING, which is the single biggest
+  /// realism cue available: fresh blood is bright, wet and translucent, and
+  /// within minutes it goes dark, matte and opaque as the haemoglobin
+  /// oxidises. A screen where every mark is the same colour reads as paint no
+  /// matter how good the shapes are — and once marks age at different rates
+  /// you can tell at a glance which ones are from ten minutes ago and which
+  /// one just happened.
+  double age = 0;
+
+  /// 0..1 — how dried. Non-linear: the surface skins over fast, the body of
+  /// it takes much longer.
+  double get dry => (1 - math.exp(-age / 70)).clamp(0.0, 1.0);
+
+  /// Seconds until this run sheds its next bead.
+  double dripIn = 0;
 }
 
 /// A hand, pressed flat and dragged. Drawn on the window, from the OUTSIDE.
@@ -70,9 +86,22 @@ class BloodLayer {
   /// 0..1 — a wash of it over the whole pane, for the worst moments.
   double wash = 0;
 
+  /// Beads that have let go this frame, as (x, y, size). Drained by the sim
+  /// and turned into sound: a drip you HEAR before you find it is worth more
+  /// than one you only see.
+  final List<({double x, double y, double size})> drips =
+      <({double x, double y, double size})>[];
+
+  /// Residual dots left behind by a run as it travels. Real runs do not slide
+  /// cleanly — they pin, stretch and leave a broken trail.
+  final List<({double x, double y, double r, double seed})> trail =
+      <({double x, double y, double r, double seed})>[];
+
   void clear() {
     splats.clear();
     hands.clear();
+    trail.clear();
+    drips.clear();
     wash = 0;
   }
 
@@ -114,9 +143,41 @@ class BloodLayer {
 
   void tick(double dt) {
     for (final s in splats) {
+      s.age += dt;
       if (!s.heavy) continue;
-      // Runs slow down as they lengthen, the way real ones do as they thin.
-      s.run = math.min(1.0, s.run + dt * (0.030 + s.seed * 0.045) * (1 - s.run * 0.6));
+      // A run creeps, and it creeps LESS as it dries — the same mark that ran
+      // fast in its first ten seconds is barely moving two minutes later.
+      final double before = s.run;
+      s.run = math.min(
+          1.0,
+          s.run +
+              dt * (0.030 + s.seed * 0.045) * (1 - s.run * 0.6) * (1 - s.dry * 0.85));
+
+      if (s.run > before && s.run < 0.999) {
+        // pin points: a travelling run leaves a broken trail behind it rather
+        // than a clean stripe
+        if (rand() < dt * 1.4) {
+          trail.add((
+            x: s.x + (rand() - 0.5) * s.r * 1.2,
+            y: s.y + s.r * 0.5 + s.run * (48 + s.seed * 130) * rand(),
+            r: 0.8 + rand() * 1.9,
+            seed: rand(),
+          ));
+        }
+        // and the fat ones shed a bead every so often, which is a SOUND
+        s.dripIn -= dt;
+        if (s.dripIn <= 0 && s.r > 11 && s.run > 0.30) {
+          s.dripIn = 3.5 + rand() * 9.0;
+          drips.add((
+            x: s.x,
+            y: s.y + s.r * 0.5 + s.run * (48 + s.seed * 130),
+            size: (s.r / 26).clamp(0.15, 1.0),
+          ));
+        }
+      }
+    }
+    while (trail.length > 160) {
+      trail.removeAt(0);
     }
     wash = math.max(0, wash - dt * 0.012);
   }
@@ -126,9 +187,30 @@ class BloodLayer {
 
 // --- painting ---------------------------------------------------------------
 
-const ui.Color _kDark = ui.Color(0xFF1A0204);
-const ui.Color _kMid = ui.Color(0xFF4A0508);
-const ui.Color _kWet = ui.Color(0xFF6B0A0E);
+// THE DRYING CURVE.
+//
+// Fresh arterial blood on glass is bright, thin and TRANSLUCENT — you can see
+// the room through the edges of it. Within a couple of minutes the haemoglobin
+// oxidises and it goes dark, matte, opaque and slightly brown. Every mark in
+// the first pass was the same flat maroon, which is why the whole layer read
+// as paint: paint does not change, and the eye knows that.
+const ui.Color _kFresh = ui.Color(0xFF8E0F14); // just landed
+const ui.Color _kDried = ui.Color(0xFF25100A); // ten minutes old, browner
+const ui.Color _kDeep = ui.Color(0xFF120203); // the thick middle
+const ui.Color _kSheen = ui.Color(0xFFD46A62); // wet highlight, fresh only
+
+ui.Color _lerpC(ui.Color a, ui.Color b, double f) {
+  final double k = f.clamp(0.0, 1.0);
+  return ui.Color.fromARGB(
+    255,
+    (a.r * 255 + (b.r - a.r) * 255 * k).round(),
+    (a.g * 255 + (b.g - a.g) * 255 * k).round(),
+    (a.b * 255 + (b.b - a.b) * 255 * k).round(),
+  );
+}
+
+/// Body colour for a mark of the given dryness.
+ui.Color _bodyOf(double dry) => _lerpC(_kFresh, _kDried, dry);
 
 /// Draws the whole layer, in cabinet space. Call INSIDE the room clip, last,
 /// so it sits on the glass in front of everything including the CRT.
@@ -151,6 +233,14 @@ void drawBlood(ui.Canvas g, BloodLayer b, double t) {
     g.drawRect(kRoom, wp);
   }
 
+  // the broken trail a travelling run leaves behind it
+  for (final d in b.trail) {
+    g.drawOval(
+      ui.Rect.fromCenter(
+          center: ui.Offset(d.x, d.y), width: d.r * 1.6, height: d.r * 2.2),
+      fill(rgba(58, 8, 10, 0.55)),
+    );
+  }
   for (final s in b.splats) {
     _splat(g, s, t);
   }
@@ -165,7 +255,8 @@ void drawBlood(ui.Canvas g, BloodLayer b, double t) {
 void _hand(ui.Canvas g, Handprint h) {
   final double s = 1.0 + h.seed * 0.35;
   final double dir = h.flip ? -1 : 1;
-  final ui.Paint pt = fill(rgba(104, 9, 13, 0.72));
+  // old, thick, and mostly opaque — this was pressed and held, not thrown
+  final ui.Paint pt = fill(rgba(52, 14, 11, 0.86));
 
   // palm — broad, and squarer than an oval, because a pressed palm flattens
   g.drawRRect(
@@ -217,7 +308,7 @@ void _hand(ui.Canvas g, Handprint h) {
     ..shader = ui.Gradient.linear(
       ui.Offset(h.x, h.y),
       ui.Offset(h.x, h.y + 54 * s),
-      <ui.Color>[rgba(104, 9, 13, 0.5), rgba(104, 9, 13, 0)],
+      <ui.Color>[rgba(52, 14, 11, 0.62), rgba(52, 14, 11, 0)],
     );
   g.drawRect(
       ui.Rect.fromLTWH(h.x - 15 * s, h.y, 30 * s, 56 * s), smear);
@@ -262,42 +353,148 @@ void _splat(ui.Canvas g, Splat s, double t) {
     p.quadraticBezierTo(c.dx, c.dy, nx.dx, nx.dy);
   }
   p.close();
-  g.drawPath(p, fill(_kMid));
 
-  // a darker, dried edge — the thing that stops it looking like paint
-  g.drawPath(
-      p,
-      stroke(_kDark, 1.6 + s.r * 0.06)
-        ..style = ui.PaintingStyle.stroke);
+  final double dry = s.dry;
+  final ui.Color body = _bodyOf(dry);
+  // TRANSLUCENT while fresh. Blood on glass is not a sticker: thin blood lets
+  // the room through and only reads as opaque where it has pooled. Opacity
+  // climbs as it dries and thickens.
+  final double alpha = 0.62 + dry * 0.34;
 
-  // the wet highlight, offset up-left like a light source in the room
-  // A faint sheen, not a specular ball. The first pass put a big soft
-  // highlight up-left on every mark and they all read as polished spheres.
-  final ui.Paint hi = ui.Paint()
+  // 1. the halo — the thinnest film, wider than the mark, barely there. This
+  //    is the edge you actually perceive first and the first pass had none.
+  final ui.Paint halo = ui.Paint()
     ..shader = ui.Gradient.radial(
-      ui.Offset(s.x - s.r * 0.18, s.y - s.r * 0.22),
-      s.r * 0.55,
-      <ui.Color>[rgba(150, 34, 36, 0.16), rgba(120, 14, 18, 0)],
+      ui.Offset(s.x, s.y),
+      s.r * 1.45,
+      <ui.Color>[
+        // tight and faint. At 0.30 over 2.1r this read as a glow around the
+        // mark — light coming OFF it — which is exactly wrong for a fluid.
+        body.withValues(alpha: alpha * 0.11),
+        body.withValues(alpha: 0),
+      ],
+      <double>[0.72, 1.0],
     );
+  g.drawRect(
+      ui.Rect.fromCircle(center: ui.Offset(s.x, s.y), radius: s.r * 2.2), halo);
+
+  // 2. the body
+  g.drawPath(p, fill(body.withValues(alpha: alpha)));
+
+  // 3. the pooled middle — thicker, darker, and offset, because a mark does
+  //    not pool at its own centroid
   g.save();
   g.clipPath(p);
+  final ui.Paint core = ui.Paint()
+    ..shader = ui.Gradient.radial(
+      ui.Offset(s.x + (_n(s.seed * 3) - 0.5) * s.r * 0.5,
+          s.y + (_n(s.seed * 11) - 0.5) * s.r * 0.4),
+      s.r * 1.1,
+      <ui.Color>[
+        _kDeep.withValues(alpha: 0.55 + dry * 0.25),
+        _kDeep.withValues(alpha: 0),
+      ],
+    );
   g.drawRect(
-      ui.Rect.fromCircle(center: ui.Offset(s.x, s.y), radius: s.r * 1.4), hi);
+      ui.Rect.fromCircle(center: ui.Offset(s.x, s.y), radius: s.r * 2), core);
   g.restore();
+
+  // 4. the dried rim. Blood dries from the outside in, so an older mark has a
+  //    hard dark ring and a fresh one does not.
+  if (dry > 0.06) {
+    g.drawPath(
+        p,
+        stroke(_kDried.withValues(alpha: 0.30 + dry * 0.55),
+            0.9 + s.r * 0.045));
+  }
+
+  // 5. SPINES. Surface tension breaks the leading edge of an impact into fine
+  //    points. This is the single most recognisable thing about real spatter
+  //    and a smooth outline never reads right without it.
+  final int spines = 3 + (_n(s.seed * 23) * 7).floor();
+  for (var i = 0; i < spines; i++) {
+    final double sa = axis + (_n(s.seed * 41 + i * 2.7) - 0.5) * 2.2;
+    final double base = rAt((i * 3) % lobes);
+    final double len = base * (0.35 + _n(s.seed * 19 + i) * 1.5);
+    final double bx = s.x + math.cos(sa) * base * 0.92 * stretch;
+    final double by = s.y + math.sin(sa) * base * 0.72;
+    final ui.Path sp = ui.Path()
+      ..moveTo(bx - math.sin(sa) * 1.6, by + math.cos(sa) * 1.6)
+      ..lineTo(bx + math.sin(sa) * 1.6, by - math.cos(sa) * 1.6)
+      ..lineTo(bx + math.cos(sa) * len, by + math.sin(sa) * len * 0.8)
+      ..close();
+    g.drawPath(sp, fill(body.withValues(alpha: alpha * 0.9)));
+    // and a detached droplet past the tip of some of them
+    if (_n(s.seed * 61 + i) > 0.55) {
+      final double dd = len * (1.25 + _n(s.seed * 71 + i) * 0.8);
+      final double dr = 0.7 + _n(s.seed * 83 + i) * 1.6;
+      g.drawOval(
+        ui.Rect.fromCenter(
+          center: ui.Offset(
+              bx + math.cos(sa) * dd, by + math.sin(sa) * dd * 0.8),
+          width: dr * 2,
+          height: dr * 2.3,
+        ),
+        fill(body.withValues(alpha: alpha)),
+      );
+    }
+  }
+
+  // the wet highlight, offset up-left like a light source in the room
+  // WET SHEEN, and only while it is wet. A dried mark has no specular at all,
+  // so a screen of old marks with one bright fresh one tells you instantly
+  // which thing just happened — without a single word of UI.
+  if (dry < 0.85) {
+    final double wet = 1 - dry / 0.85;
+    final ui.Paint hi = ui.Paint()
+      ..blendMode = ui.BlendMode.plus
+      ..shader = ui.Gradient.radial(
+        ui.Offset(s.x - s.r * 0.20, s.y - s.r * 0.26),
+        s.r * 0.62,
+        <ui.Color>[
+          _kSheen.withValues(alpha: 0.20 * wet),
+          _kSheen.withValues(alpha: 0),
+        ],
+      );
+    g.save();
+    g.clipPath(p);
+    g.drawRect(
+        ui.Rect.fromCircle(center: ui.Offset(s.x, s.y), radius: s.r * 1.4), hi);
+    g.restore();
+  }
+
+  // AEROSOL. A high-energy impact throws a mist of sub-millimetre droplets
+  // well beyond the mark. Individually invisible; collectively the difference
+  // between "a shape" and "something hit this".
+  final int mist = 10 + (_n(s.seed * 29) * 16).floor();
+  for (var i = 0; i < mist; i++) {
+    final double ma = axis + (_n(s.seed * 37 + i * 1.3) - 0.5) * 2.6;
+    final double md = s.r * (1.4 + _n(s.seed * 43 + i * 2.1) * 4.2);
+    final double mr = 0.28 + _n(s.seed * 47 + i * 3.3) * 0.62;
+    g.drawOval(
+      ui.Rect.fromCenter(
+        center: ui.Offset(
+            s.x + math.cos(ma) * md * stretch, s.y + math.sin(ma) * md * 0.8),
+        width: mr * 2,
+        height: mr * 2.2,
+      ),
+      fill(body.withValues(alpha: (0.22 + dry * 0.30) * (1 - md / (s.r * 6)))),
+    );
+  }
 
   // satellite spatter — the small stuff that sells the impact
   final int sat = 2 + (s.seed * 4).floor();
   for (var i = 0; i < sat; i++) {
     final double a = _n(s.seed * 13 + i) * math.pi * 2;
     final double d = s.r * (1.3 + _n(s.seed * 5 + i * 2) * 2.4);
-    final double rr1 = 0.9 + _n(s.seed * 3 + i * 5) * 2.6;
+    final double rr1 = 0.7 + _n(s.seed * 3 + i * 5) * 1.7;
     g.drawOval(
       ui.Rect.fromCenter(
         center: ui.Offset(s.x + math.cos(a) * d, s.y + math.sin(a) * d * 0.8),
         width: rr1 * 2,
         height: rr1 * 2.4,
       ),
-      fill(_kDark),
+      fill(_kDeep.withValues(alpha: 0.55 + dry * 0.35)),
     );
   }
 
@@ -333,7 +530,7 @@ void _splat(ui.Canvas g, Splat s, double t) {
     drip.lineTo(o.dx, o.dy);
   }
   drip.close();
-  g.drawPath(drip, fill(_kMid));
+  g.drawPath(drip, fill(body.withValues(alpha: alpha * 0.95)));
 
   // only the fat ones ever reach a bead
   if (w0 > s.r * 0.42 && s.run > 0.35) {
@@ -344,7 +541,8 @@ void _splat(ui.Canvas g, Splat s, double t) {
         width: w0 * 0.85,
         height: w0 * 1.15,
       ),
-      fill(_kWet),
+      fill(_lerpC(_kFresh, _kDried, dry * 0.6)
+          .withValues(alpha: 0.55 + dry * 0.4)),
     );
   }
 }

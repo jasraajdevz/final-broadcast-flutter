@@ -143,6 +143,17 @@ abstract class GameAudio {
   /// in the chest as unease and reads on a meter as almost nothing.
   void setSub(double v);
 
+  /// A wet impact. [force] 0..1.
+  void bloodImpact(double force);
+
+  /// A single bead letting go and landing. [pan] -1..1 places it in the room,
+  /// [size] 0..1 sets how big the drop was.
+  ///
+  /// The most recognisable sound in the horror vocabulary, and the reason it
+  /// works is that it arrives from somewhere specific while you are looking
+  /// somewhere else.
+  void bloodDrip(double pan, double size);
+
   /// Something in the room says almost a word. Formants that nearly resolve.
   /// [near] 0..1 moves it from down the hall to directly behind you.
   void voice(double near, double side);
@@ -220,6 +231,10 @@ class NullAudio implements GameAudio {
   void warn() {}
   @override
   void scare() {}
+  @override
+  void bloodImpact(double force) {}
+  @override
+  void bloodDrip(double pan, double size) {}
   @override
   void breath(double side, double near) {}
   @override
@@ -1219,6 +1234,7 @@ class AnomalyRuntime extends ChangeNotifier {
     // A fumble puts a little of it on the glass too. Being wrong should cost
     // something you can SEE for the rest of the night, not just a number.
     blood.add(0.12, ox: kScr.center.dx, oy: kScr.center.dy, count: 1);
+    audio.bloodImpact(0.18);
     wrongFxKey = cid;
     final pen = (s.ups['autocue'] ?? false) ? 0.45 : 0.9;
     active?.wrongs++;
@@ -1593,6 +1609,9 @@ class AnomalyRuntime extends ChangeNotifier {
           kWin.top + 40 + rand() * (kWin.height - 90),
         );
       }
+      // hard right, where the window is
+      _later(220, () => audio.bloodImpact(0.35));
+      _later(760, () => audio.bloodDrip(0.85, 0.8));
     } else if (k == ScarKind.burnIn) {
       blood.add(0.5, ox: kScr.center.dx, oy: kScr.top + 20);
     }
@@ -1765,7 +1784,9 @@ class AnomalyRuntime extends ChangeNotifier {
     _leaveScar(def);
     // AND IT MARKS THE GLASS. Not a red flash that fades — something lands on
     // the pane between you and the room and is still there at 05:00, running.
-    blood.add(0.55 + rand() * 0.45, ox: kScr.center.dx, oy: kScr.center.dy);
+    final double spray = 0.55 + rand() * 0.45;
+    blood.add(spray, ox: kScr.center.dx, oy: kScr.center.dy);
+    audio.bloodImpact(spray);
 
     // the channel feed.dart and tube.dart already read: 1.5s, counting down
     scare = 1.5;
@@ -2248,6 +2269,17 @@ class AnomalyRuntime extends ChangeNotifier {
     // once, without any call site knowing he exists
     gVertRoll = vertRoll;
     blood.tick(dt);
+    // Every bead that lets go is a sound, panned to WHERE it is on the glass.
+    // A drip you hear from off to your left while you are watching the tube is
+    // the cheapest and oldest trick in the genre, and it works because it is
+    // information about a place you are not looking.
+    if (blood.drips.isNotEmpty) {
+      for (final d in blood.drips) {
+        audio.bloodDrip(
+            ((d.x / kRoom.width) * 2 - 1).clamp(-1.0, 1.0), d.size);
+      }
+      blood.drips.clear();
+    }
     wrongFx = math.max(0, wrongFx - dt * 3);
     blackout = math.max(0, blackout - dt);
     if (scare > 0) {
