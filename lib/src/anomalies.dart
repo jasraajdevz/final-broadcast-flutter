@@ -37,6 +37,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'consts.dart';
+import 'career.dart';
 import 'checks.dart';
 import 'economy.dart';
 import 'nights.dart';
@@ -2058,6 +2059,36 @@ class AnomalyRuntime extends ChangeNotifier {
   }
 
   /// 06:00. The thing the whole night was for.
+  /// The roster lines on the 06:00 sheet. Built here rather than in the UI so
+  /// they are frozen with the rest of the model at the moment it opens.
+  List<EndPara> _rosterParas() {
+    final out = <EndPara>[];
+    // s.survived has already been incremented by the time this runs
+    final justPassed = passedBetween(s.survived - 1, s.survived);
+    for (final o in justPassed) {
+      out.add(EndPara(<String>[
+        'You have outlasted ',
+        o.name,
+        ', who lasted ${o.nights} '
+            '${o.nights == 1 ? "night" : "nights"}. ${o.fate}',
+      ]));
+      if (o.unlock != null) {
+        out.add(EndPara(<String>['', o.unlock!, '']));
+      }
+    }
+    final next = nextOnRoster(s);
+    if (next != null) {
+      final left = next.nights - s.survived;
+      out.add(EndPara(<String>[
+        'Next on the roster: ',
+        next.name,
+        ' at ${next.nights} nights — '
+            '${left == 1 ? "one more shift" : "$left more shifts"}.',
+      ], ParaStyle.dim));
+    }
+    return out;
+  }
+
   void dawn() {
     if (lost) return;
     lost = true;
@@ -2108,6 +2139,11 @@ class AnomalyRuntime extends ChangeNotifier {
           cardForNight(s.night + 1).nm,
           '. It starts at 23:00.',
         ]),
+        // THE RETENTION MOMENT. This sheet is where the player decides whether
+        // there is a tomorrow, and it used to close on a bare count. It now
+        // says who you just outlasted, what that opened, and who is next with
+        // a distance — the three things that make someone take one more shift.
+        ..._rosterParas(),
         EndPara(<String>['Nights survived: ${s.survived}'], ParaStyle.fine),
       ],
     );

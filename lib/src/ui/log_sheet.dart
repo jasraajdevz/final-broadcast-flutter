@@ -62,7 +62,8 @@ class LogSheet extends StatelessWidget {
                   Expanded(
                     child: Text(page.head,
                         maxLines: 2,
-                        style: t.at(11, const Color(0xFFC9B98A), ls: 2)),
+                        style: typed(12 * s.ui, const Color(0xFFC9B98A),
+                            letterSpacing: 1.2)),
                   ),
                   const SizedBox(width: 10),
                   Text(page.kindLabel,
@@ -76,12 +77,15 @@ class LogSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
+                    // typed on a machine in 1974, not written by a HUD
                     Text(page.body,
-                        style: t.at(15, const Color(0xFFD8CDAC), h: 1.95)),
+                        style: typed(15 * s.ui, const Color(0xFFD8CDAC),
+                            height: 1.85)),
                     if (page.sign != null) ...<Widget>[
                       const SizedBox(height: 14),
                       Text(page.sign!,
-                          style: t.at(12, const Color(0xFFB6A87E), h: 1.7)),
+                          style: typed(13 * s.ui, const Color(0xFFB6A87E),
+                              height: 1.6)),
                     ],
                     const SizedBox(height: 20),
                     Text(

@@ -25,6 +25,7 @@ import 'src/consts.dart';
 import 'src/economy.dart';
 import 'src/state.dart';
 import 'src/archive.dart';
+import 'src/career.dart';
 import 'src/tools.dart';
 import 'src/ui/ad_break.dart';
 import 'src/ui/boot_screen.dart';
@@ -374,7 +375,7 @@ class _GameRootState extends State<GameRoot>
 
   void _signOn() {
     final page = docForNight(s.night);
-    if (page != null && !docFound(s, s.night)) {
+    if (page != null && unlocked(s, 'archive') && !docFound(s, s.night)) {
       s.log[s.night] = true;
       s.save();
       setState(() => _pendingLog = page);

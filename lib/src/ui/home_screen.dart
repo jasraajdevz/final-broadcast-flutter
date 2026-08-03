@@ -13,7 +13,7 @@ import 'package:flutter/widgets.dart';
 
 import '../consts.dart';
 import '../meta.dart';
-import '../archive.dart';
+import '../career.dart';
 import '../nights.dart';
 import '../story.dart';
 import '../state.dart';
@@ -66,7 +66,25 @@ class HomeScreen extends StatelessWidget {
           Positioned.fill(
             child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 26),
-            child: Column(
+            // SCROLLS, and shrinks to fit before it does.
+            //
+            // Adding the rank, the standing line, the next-rung bar and the
+            // "THEN:" payoff overflowed a 1280x720 cabinet by 96px — caught by
+            // a widget test before it shipped, which is exactly the class of
+            // layout regression that has bitten this screen twice now. The
+            // FittedBox scales the whole desk down rather than clipping it,
+            // and the scroll view is the backstop at 180% TEXT SIZE.
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints box) =>
+                  SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: box.maxHeight),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: box.maxWidth,
+                      child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 Text(kBootStationLine,
@@ -127,6 +145,11 @@ class HomeScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: t.at(9, K.bootFine, ls: 2)),
               ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
             ),
           ),
@@ -143,9 +166,11 @@ class _Title extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Sty(ui);
     const txt = 'FINAL BROADCAST';
-    TextStyle st(Color c) => t.at(44, c, ls: 14, w: FontWeight.bold);
+    // condensed broadcast signage — the wordmark was set in the same face as
+    // the keycaps, so the title had no more weight than a meter label
+    TextStyle st(Color c) =>
+        display(46 * ui, c, letterSpacing: 10, weight: FontWeight.w700);
     return SizedBox(
       height: 58,
       child: Stack(
@@ -254,13 +279,20 @@ class _Ledger extends StatelessWidget {
             _Stat(ui: s.ui, k: 'RATINGS PTS', v: fmt(s.rp), amber: true),
           ],
         ),
-        // THE HOOK. Not a stat — a count of what is still missing. You do not
-        // come back for the numbers, you come back because there is a page 38
-        // and you have read 37.
-        const SizedBox(height: 12),
-        Text(archiveLine(s),
+        // THE SPINE. Rank, standing, and the next name on the roster with a
+        // bar that always starts empty and always fills — a bar stuck at 94%
+        // for six nights tells the player nothing, so it measures from the
+        // PREVIOUS rung rather than from zero.
+        const SizedBox(height: 14),
+        Text(rankOf(s),
             textAlign: TextAlign.center,
-            style: Sty(s.ui).at(11, K.amber, ls: 2.5)),
+            style: display(20 * s.ui, K.ink, letterSpacing: 6)),
+        const SizedBox(height: 2),
+        Text(standingLine(s),
+            textAlign: TextAlign.center,
+            style: Sty(s.ui).at(9.5, K.lbl, ls: 2)),
+        const SizedBox(height: 12),
+        _NextRung(s: s),
         if (held.isNotEmpty) ...<Widget>[
           const SizedBox(height: 14),
           ConstrainedBox(
@@ -436,4 +468,84 @@ class _Card extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The next name on the roster, with a distance and a bar. This is the single
+/// most important element on the front desk: it is the answer to "what am I
+/// working toward", and it is never absent — when the roster runs out the file
+/// is still being assembled, and when that runs out you are told so.
+class _NextRung extends StatelessWidget {
+  const _NextRung({required this.s});
+  final GameState s;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(s.ui);
+    final g = nearestGoal(s);
+    if (g == null) {
+      return Text('THE FILE IS COMPLETE AND THE ROSTER IS SPENT.',
+          textAlign: TextAlign.center, style: t.at(11, K.amber, ls: 2));
+    }
+    final next = nextOnRoster(s);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
+      child: Column(
+        children: <Widget>[
+          // Flexible, not fixed: at 180% TEXT SIZE a fixed Row overflowed by
+          // 191px to the right. The name gives way before the distance does —
+          // "4 MORE NIGHTS" is the actionable half.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[
+              Flexible(
+                child: Text(g.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.at(12, K.amber, ls: 2.5)),
+              ),
+              const SizedBox(width: 10),
+              Text(g.detail,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: t.at(11, K.greenDim, ls: 1.5)),
+            ],
+          ),
+          const SizedBox(height: 5),
+          SizedBox(
+            height: 7,
+            width: double.infinity,
+            child: CustomPaint(painter: _RungBar(g.progress)),
+          ),
+          if (next != null && next.unlock != null) ...<Widget>[
+            const SizedBox(height: 7),
+            Text('THEN: ${next.unlock!}',
+                textAlign: TextAlign.center,
+                style: t.at(10, K.bootBody, h: 1.5)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RungBar extends CustomPainter {
+  _RungBar(this.v);
+  final double v;
+
+  @override
+  void paint(Canvas g, Size z) {
+    g.drawRect(Offset.zero & z, Paint()..color = const Color(0xFF14191B));
+    g.drawRect(Rect.fromLTWH(0, 0, z.width * v.clamp(0.0, 1.0), z.height),
+        Paint()..color = K.amber);
+    g.drawRect(
+      Offset.zero & z,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = const Color(0xFF2A3235),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RungBar o) => o.v != v;
 }

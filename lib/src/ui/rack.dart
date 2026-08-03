@@ -9,6 +9,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../anomalies.dart';
+import '../career.dart';
 import '../consts.dart';
 import '../economy.dart';
 import '../meta.dart';
@@ -137,11 +138,15 @@ class _RackState extends State<Rack> {
   // -------------------------------------------------------------------------
 
   Widget _tabs() {
-    const labels = <List<String>>[
+    // Everything at once is the same as nothing. A first-time operator used to
+    // be handed four tabs, eight keys, five tools, six bots, a canteen, a
+    // board and an archive inside ninety seconds, none of it legible. The tabs
+    // now arrive one per rung of the roster, each with a name attached.
+    final labels = <List<String>>[
       <String>['tx', 'TRANSMIT'],
       <String>['hw', 'HARDWARE'],
-      <String>['bot', 'AUTO'],
-      <String>['st', 'STATION'],
+      if (unlocked(s, 'bots')) <String>['bot', 'AUTO'],
+      if (unlocked(s, 'board')) <String>['st', 'STATION'],
     ];
     final t = Sty(s.ui);
     return Container(
@@ -282,6 +287,18 @@ class _RackState extends State<Rack> {
   /// THE CANTEEN. DREAD used to be a one-way ratchet with nothing you could do
   /// about it, so a bad night just had to be endured. Signal buys it back.
   List<Widget> _canteen() {
+    if (!unlocked(s, 'canteen')) {
+      // Named, not hidden. A locked panel that says WHO opens it is a rung you
+      // can see from here; one that says nothing is just an absent feature.
+      return <Widget>[
+        RackHead('CANTEEN   ·   SEALED', ui: s.ui),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 14),
+          child: Text(lockedLine(s, 'canteen'),
+              style: Sty(s.ui).at(11, K.amberDim, ls: 1.5)),
+        ),
+      ];
+    }
     final out = <Widget>[
       RackHead('CANTEEN   ·   DREAD ${s.dread.round()}/100', ui: s.ui),
     ];

@@ -9,6 +9,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 
 import '../anomalies.dart';
+import '../career.dart';
 import '../consts.dart';
 import '../state.dart';
 import '../tools.dart';
@@ -63,7 +64,10 @@ class Deck extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          SizedBox(height: kToolsBarH, child: ToolsBar(s: s, tools: tools)),
+          // R. OKONKWO's rung. Until then the deck is the eight keys, which
+          // is enough to learn and few enough to remember.
+          if (unlocked(s, 'tools'))
+            SizedBox(height: kToolsBarH, child: ToolsBar(s: s, tools: tools)),
           const SizedBox(height: 3),
           Expanded(
             child: Row(

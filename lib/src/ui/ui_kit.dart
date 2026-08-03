@@ -10,6 +10,7 @@
 // are NOT scaled, exactly as in the CSS.
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../bake.dart' show mono;
 import '../consts.dart' show K;
@@ -109,6 +110,62 @@ class UX {
 // ---------------------------------------------------------------------------
 
 /// `calc(Npx * var(--ui))`. Build one per widget build from `GameState.ui`.
+// ---------------------------------------------------------------------------
+// TYPE
+//
+// The body of this game is a bundled monospace (Courier Prime, registered as
+// 'Courier New' because CanvasKit does not resolve system families). That stays
+// — it IS the aesthetic, and every readout, key cap and meter is measured in
+// it.
+//
+// What was missing was a SECOND and THIRD voice. Everything from the wordmark
+// to a 1974 viewer letter to a keycap was set in one face at one width, so
+// nothing had any hierarchy and the documents did not read as documents.
+//
+// Two faces, each doing a job the mono cannot:
+//   display() — condensed broadcast signage, for titles and ranks. Authority.
+//   typed()   — a distressed typewriter, for the archive. These are supposed
+//               to be pages somebody typed on a machine in 1974, and setting
+//               them in the same face as the HUD made them read as UI copy.
+//
+// google_fonts fetches at runtime, so both degrade to the bundled mono if the
+// network is not there. Nothing load-bearing is ever set in them: no keycap,
+// no meter, no number.
+// ---------------------------------------------------------------------------
+
+/// Condensed signage. Titles, ranks, sheet headers.
+TextStyle display(double size, Color c,
+    {FontWeight weight = FontWeight.w600, double? letterSpacing, double? height}) {
+  try {
+    return GoogleFonts.oswald(
+      fontSize: size,
+      color: c,
+      fontWeight: weight,
+      letterSpacing: letterSpacing,
+      height: height,
+    );
+  } catch (_) {
+    // never let a font failure take the screen down
+    return mono(size, c, weight: weight, letterSpacing: letterSpacing, height: height);
+  }
+}
+
+/// A typewriter with a worn ribbon. The archive, and only the archive.
+TextStyle typed(double size, Color c,
+    {FontWeight weight = FontWeight.normal, double? letterSpacing, double? height}) {
+  try {
+    return GoogleFonts.specialElite(
+      fontSize: size,
+      color: c,
+      fontWeight: weight,
+      letterSpacing: letterSpacing,
+      height: height,
+    );
+  } catch (_) {
+    return mono(size, c, weight: weight, letterSpacing: letterSpacing, height: height);
+  }
+}
+
 class Sty {
   const Sty(this.ui);
 
