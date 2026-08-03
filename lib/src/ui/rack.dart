@@ -406,7 +406,11 @@ class _RackState extends State<Rack> {
                 text: 'RATINGS POINTS',
                 style: b.copyWith(color: K.amber)),
             TextSpan(
-                text: ' — a permanent ×${(1 + s.rp * 0.08).toStringAsFixed(2)}'
+                // was (1 + s.rp * 0.08) — the retired formula AND it left out the
+                // gain, so a first-time player was told the biggest decision in
+                // the game was worth 'a permanent x1.00 to everything, forever'
+                text: ' — a permanent ×'
+                    '${(rpMultAt(s.rp + rpGain(s)) / rpMultAt(s.rp)).toStringAsFixed(2)}'
                     ' to everything, forever.\n\nLifetime output: '),
             TextSpan(text: fmt(s.lifetimeSig), style: b),
             const TextSpan(text: '\nSign off now for: '),

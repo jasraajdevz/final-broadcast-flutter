@@ -183,8 +183,24 @@ double tuneYield(GameState s, AnomalyRuntime a) {
   // CARRIER LOCK multiplies the payout 1.0 -> 3.0. It is the whole reason the
   // rhythm is worth holding, and the reason the most-repeated verb in the game
   // now has an arc instead of a flat rate.
-  return s.tune.tierMult *
-      (base + sigRate(s, a) * 0.28) *
+  // THE COUPLING, BROKEN.
+  //
+  // The strike payout was DEFINED as a multiple of the rack's per-second
+  // output, so its value relative to the rack was invariant to progression:
+  // measured 0.871 strike-per-rack-second at a 195/s rack and 0.840 at a
+  // 3.8M/s rack. Breakeven sat at 1.19 clicks/s at EVERY scale, CARRIER LOCK
+  // tier 4 arrives 13.7s into a cold start, and at 3.5cps hand strikes were
+  // 79.3% of a night's SIGNAL. The idle half of an idle game never took over,
+  // which is a large part of why the whole thing felt thin.
+  //
+  // Two changes. The rack term now has diminishing returns, so the hand keeps
+  // its early-game job and stops scaling with the machine you built; and the
+  // LOCK multiplies only the flat term, so rhythm is rewarded on its own
+  // merits instead of amplifying the rack you are supposed to be replacing it
+  // with. The automation ceiling (1.06 effective cps) is deliberately just
+  // under the old 1.19 breakeven — the intent was always rack-parity.
+  final double rackTerm = 26 * math.pow(sigRate(s, a) / 26, 0.62).toDouble();
+  return (s.tune.tierMult * base + rackTerm) *
       ((s.ups['preheat'] ?? false) ? 1.3 : 1) *
       sponsorMult(s);
 }

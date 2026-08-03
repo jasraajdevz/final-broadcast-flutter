@@ -63,10 +63,15 @@ const List<StationNode> kStationNodes = <StationNode>[
     maxLvl: 2,
     step: 3.0,
   ),
+  // Was STAFF ROSTER: "automation comes back on shift at level 1". Bot levels
+  // live under bot.<id> keys and resetForNewNight only zeroes kProducers ids,
+  // so automation ALREADY survives sign-off at full level — the node sold a
+  // downgrade for 5 RP. Repurposed into the thing the board had no answer for.
   StationNode(
     id: 'roster',
-    nm: 'STAFF ROSTER',
-    ds: 'Automation you have paid for once comes back on shift at level 1.',
+    nm: 'THE NIGHT PORTER',
+    ds: 'He walks the corridor on the hour. The first anomaly of every night '
+        'arrives one tier weaker.',
     cost: 5,
     maxLvl: 1,
   ),
@@ -161,8 +166,8 @@ int metaFreeRevives(GameState s) => metaLevel(s, 'second');
 double? metaStallCap(GameState s) =>
     metaLevel(s, 'union') > 0 ? 45.0 : null;
 
-/// Do owned bots come back at level 1 after sign-off?
-bool metaKeepsRoster(GameState s) => metaLevel(s, 'roster') > 0;
+/// THE NIGHT PORTER — does the night's opening arrival come in soft?
+bool metaHasPorter(GameState s) => metaLevel(s, 'roster') > 0;
 
 
 // ---------------------------------------------------------------------------
@@ -260,17 +265,22 @@ const List<CanteenItem> kCanteen = <CanteenItem>[
     nm: 'SOMEONE ELSE\'S CIGARETTE',
     ds: 'Left in the pack by the door. -30 DREAD. You do not smoke.',
     dread: 30,
-    seconds: 34,
-    calm: 6,
+    seconds: 26,
+    calm: 8,
     night: 2,
   ),
+  // Priced in dread-per-raw-second the old ladder ran 1.500 / 1.100 / 0.882 /
+  // 0.786 — monotonically WORSE as items got more expensive and more deeply
+  // gated, so the night-3 unlock was the worst thing in the shop and matched
+  // careers bought 442 coffees against 2 tins. Depth has to pay.
   CanteenItem(
     id: 'pills',
     nm: 'THE TIN IN THE DESK',
-    ds: 'Prescribed to an operator who left in 1987. -55 DREAD.',
+    ds: 'Prescribed to an operator who left in 1987. -55 DREAD, and twelve '
+        'seconds where nothing can reach you.',
     dread: 55,
-    seconds: 70,
-    calm: 3,
+    seconds: 34,
+    calm: 12,
     night: 3,
   ),
 ];

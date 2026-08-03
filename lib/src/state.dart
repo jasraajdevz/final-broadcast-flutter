@@ -131,6 +131,16 @@ class TuneState {
 
   int _held = 0;
 
+  /// THE SNOW CRAWLER takes a tier off the lock. Drops to the FOOT of the tier
+  /// below rather than the top of it, so a knock costs real strikes to undo —
+  /// otherwise one more hit puts it straight back and the threat is theatre.
+  void knockDown() {
+    if (tier <= 0) return;
+    tier--;
+    lockP = 0;
+    _held = 0;
+  }
+
   double get tierMult => kTierMult[tier.clamp(0, 4)];
 
   /// The name printed on the lock meter.

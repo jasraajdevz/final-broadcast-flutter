@@ -299,6 +299,21 @@ class ActiveAnom {
   /// TWO-STAGE: 0 = untouched, 1 = already split once.
   int modStage = 0;
 
+  /// Generic per-visit sabotage cadence, for the five entities that had no
+  /// live effect at all. Reused rather than adding five more timers.
+  double sabIv = 1.2;
+
+  /// What THE RERUN and THE NIELSEN have taken so far this visit, so both are
+  /// budgeted per visit rather than per second — a long window must not be
+  /// arbitrarily more expensive than a short one.
+  double takenSeg = 0;
+  double takenLife = 0;
+
+  /// Segment output at the moment it arrived. THE RERUN cannot push you back
+  /// past this: it overwrites what you transmit WHILE it is on, and nothing
+  /// you banked before it showed up.
+  double segAtArrival = 0;
+
   /// COUPLED: which halves have been answered.
   bool selfDown = false;
   bool partnerDown = false;
@@ -515,6 +530,11 @@ class AnomalyRuntime extends ChangeNotifier {
   /// 1 -> 0 after a last-second save. Read by the painters for the flare.
   double clutchFx = 0;
 
+  /// 0..1 — THE VERTICAL MAN's hold on the instruments. Every numeric readout
+  /// in the rack and the status strip rolls by this much. He takes nothing;
+  /// he just makes the desk unreadable, which is a cost no other entity has.
+  double vertRoll = 0;
+
   /// Which counter was pressed in error, so the painters can flash THAT key
   /// rather than the whole deck. Cleared with [wrongFx].
   String? wrongFxKey;
@@ -531,6 +551,9 @@ class AnomalyRuntime extends ChangeNotifier {
   /// inflow, so the field is pressure rather than wallpaper. Defensively
   /// clamped on read; leaving it at 0 simply removes the inflow.
   double lurkPressure = 0;
+
+  /// How long the current hold has lasted, for UNION RULES' 45-second cap.
+  double _stallHeld = 0;
 
   /// Seconds until the room tone next STOPS dead for a beat.
   ///
@@ -978,12 +1001,18 @@ class AnomalyRuntime extends ChangeNotifier {
       window: w,
       masked: masked,
       stage: masked ? 0 : 1,
-      intensity: first ? 0.5 : (soft ? 0.7 : 1),
+      // THE NIGHT PORTER softens the night's opening arrival.
+      intensity: first
+          ? 0.5
+          : (soft ? 0.7 : (nightAnoms == 0 && metaHasPorter(s) ? 0.65 : 1)),
       seed: rand(),
       cold: cold,
       mod: mod,
       partner: partner,
     );
+    // THE RERUN overwrites what you transmit WHILE it is on. It must never be
+    // able to walk back output you had already banked before it arrived.
+    active!.segAtArrival = s.segSig;
     if (cold) s.toast(coldTellFor(s, def), ToastKind.bad);
     if (mod == EncounterMod.twoStage) {
       s.toast('TWO-STAGE SIGNATURE — ONE HIT WILL NOT DO IT', ToastKind.bad);
@@ -1302,6 +1331,100 @@ class AnomalyRuntime extends ChangeNotifier {
           shake = math.max(shake, 7);
           s.toast('## ${victim.nm} IS OFF THE AIR', ToastKind.bad);
         }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // THE FIVE THAT DID NOTHING
+    //
+    // sabotageTick had bodies for exactly two ids, and _simulate handled a
+    // third. Measured on the shipped build, THE SNOW CRAWLER, MR. SLEEPWELL,
+    // THE VERTICAL MAN, THE RERUN and THE NIELSEN left sigRate at 40118 ->
+    // 40118 with muted=0, held=0, rings=0 — five of eight entities were a
+    // picture and a key, identical to each other in every way that matters.
+    // That is what "it's too simple" is: eight signatures, one encounter.
+    //
+    // Each now applies a DIFFERENT pressure, so which one is on the tube
+    // changes what you should be doing about it. All five are budgeted per
+    // visit, not per second, so a long window is not arbitrarily worse.
+    // -----------------------------------------------------------------------
+
+    // THE SNOW CRAWLER — snow eats the picture, and the picture is the lock.
+    // It knocks the CARRIER LOCK down a tier at a time. Hurts precisely the
+    // player who has been playing well, and DEGAUSS is the answer to snow.
+    if (a.def.id == 'snow') {
+      a.sabIv -= dt;
+      if (a.sabIv <= 0) {
+        a.sabIv = math.max(1.1, 2.4 - p * 1.2);
+        if (s.tune.tier > 0) {
+          s.tune.knockDown();
+          audio.env('sawtooth', 180, 0.35, 0.10, 60);
+          shake = math.max(shake, 5);
+          s.toast('## THE LOCK IS SLIPPING — ${s.tune.tier > 0 ? s.tune.tierName : "CARRIER LOST"}',
+              ToastKind.bad);
+        }
+      }
+    }
+
+    // MR. SLEEPWELL — you are still transmitting. You are transmitting HIM.
+    // Output keeps arriving in the bank and stops counting toward the quota,
+    // which threatens the clock without touching your money. Distinct from
+    // DEAD AIR, which cuts the rate itself.
+    if (a.def.id == 'sleep') {
+      if (a.rings == 0) {
+        a.rings = 1;
+        s.toast('## YOU ARE OFF THE RUNDOWN — NOTHING IS COUNTING',
+            ToastKind.bad);
+      }
+    }
+
+    // THE VERTICAL MAN — vertical hold. The instruments stop being readable:
+    // every figure in the rack and the strip rolls. Nothing is taken from you
+    // at all, which is the point — you simply cannot see what you have.
+    if (a.def.id == 'vert') {
+      vertRoll = math.min(1.0, vertRoll + dt * 1.6);
+    }
+
+    // THE RERUN — its own manual page promises it "will overwrite anything you
+    // transmit with itself", and it did nothing. It now walks this segment's
+    // output backward, but never past what you had banked when it arrived.
+    if (a.def.id == 'rerun') {
+      // Measured: a budget-based drain was SLOWER than live output, so the
+      // segment counter never actually fell — it just grew more slowly, which
+      // reads as nothing at all. It has to outrun you, or "it will overwrite
+      // anything you transmit" is a sentence and not a mechanic. Pegged to
+      // your own output rate, so it scales with the station and stays
+      // frightening at every depth, and floored at 55% of what you had when
+      // it arrived so it can never zero a segment outright.
+      final double floor = a.segAtArrival * 0.55;
+      final double take = sigRateRaw(s) * 1.35 * sabK() * dt;
+      if (s.segSig > floor) {
+        s.segSig = math.max(floor, s.segSig - take);
+        a.takenSeg += take;
+      }
+      a.sabIv -= dt;
+      if (a.sabIv <= 0) {
+        a.sabIv = 2.6;
+        audio.env('triangle', 96, 0.4, 0.08, 70);
+        s.toast('## THE RERUN IS GOING OUT INSTEAD OF YOU', ToastKind.bad);
+      }
+    }
+
+    // THE NIELSEN — he is measuring, and what he measures he keeps. He is the
+    // only thing in the game that touches the CAREER: lifetimeSig is what
+    // rpGain() reads, so a visit from him costs you tomorrow, not tonight.
+    if (a.def.id == 'niel') {
+      final double budget = s.lifetimeSig * 0.06 * sabK();
+      final double take = math.min(budget - a.takenLife, budget * dt / 6.0);
+      if (take > 0) {
+        s.lifetimeSig = math.max(0, s.lifetimeSig - take);
+        a.takenLife += take;
+      }
+      a.sabIv -= dt;
+      if (a.sabIv <= 0) {
+        a.sabIv = 3.0;
+        audio.env('square', 320, 0.18, 0.06, 240);
+        s.toast('## HE IS WRITING YOUR NUMBERS DOWN', ToastKind.bad);
       }
     }
 
@@ -1662,7 +1785,12 @@ class AnomalyRuntime extends ChangeNotifier {
     audio.setStatic(0.3);
     audio.setDrone(0.25, 26);
     final rg = rpGain(s);
-    final mult = (1 + (s.rp + rg) * 0.08).toStringAsFixed(2);
+    // rpMult was made sub-linear (1 + 0.26*rp^0.62) and rpMultAt() exists
+    // precisely so the sheets can quote what a bank WOULD be worth — it had
+    // no callers, and all three sales pitches still ran the retired linear
+    // formula. The status bar printed the correct figure on the same frame:
+    // measured x37.51 in the HUD against x2213.88 on the sheet.
+    final mult = (rpMultAt(s.rp + rg) / rpMultAt(s.rp)).toStringAsFixed(2);
     endScreen = EndScreen.signalLost;
     endScreenModel = EndScreenModel(
       win: false,
@@ -1718,9 +1846,16 @@ class AnomalyRuntime extends ChangeNotifier {
     notifyListeners();
     _rollAd('EMERGENCY SPONSORSHIP', () {
       s.revives++;
-      s.dread = 45;
+      // SECOND SHIFT (35 RP) bought nothing: metaFreeRevives() had no callers,
+      // and revive() hardcoded the same numbers every time, so eight deaths in
+      // one night returned byte-identical state while the sheet counted
+      // "#8 tonight" at you. The free ones come back clean; after that each
+      // one leaves you deeper in it than the last.
+      final int free = metaFreeRevives(s);
+      final int over = math.max(0, s.revives - 1 - free);
+      s.dread = math.min(88, 45 + over * 12.0);
       lost = false;
-      s.sponsorEnd = math.max(s.sponsorEnd, 45);
+      s.sponsorEnd = math.max(s.sponsorEnd, 45 / (1 + over * 0.45));
       _clearScareFx();
       // You came back from the dead. You do not get hit in the doorway: a full
       // recovery window, and the night's ease-in is partly re-armed.
@@ -1754,7 +1889,12 @@ class AnomalyRuntime extends ChangeNotifier {
     s.survived++;
     s.dawnBonus = 6; // surviving is worth more than bailing out
     final g = rpGain(s) + s.dawnBonus;
-    final mult = (1 + (s.rp + g) * 0.08).toStringAsFixed(2);
+    // rpMult was made sub-linear (1 + 0.26*rp^0.62) and rpMultAt() exists
+    // precisely so the sheets can quote what a bank WOULD be worth — it had
+    // no callers, and all three sales pitches still ran the retired linear
+    // formula. The status bar printed the correct figure on the same frame:
+    // measured x37.51 in the HUD against x2213.88 on the sheet.
+    final mult = (rpMultAt(s.rp + g) / rpMultAt(s.rp)).toStringAsFixed(2);
     endScreen = EndScreen.dawn;
     endScreenModel = EndScreenModel(
       win: true,
@@ -1913,6 +2053,12 @@ class AnomalyRuntime extends ChangeNotifier {
     // The false clear holds its green wash until the beat takes it away.
     if (!falseClear) banishFx = math.max(0, banishFx - dt * 2.4);
     clutchFx = math.max(0, clutchFx - dt * 1.6);
+    if (active?.def.id != 'vert') {
+      vertRoll = math.max(0, vertRoll - dt * 1.1);
+    }
+    // published to the formatter so every readout in the game rolls at
+    // once, without any call site knowing he exists
+    gVertRoll = vertRoll;
     wrongFx = math.max(0, wrongFx - dt * 3);
     blackout = math.max(0, blackout - dt);
     if (scare > 0) {
@@ -1954,20 +2100,30 @@ class AnomalyRuntime extends ChangeNotifier {
     }
     // Quotas are met by TRANSMITTING. Output counts even while the Test Card
     // Girl is holding the bank, because it did go out — she just kept it.
+    //
+    // MR. SLEEPWELL is the exception: you are still transmitting, but what is
+    // going out is him. The money still arrives; none of it is on the rundown.
     final out = sr * dt;
-    s.segSig += out;
+    if (!sabOn('sleep')) s.segSig += out;
     s.lifetimeSig += out;
     s.airtime += dt;
 
     // --- the shift clock ---
     // Runs freely to :59 then HOLDS until the segment's quota is met.
     final seg0 = segIndex(s);
-    if (s.shiftMin % 60 >= 59 && !quotaMet(s)) {
+    // UNION RULES promises "the clock cannot hold you for more than 45 seconds
+    // at a stretch" and metaStallCap() had no callers, so real played nights
+    // recorded holds of 280-508s. It is the priciest node on the board.
+    final double? cap = metaStallCap(s);
+    final bool capped = cap != null && s.stalled && _stallHeld >= cap;
+    if (s.shiftMin % 60 >= 59 && !quotaMet(s) && !capped) {
       if (!s.stalled) {
         s.stalled = true;
+        _stallHeld = 0;
         _stallSay = 0;
         _stallAdvice = 0;
       }
+      _stallHeld += dt;
       // A held clock used to announce itself exactly once, into silence, with
       // no figure attached — a traced blind night ends frozen at 23:59 with
       // nothing on screen naming the action that would unfreeze it. It now
@@ -1991,8 +2147,13 @@ class AnomalyRuntime extends ChangeNotifier {
     } else {
       if (s.stalled) {
         s.stalled = false;
-        s.toast('QUOTA MET — CLOCK RUNNING', ToastKind.good);
+        s.toast(
+            capped
+                ? 'UNION RULES — THEY CANNOT HOLD YOU ANY LONGER'
+                : 'QUOTA MET — CLOCK RUNNING',
+            ToastKind.good);
       }
+      _stallHeld = 0;
       s.shiftMin += dt / kMinReal;
       if (segIndex(s) != seg0 && s.shiftMin < kShiftMinutes) {
         // A quota measures what you broadcast DURING its segment. Without this

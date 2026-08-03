@@ -55,11 +55,41 @@ const List<String> kSuffixes = [
 ];
 
 /// JS `fmt(n)` — the number formatter used everywhere in the UI.
-String fmt(num value) {
+/// THE VERTICAL MAN's hold on the instruments, 0..1. Set by the runtime while
+/// he is on the tube and read by [fmt], so every numeric readout in the game —
+/// rack, status strip, wings, deck — rolls at once without a single call site
+/// having to know he exists.
+///
+/// He is the only entity that takes nothing from you. He just makes the desk
+/// unreadable, which is a pressure no amount of banked SIGNAL answers.
+double gVertRoll = 0;
+
+const String _kRollGlyphs = '0123456789';
+
+/// Rolls a rendered figure: each digit has an independent chance of having
+/// slipped to a neighbouring one, scaling with [gVertRoll].
+String _roll(String s) {
+  if (gVertRoll <= 0.02) return s;
+  final b = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    final ch = s[i];
+    if (ch.codeUnitAt(0) >= 48 && ch.codeUnitAt(0) <= 57 &&
+        rand() < gVertRoll * 0.55) {
+      b.write(_kRollGlyphs[(rand() * 10).floor().clamp(0, 9)]);
+    } else {
+      b.write(ch);
+    }
+  }
+  return b.toString();
+}
+
+String fmt(num value) => _roll(_fmt(value));
+
+String _fmt(num value) {
   double n = value.toDouble();
   if (n.isNaN) return '0';
   if (n.isInfinite) return '∞';
-  if (n < 0) return '-${fmt(-n)}';
+  if (n < 0) return '-${_fmt(-n)}';
   if (n < 1000) {
     if (n < 10) {
       final v = (n * 10).round() / 10;

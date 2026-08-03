@@ -711,12 +711,17 @@ class BotRuntime extends ChangeNotifier {
       return;
     }
 
-    final seg = segOf(s);
-    final left = seg.quota * kMgrSegCap - _mgrGiven;
+    // TONIGHT's quota, not the printed table. economy.dart states the rule
+    // verbatim; two sibling sites were corrected and this one was missed, so
+    // the manager stopped contributing at 40.2% of the real threshold instead
+    // of the advertised 55% and then sat reading "ON THE AIR" through the
+    // terminal 7-31s of every hold, contributing exactly zero.
+    final double tonight = segQuota(s);
+    final left = tonight * kMgrSegCap - _mgrGiven;
     if (left <= 0) return;
 
     final eff = mgrEff(lvl);
-    final need = seg.quota - s.segSig;
+    final need = tonight - s.segSig;
     if (need <= 0) return;
 
     // Capped by INCOME, not by the bank. At 8-14% of BANK per second the float
