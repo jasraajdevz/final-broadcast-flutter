@@ -273,6 +273,12 @@ class _GameRootState extends State<GameRoot>
         runtime.releaseCheck();
         return KeyEventResult.handled;
       }
+      // the ninth key is held, like the book
+      if (e.logicalKey == LogicalKeyboardKey.digit9 ||
+          e.logicalKey == LogicalKeyboardKey.numpad9) {
+        runtime.endCarrier();
+        return KeyEventResult.handled;
+      }
       return KeyEventResult.ignored;
     }
     // KeyRepeatEvent is a different type, so `if(e.repeat)return` is implicit.
@@ -305,6 +311,12 @@ class _GameRootState extends State<GameRoot>
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
       runtime.pressCheck();
+      return KeyEventResult.handled;
+    }
+    // 9. Nothing in the game says this key exists.
+    if (key == LogicalKeyboardKey.digit9 ||
+        key == LogicalKeyboardKey.numpad9) {
+      runtime.beginCarrier();
       return KeyEventResult.handled;
     }
 

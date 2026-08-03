@@ -679,6 +679,37 @@ class AnomalyRuntime extends ChangeNotifier {
   /// True while the current visit is the one that turns.
   bool presenceTurning = false;
 
+  // -------------------------------------------------------------------------
+  // THE NINTH KEY
+  //
+  // A. VOSS's roster entry has promised this since the ladder was written —
+  // "a ninth key, it is not on the deck yet" — and H. VANCE's entry records
+  // what it is for: "the only one who ever turned the carrier down. For nine
+  // seconds."
+  //
+  // It has no label, no manual page, and nothing in the game ever explains it.
+  // It is not pressed, it is HELD, and holding it takes the station off air.
+  //
+  // The premise of the whole game is that the carrier is a lid. This is the
+  // handle on the lid. It works — whatever is on the tube leaves immediately,
+  // because the thing keeping it in there has stopped — and the cost is that
+  // for a few seconds nothing at all is holding the rest of it down.
+  //
+  // A pure lose-button would be pressed once and never again. This is a real
+  // emergency release with a catastrophic price, which is a different thing:
+  // you WILL use it, and you will hate that you did.
+  // -------------------------------------------------------------------------
+
+  /// 0..1 — how far the operator's hand has taken the carrier down.
+  double carrierHold = 0;
+  bool carrierHolding = false;
+
+  /// Times it has been taken down tonight. Each one is worse than the last.
+  int carrierDrops = 0;
+
+  /// Seconds of hold before the lid actually comes off.
+  static const double kCarrierHoldSeconds = 2.4;
+
   /// Which camera is showing THIS ROOM, or -1.
   ///
   /// The cameras watch the corridor and the mast. There is no camera in the
@@ -1414,6 +1445,80 @@ class AnomalyRuntime extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// The hand goes on the ninth key.
+  void beginCarrier() {
+    if (!signedOn || lost || paused || !unlocked(s, 'ninth')) return;
+    if (carrierHolding) return;
+    carrierHolding = true;
+    audio.init();
+    audio.env('square', 90, 0.5, 0.12, 60);
+    // no toast. It has never been explained and it is not going to be now.
+    notifyListeners();
+  }
+
+  /// The hand comes off it.
+  void endCarrier() {
+    if (!carrierHolding) return;
+    carrierHolding = false;
+    if (carrierHold > 0.1 && carrierHold < 1.0) {
+      // Let go in time. Nothing happened, and knowing that it nearly did is
+      // its own cost.
+      s.dread = math.min(100, s.dread + 4 * cardOf(s).dread);
+      audio.env('sine', 220, 0.3, 0.07, 300);
+      s.toast('THE NEEDLE COMES BACK UP', ToastKind.gold);
+    }
+    notifyListeners();
+  }
+
+  /// THE LID COMES OFF.
+  void dropCarrier() {
+    carrierHolding = false;
+    carrierHold = 0;
+    carrierDrops++;
+
+    // Whatever was on the tube leaves at once. It was only ever in the signal
+    // because there was a signal.
+    final a = active;
+    if (a != null) {
+      active = null;
+      dying = a;
+      dyingT = 0;
+      dyingSpan = kDyingSpanQuiet;
+      glitch = 0;
+      s.toast('IT IS NOT IN THE SIGNAL ANY MORE', ToastKind.bad);
+    }
+
+    // And for a few seconds nothing is holding the rest of it down. Each drop
+    // costs more than the last, so this can never become a rotation.
+    final double bite = 26.0 + carrierDrops * 14.0;
+    s.dread = math.min(100, s.dread + bite * cardOf(s).dread);
+    calm = 0;
+    calmSpan = 0;
+    calmGuard = 0;
+    calmGuardSpan = 0;
+
+    audio.deadAir(true);
+    audio.hold(520);
+    audio.setSub(1.0);
+    _later(560, () => audio.distantScream(0.95, rand() < 0.5 ? -1 : 1));
+    _later(1400, () => audio.deadAir(false));
+    blood.add(0.6,
+        ox: kScr.center.dx + (rand() - 0.5) * 500,
+        oy: kScr.bottom + 20 + rand() * 90);
+    shake = math.max(shake, 26);
+    blackout = math.max(blackout, 1);
+
+    // it comes into the room while the lid is off
+    presence = 1;
+    presenceSpan = rr(6, 12);
+    presenceTurning = carrierDrops >= 2 && rand() < 0.35;
+    audio.setHeart(140, 0.30);
+
+    s.toasts.pushDelayed(900, 'KBLK-7 IS OFF THE AIR', ToastKind.bad);
+    s.toasts.pushDelayed(2200, 'PUT IT BACK UP', ToastKind.bad);
+    notifyListeners();
+  }
+
   /// ENTER — the operator signs the book.
   ///
   /// One key, always the same, because the check is an ATTENTION test and not
@@ -1455,6 +1560,9 @@ class AnomalyRuntime extends ChangeNotifier {
     presenceSpan = 0;
     presenceVisits = 0;
     presenceTurning = false;
+    carrierHold = 0;
+    carrierHolding = false;
+    carrierDrops = 0;
     mirrorCam = -1;
     mirrorIn = rr(120, 260);
     mirrorLeft = 0;
@@ -2438,6 +2546,20 @@ class AnomalyRuntime extends ChangeNotifier {
       // drift is a continuous tax on a neglected station
       if (checks.drift > 0) {
         s.dread = math.min(100, s.dread + driftDread(checks) * dt);
+      }
+    }
+
+    // THE HAND ON THE CARRIER. Nothing explains this and nothing ever will.
+    if (signedOn && !lost) {
+      if (carrierHolding) {
+        carrierHold = math.min(1.0, carrierHold + dt / kCarrierHoldSeconds);
+        // the room goes with it — the bed thins, the floor drops away
+        audio.setSub(math.min(1.0, 0.3 + carrierHold * 0.7));
+        audio.setStatic(0.03 + (1 - carrierHold) * 0.10);
+        shake = math.max(shake, carrierHold * 9);
+        if (carrierHold >= 1.0) dropCarrier();
+      } else if (carrierHold > 0) {
+        carrierHold = math.max(0, carrierHold - dt * 1.6);
       }
     }
 

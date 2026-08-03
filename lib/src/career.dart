@@ -278,6 +278,7 @@ const Map<String, int> kUnlockAt = <String, int>{
   'board': 4, // S. BRIGHT
   'tools': 7, // R. OKONKWO
   'bots': 11, // J. FENN
+  'ninth': 16, // A. VOSS
 };
 
 bool unlocked(GameState s, String feature) =>

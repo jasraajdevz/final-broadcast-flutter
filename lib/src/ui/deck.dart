@@ -102,7 +102,33 @@ class Deck extends StatelessWidget {
         row(0),
         const SizedBox(height: 6),
         row(4),
+        // THE NINTH KEY. A. VOSS's rung. No label, no manual page, no tooltip,
+        // and no toast when you touch it. It is not pressed, it is HELD.
+        if (unlocked(s, 'ninth')) ...<Widget>[
+          const SizedBox(height: 6),
+          SizedBox(height: 26, child: _ninth()),
+        ],
       ],
+    );
+  }
+
+  Widget _ninth() {
+    final t = Sty(s.ui);
+    final double h = runtime.carrierHold;
+    return Listener(
+      onPointerDown: (_) => runtime.beginCarrier(),
+      onPointerUp: (_) => runtime.endCarrier(),
+      onPointerCancel: (_) => runtime.endCarrier(),
+      child: CustomPaint(
+        painter: _NinthPainter(h),
+        child: Center(
+          child: Text(
+            // deliberately not a name. The cap was scratched out.
+            h > 0.02 ? '${(h * 100).round()}%' : '\u2014',
+            style: t.at(10, h > 0.02 ? K.red : const Color(0xFF4A3A3A), ls: 6),
+          ),
+        ),
+      ),
     );
   }
 
@@ -348,4 +374,38 @@ class _SKey extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// The ninth key. A worn brass switch guard with nothing written under it.
+class _NinthPainter extends CustomPainter {
+  _NinthPainter(this.h);
+  final double h;
+
+  @override
+  void paint(Canvas g, Size z) {
+    g.drawRect(Offset.zero & z, Paint()..color = const Color(0xFF120C0C));
+    // it fills red as the carrier comes down
+    if (h > 0.001) {
+      g.drawRect(Rect.fromLTWH(0, 0, z.width * h, z.height),
+          Paint()..color = const Color(0xFF4A0A0C));
+    }
+    // hatched guard, so it reads as something you are not meant to touch
+    final p = Paint()
+      ..color = const Color(0x2EFF6A5A)
+      ..strokeWidth = 1;
+    for (double x = -z.height; x < z.width; x += 9) {
+      g.drawLine(Offset(x, z.height), Offset(x + z.height, 0), p);
+    }
+    g.drawRect(
+      Offset.zero & z,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = h > 0.001 ? const Color(0xFF8A1418) : const Color(0xFF3A2A2A),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _NinthPainter o) => o.h != h;
 }
