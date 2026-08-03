@@ -40,6 +40,7 @@ import 'consts.dart';
 import 'checks.dart';
 import 'economy.dart';
 import 'nights.dart';
+import 'paint/blood.dart';
 import 'meta.dart';
 import 'encounter.dart';
 import 'state.dart';
@@ -567,6 +568,10 @@ class AnomalyRuntime extends ChangeNotifier {
   /// THE STATION CHECKS. The job you do in the quiet, and the only thing in
   /// the game that competes with the tube for your attention.
   final CheckRuntime checks = CheckRuntime();
+
+  /// What is on the glass. Accumulates across a night and is only ever
+  /// cleaned by sunrise. See paint/blood.dart.
+  final BloodLayer blood = BloodLayer();
 
   /// What tonight has left on the room. Cleared at sign-on, never inside a
   /// night. The painters read it; nothing announces it.
@@ -1211,6 +1216,9 @@ class AnomalyRuntime extends ChangeNotifier {
     s.stats.wrong++;
     nightWrongs++;
     wrongFx = 1;
+    // A fumble puts a little of it on the glass too. Being wrong should cost
+    // something you can SEE for the rest of the night, not just a number.
+    blood.add(0.12, ox: kScr.center.dx, oy: kScr.center.dy, count: 1);
     wrongFxKey = cid;
     final pen = (s.ups['autocue'] ?? false) ? 0.45 : 0.9;
     active?.wrongs++;
@@ -1289,6 +1297,7 @@ class AnomalyRuntime extends ChangeNotifier {
     // Coming back to the desk — mid-night or not — earns the slow opening.
     checks.resetForNight();
     scars.clear();
+    blood.clear();
     nightAnoms = 0;
     calm = 0;
     calmSpan = 0;
@@ -1574,6 +1583,19 @@ class AnomalyRuntime extends ChangeNotifier {
     ];
     if (open.isEmpty) return;
     final ScarKind k = open.first;
+    // The glass remembers it too. AT THE GLASS is the one that gets hands:
+    // there is nothing out in that field that has hands, and the game never
+    // remarks on it.
+    if (k == ScarKind.atTheGlass) {
+      for (var i = 0; i < 3; i++) {
+        blood.addHand(
+          kWin.left + 14 + rand() * (kWin.width - 28),
+          kWin.top + 40 + rand() * (kWin.height - 90),
+        );
+      }
+    } else if (k == ScarKind.burnIn) {
+      blood.add(0.5, ox: kScr.center.dx, oy: kScr.top + 20);
+    }
     scars.add(Scar(
       k,
       def,
@@ -1741,6 +1763,9 @@ class AnomalyRuntime extends ChangeNotifier {
     // you are supposed to notice on your own, later, that a camera has had
     // someone standing in it for twenty minutes.
     _leaveScar(def);
+    // AND IT MARKS THE GLASS. Not a red flash that fades — something lands on
+    // the pane between you and the room and is still there at 05:00, running.
+    blood.add(0.55 + rand() * 0.45, ox: kScr.center.dx, oy: kScr.center.dy);
 
     // the channel feed.dart and tube.dart already read: 1.5s, counting down
     scare = 1.5;
@@ -2167,6 +2192,11 @@ class AnomalyRuntime extends ChangeNotifier {
             shake = math.max(shake, 6);
             s.toast('## ${ev.check!.nm} — NOT SIGNED. THE STATION IS DRIFTING.',
                 ToastKind.bad);
+            // A book left unsigned while something was in the room leaves a
+            // mark. Nobody says whose.
+            if (active != null) {
+              blood.add(0.2, ox: kScr.center.dx, oy: kScr.bottom - 20, count: 2);
+            }
           case CheckEventKind.falseEntry:
             break; // signBook() handles it; nothing is raised here
         }
@@ -2217,6 +2247,7 @@ class AnomalyRuntime extends ChangeNotifier {
     // published to the formatter so every readout in the game rolls at
     // once, without any call site knowing he exists
     gVertRoll = vertRoll;
+    blood.tick(dt);
     wrongFx = math.max(0, wrongFx - dt * 3);
     blackout = math.max(0, blackout - dt);
     if (scare > 0) {

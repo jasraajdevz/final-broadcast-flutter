@@ -24,6 +24,7 @@ import '../anomalies.dart';
 import '../bake.dart';
 import '../consts.dart';
 import '../state.dart';
+import 'blood.dart';
 import 'entities.dart';
 import 'feed.dart';
 import 'room.dart';
@@ -137,6 +138,11 @@ class Booth {
       fillRect(g, 0, 0, kRoom.width, kRoom.height,
           rgba(255, 240, 240, runtime.flash * 0.5));
     }
+    // WHAT IS ON THE GLASS. Last inside the room clip, over the CRT, the desk
+    // and every effect — it is on the pane between the player and the booth,
+    // and the game never explains how it got on the inside.
+    drawBlood(g, runtime.blood, t);
+
     final ui.Image? grain = noiseTile(t, 18);
     if (grain != null) {
       drawImageStretch(g, grain, kRoom, nearestPaint(alpha: 0.035));

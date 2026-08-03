@@ -251,15 +251,89 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
       }
     }
   } else if (a.scare > 0 && scareDef != null) {
-    // jumpscare frame
+    // THE JUMPSCARE FRAME.
+    //
+    // This used to be the entity's own sprite scaled up 2x on black, which
+    // reads as a logo sting: a shape, centred, briefly. A face is not a shape.
+    // It is too close, it is off-centre, it is WET, and the parts of it your
+    // eye hunts for — the sockets, the mouth — are the parts that are wrong.
     fillRect(f, 0, 0, _fw, _fh, const ui.Color(0xFF000000));
+
+    final double bite = clampD(1.5 - a.scare, 0, 1.5) / 1.5; // 0 -> 1
     f.save();
-    final z = 1.28 + clampD(1.5 - a.scare, 0, 1.5) * 0.85;
-    f.translate(_fw / 2, _fh * 0.44);
+    // hard push in, and never centred — a face square in frame is a portrait
+    final double z = 2.4 + bite * 1.5;
+    final double ox = _fw * (0.5 + (scareDef.id.hashCode % 7 - 3) * 0.022);
+    f.translate(ox, _fh * 0.40);
     f.scale(z, z);
-    f.translate(-_fw / 2, -_fh * 0.44);
+    f.translate(-ox, -_fh * 0.40);
     drawAnom(f, scareDef, t, 1);
     f.restore();
+
+    // --- the sockets ---
+    // Two holes with nothing behind them, torn rather than drawn, sitting
+    // where the eye is already looking for eyes.
+    final double eyeY = _fh * 0.34;
+    for (var s = -1; s <= 1; s += 2) {
+      final double ex = ox + s * _fw * 0.13;
+      final ui.Paint hole = ui.Paint()
+        ..shader = ui.Gradient.radial(
+          ui.Offset(ex, eyeY),
+          _fw * 0.085 * (1 + bite * 0.35),
+          <ui.Color>[
+            const ui.Color(0xFF000000),
+            const ui.Color(0xFF000000),
+            rgba(70, 6, 8, 0.75),
+            rgba(70, 6, 8, 0),
+          ],
+          <double>[0, 0.42, 0.72, 1],
+        );
+      f.drawRect(_feedRect, hole);
+      // the wet line under it
+      f.drawOval(
+        ui.Rect.fromCenter(
+          center: ui.Offset(ex, eyeY + _fh * 0.055 + bite * 8),
+          width: _fw * 0.020,
+          height: _fh * 0.10 + bite * 26,
+        ),
+        fill(rgba(120, 12, 16, 0.55 + bite * 0.35)),
+      );
+    }
+
+    // --- the mouth ---
+    // Open far too wide, and the wrong shape for a scream.
+    final double mw = _fw * (0.10 + bite * 0.16);
+    final double mh = _fh * (0.05 + bite * 0.22);
+    final ui.Rect mouth = ui.Rect.fromCenter(
+        center: ui.Offset(ox, _fh * 0.62), width: mw, height: mh);
+    f.drawOval(mouth, fill(const ui.Color(0xFF070203)));
+    f.drawOval(mouth, stroke(rgba(110, 10, 14, 0.9), 2));
+    // teeth, uneven, not all present
+    final int teeth = 7;
+    for (var i = 0; i < teeth; i++) {
+      if ((scareDef.id.hashCode >> i) & 1 == 0) continue;
+      final double tx = mouth.left + mouth.width * ((i + 0.5) / teeth);
+      final double th = mouth.height * (0.20 + ((i * 37) % 11) / 11 * 0.24);
+      fillRect(f, tx - mouth.width * 0.035, mouth.top, mouth.width * 0.07, th,
+          rgba(196, 184, 158, 0.82));
+      fillRect(f, tx - mouth.width * 0.035, mouth.bottom - th * 0.8,
+          mouth.width * 0.07, th * 0.8, rgba(178, 166, 140, 0.7));
+    }
+
+    // --- and it is on the lens ---
+    // The last thing between the player and it is a pane with something wet
+    // on the near side.
+    for (var i = 0; i < 5; i++) {
+      final double sx = _fw * (0.12 + ((i * 53) % 79) / 79 * 0.78);
+      final double sy = _fh * (0.10 + ((i * 31) % 67) / 67 * 0.72);
+      final double sr = 3.0 + ((i * 17) % 13) / 13 * 9 * (0.4 + bite);
+      f.drawOval(
+        ui.Rect.fromCenter(center: ui.Offset(sx, sy), width: sr * 2, height: sr * 2.3),
+        fill(rgba(126, 10, 14, 0.62)),
+      );
+      fillRect(f, sx - sr * 0.22, sy, sr * 0.44, sr * (2 + bite * 7),
+          rgba(96, 8, 12, 0.5));
+    }
     final n = noiseTile(t, 40);
     if (n != null) {
       drawImageStretch(f, n, _feedRect, nearestPaint(alpha: 0.42));
