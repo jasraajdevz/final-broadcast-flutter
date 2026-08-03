@@ -668,6 +668,31 @@ class AnomalyRuntime extends ChangeNotifier {
   double presenceIn = 88;
   double presenceSpan = 0;
 
+  /// How many times it has stood behind the chair and then left.
+  ///
+  /// A presence that is guaranteed harmless is only frightening until the
+  /// player notices it is guaranteed harmless — which takes about three
+  /// nights, and after that it is weather. This counts the times it has been
+  /// merciful, and feeds the chance that the next one is not.
+  int presenceVisits = 0;
+
+  /// True while the current visit is the one that turns.
+  bool presenceTurning = false;
+
+  /// Which camera is showing THIS ROOM, or -1.
+  ///
+  /// The cameras watch the corridor and the mast. There is no camera in the
+  /// booth, there has never been a camera in the booth, and nothing in the
+  /// game ever remarks on the fact that one of them is looking at the back of
+  /// your chair. It is the cheapest genuinely upsetting image available,
+  /// because the player supplies the meaning themselves.
+  int mirrorCam = -1;
+  double mirrorIn = 150;
+  double mirrorLeft = 0;
+
+  /// 0..1 — how far the figure in that chair has turned round.
+  double mirrorTurn = 0;
+
   /// Seconds until somebody screams somewhere else in the building.
   ///
   /// Deliberately independent of the anomaly scheduler and of dread: it is not
@@ -1428,6 +1453,12 @@ class AnomalyRuntime extends ChangeNotifier {
     presence = 0;
     presenceIn = rr(70, 150);
     presenceSpan = 0;
+    presenceVisits = 0;
+    presenceTurning = false;
+    mirrorCam = -1;
+    mirrorIn = rr(120, 260);
+    mirrorLeft = 0;
+    mirrorTurn = 0;
     scars.clear();
     blood.clear();
     nightAnoms = 0;
@@ -1765,6 +1796,23 @@ class AnomalyRuntime extends ChangeNotifier {
   /// Opens the forced-quiet recovery window FIRST, so that whatever the beat
   /// does with the next second, nothing can telegraph over the top of it and
   /// nothing can manifest while the player is still recovering.
+  /// A scare that did not come from the tube.
+  ///
+  /// jumpscare() operates on `active` and returns immediately without one, so
+  /// nothing in the game could frighten the player except a missed anomaly.
+  /// This is the room doing it, with no window, no counter and nothing the
+  /// player could have pressed.
+  void jumpscareFromRoom() {
+    if (lost) return;
+    final Anom def = pick(unlockedAnoms(s));
+    _scareSerial++;
+    scareBeat = ScareBeat.lunge;
+    _scareHit(def, ScareBeat.lunge, _scareSerial, 0);
+    // It costs nothing but dread — it did not rob you, it just came round.
+    s.dread = math.min(100, s.dread + 18 * cardOf(s).dread);
+    s.toast('## IT WAS NOT BEHIND YOU ANY MORE', ToastKind.bad);
+  }
+
   void jumpscare() {
     final a = active;
     if (a == null) return;
@@ -2393,6 +2441,35 @@ class AnomalyRuntime extends ChangeNotifier {
       }
     }
 
+    // ONE OF THE CAMERAS IS POINTED AT THIS ROOM.
+    //
+    // Never while anything else is happening — it needs the quiet, because the
+    // whole effect depends on the player noticing it themselves on a monitor
+    // they had stopped reading twenty minutes ago.
+    if (signedOn && !lost) {
+      if (mirrorCam >= 0) {
+        mirrorLeft -= dt;
+        // it turns round very slowly, and it is never finished turning
+        mirrorTurn = math.min(0.85, mirrorTurn + dt * 0.035);
+        if (mirrorLeft <= 0) {
+          mirrorCam = -1;
+          mirrorTurn = 0;
+        }
+      } else {
+        mirrorIn -= dt;
+        if (mirrorIn <= 0) {
+          final double d = s.dread / 100;
+          mirrorIn = rr(150, 300) - d * 60;
+          if (active == null && scare <= 0 && presence <= 0 && !paused) {
+            mirrorCam = (rand() * 4).floor().clamp(0, 3);
+            mirrorLeft = rr(14, 34);
+            mirrorTurn = 0;
+            // no toast, no sound, no lamp. If you are not looking, you miss it.
+          }
+        }
+      }
+    }
+
     // SOMETHING IS BEHIND YOU.
     //
     // Not an anomaly. It has no counter, it takes nothing, it cannot be
@@ -2403,8 +2480,20 @@ class AnomalyRuntime extends ChangeNotifier {
     if (signedOn && !lost) {
       if (presence > 0) {
         presence -= dt / math.max(0.5, presenceSpan);
-        if (presence <= 0) {
+        if (presence <= 0.42 && presenceTurning) {
+          // IT DOES NOT LEAVE.
+          //
+          // Every other visit has been harmless and the player has learned
+          // that. This is the one that comes round the front, with no
+          // telegraph, no window and no key — because the entire value of a
+          // hundred safe visits is what it buys for the one that is not.
+          presenceTurning = false;
           presence = 0;
+          audio.setHeart(150, 0.30);
+          jumpscareFromRoom();
+        } else if (presence <= 0) {
+          presence = 0;
+          presenceVisits++;
           audio.setHeart(46, 0);
           // it does not leave quietly
           if (rand() < 0.4) _later(300, () => audio.creak());
@@ -2417,6 +2506,11 @@ class AnomalyRuntime extends ChangeNotifier {
           if (active == null && scare <= 0 && !paused) {
             presenceSpan = rr(8, 20);
             presence = 1;
+            // The longer it has been merciful, the worse the odds. Never on
+            // the first two visits of a night — the player has to be allowed
+            // to learn that it is safe before that is taken away.
+            presenceTurning = presenceVisits >= 2 &&
+                rand() < 0.06 + presenceVisits * 0.035 + d * 0.10;
             // no toast, no lamp, no meter. The heart is the only tell, and it
             // is YOUR heart, so it reads as the player's own reaction rather
             // than as a notification.

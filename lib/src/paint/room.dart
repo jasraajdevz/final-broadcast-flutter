@@ -713,6 +713,43 @@ class RoomScene {
         }
       }
 
+      // THIS ROOM, ON A CAMERA THAT DOES NOT EXIST.
+      //
+      // The back of an operator's chair, a desk, the glow of a CRT — the shot
+      // the player is sitting in. And somebody in the chair. It turns, slowly,
+      // for as long as the feed lasts, and it never finishes turning.
+      if (runtime.mirrorCam == i) {
+        final double q = runtime.mirrorTurn;
+        _fillRect(g, m.dx, m.dy + sh * 0.62, sw, sh * 0.38,
+            fill(rgba(16, 22, 24, 0.9))); // the desk
+        // the tube's glow, from behind
+        g.drawOval(
+          ui.Rect.fromCenter(
+              center: ui.Offset(m.dx + sw * 0.5, m.dy + sh * 0.46),
+              width: sw * 0.62,
+              height: sh * 0.30),
+          fill(rgba(40, 90, 70, 0.35)),
+        );
+        // the chair back
+        _fillRect(g, m.dx + sw * 0.30, m.dy + sh * 0.44, sw * 0.40, sh * 0.34,
+            fill(rgba(6, 8, 9, 0.95)));
+        // and whoever is in it — head above the chair, turning
+        final double hx = m.dx + sw * 0.5 + q * sw * 0.055;
+        g.drawOval(
+          ui.Rect.fromCenter(
+              center: ui.Offset(hx, m.dy + sh * 0.40),
+              width: 20 + q * 5,
+              height: 24),
+          fill(rgba(3, 4, 5, 0.97)),
+        );
+        // once it is far enough round, an eye catches the light
+        if (q > 0.42) {
+          final double e = ((q - 0.42) / 0.43).clamp(0.0, 1.0);
+          _fillRect(g, hx + 3 + q * 3, m.dy + sh * 0.385, 2.5, 1.8,
+              fill(rgba(255, 240, 225, 0.35 + e * 0.6)));
+        }
+      }
+
       // THE SCAR. A jumpscare leaves one of the corridor cameras occupied for
       // the rest of the night. It does not move, it is never mentioned, and
       // nothing in the UI acknowledges it — you are supposed to notice on your

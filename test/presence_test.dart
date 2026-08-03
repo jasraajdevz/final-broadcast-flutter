@@ -127,6 +127,95 @@ void main() {
         reason: 'the heart never came up — there is no tell at all');
   });
 
+  test('it is merciful first, and only then is it not', () {
+    // A presence that is GUARANTEED harmless is frightening for about three
+    // nights and is weather after that. The odds of it turning climb with how
+    // many times it has already let you go — but never on the first two, so
+    // the player is allowed to learn it is safe before that is taken away.
+    seedRandom(4242);
+    final s = GameState();
+    for (final p in kProducers) {
+      s.prod[p.id] = 0;
+    }
+    s.prod['rabbit'] = 60;
+    final r = AnomalyRuntime(s, audio: const NullAudio());
+    r.startBroadcast();
+
+    // force the first two visits and confirm neither can turn
+    for (var v = 0; v < 2; v++) {
+      r.presenceIn = 0;
+      var t = 0.0;
+      while (t < 5 && r.presence <= 0) {
+        r.tick(1 / 60.0);
+        t += 1 / 60.0;
+      }
+      expect(r.presenceTurning, isFalse,
+          reason: 'visit ${v + 1} could turn — too early to break the promise');
+      var u = 0.0;
+      while (u < 30 && r.presence > 0) {
+        r.tick(1 / 60.0);
+        u += 1 / 60.0;
+      }
+    }
+    expect(r.presenceVisits, 2);
+  });
+
+  test('a scare can come from the room, with no anomaly behind it', () {
+    // jumpscare() operates on `active` and returns immediately without one, so
+    // until now literally nothing could frighten the player except a missed
+    // anomaly. This one has no window, no counter and nothing to press.
+    seedRandom(31);
+    final s = GameState();
+    for (final p in kProducers) {
+      s.prod[p.id] = 0;
+    }
+    s.prod['rabbit'] = 60;
+    for (final a in kAnoms) {
+      s.seen[a.id] = true;
+    }
+    final r = AnomalyRuntime(s, audio: const NullAudio());
+    r.startBroadcast();
+    expect(r.active, isNull);
+    final dread = s.dread;
+
+    r.jumpscareFromRoom();
+    expect(r.scare, greaterThan(0), reason: 'nothing happened');
+    expect(r.scareDef, isNotNull);
+    expect(s.dread, greaterThan(dread));
+    // it did not rob you — it just came round
+    expect(s.stats.streak, 0);
+  });
+
+  test('the booth turns up on a camera, in the quiet only', () {
+    seedRandom(909);
+    final s = GameState();
+    for (final p in kProducers) {
+      s.prod[p.id] = 0;
+    }
+    s.prod['rabbit'] = 60;
+    final r = AnomalyRuntime(s, audio: const NullAudio());
+    r.startBroadcast();
+    var t = 0.0, sightings = 0, whileBusy = 0;
+    var was = false;
+    while (t < 21 * 60 && !r.lost) {
+      r.tick(1 / 60.0);
+      t += 1 / 60.0;
+      final now = r.mirrorCam >= 0;
+      if (now && !was) {
+        sightings++;
+        if (r.active != null || r.presence > 0) whileBusy++;
+      }
+      was = now;
+      final a = r.active;
+      if (a != null && a.stage == 1 && a.p > 0.3) r.pressCounter(a.def.counter);
+    }
+    expect(sightings, greaterThan(1), reason: 'the booth never appeared');
+    expect(whileBusy, 0,
+        reason: 'it needs the quiet — nobody notices a monitor mid-encounter');
+    expect(r.mirrorTurn, lessThanOrEqualTo(0.85),
+        reason: 'it must never finish turning round');
+  });
+
   test('and it always leaves', () {
     // NOT "presence is 0 when the night ends" — a night can end mid-visit and
     // that is fine. The invariant is that a visit TERMINATES: it can never get
