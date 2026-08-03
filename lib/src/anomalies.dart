@@ -41,6 +41,7 @@ import 'career.dart';
 import 'checks.dart';
 import 'economy.dart';
 import 'nights.dart';
+import 'wallclock.dart';
 import 'paint/blood.dart';
 import 'meta.dart';
 import 'encounter.dart';
@@ -1550,6 +1551,14 @@ class AnomalyRuntime extends ChangeNotifier {
     audio.init();
     audio.resume();
     audio.setVol(s.sfx);
+
+    // IT WAS ON THE WHOLE TIME. Real hours, not shift minutes. It never says
+    // welcome back — nobody at this station is pleased to see you.
+    final back = returnLine(s);
+    if (back != null) {
+      s.toasts.pushDelayed(2600, back, ToastKind.bad);
+      _later(2700, () => audio.distantScream(0.25, rand() < 0.5 ? -1 : 1));
+    }
     signedOn = true;
     s.started = true;
     // Coming back to the desk — mid-night or not — earns the slow opening.

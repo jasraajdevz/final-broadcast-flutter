@@ -20,6 +20,7 @@
 // arrival of the fact that the roster has your name on it and always has.
 
 import 'state.dart';
+import 'wallclock.dart';
 
 enum DocKind {
   /// R. HALLORAN's operator log. The spine of the whole thing.
@@ -386,6 +387,17 @@ StationDoc personalFile(GameState s) {
       ..write(_plural(s.revives, 'time', 'times'))
       ..writeln('. It was offered, and it was accepted.');
   }
+  // ONE line about the room the reader is actually sitting in, and only when
+  // there is something true enough to say. Buried in the middle of a personnel
+  // record it reads as an oversight rather than as a trick — which is the only
+  // way this lands instead of being a gimmick.
+  final wall = wallClockLine(s);
+  if (wall != null) {
+    b
+      ..writeln()
+      ..writeln(wall);
+  }
+
   b
     ..writeln()
     ..writeln('He was told the carrier was a lid and he believed it, which is '

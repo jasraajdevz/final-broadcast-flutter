@@ -24,6 +24,7 @@ import 'src/bake.dart' show mono;
 import 'src/consts.dart';
 import 'src/economy.dart';
 import 'src/state.dart';
+import 'src/wallclock.dart';
 import 'src/archive.dart';
 import 'src/career.dart';
 import 'src/tools.dart';
@@ -147,6 +148,7 @@ class _GameRootState extends State<GameRoot>
   void initState() {
     super.initState();
     s = GameState.boot();
+    resetSession();
     runtime = AnomalyRuntime(s, audio: createGameAudio());
     tools = Tools(runtime);
     ad = AdController(s: s, runtime: runtime);
