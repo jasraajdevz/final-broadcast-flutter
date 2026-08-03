@@ -23,6 +23,7 @@ class RecordingAudio implements GameAudio {
   final List<int> preEchoes = <int>[];
   final List<double> pans = <double>[];
   int scares = 0;
+  final List<double> distantScreams = <double>[];
   int streakBreaks = 0;
   int clutches = 0;
 
@@ -40,6 +41,8 @@ class RecordingAudio implements GameAudio {
   void pan(double p) => pans.add(p);
   @override
   void scare() => scares++;
+  @override
+  void distantScream(double near, double side) => distantScreams.add(near);
   @override
   void streakBroken(int lost) => streakBreaks++;
   @override
@@ -199,6 +202,28 @@ void main() {
     });
   });
 
+  test('a player who never fails still hears screaming', () {
+    // The whole point. Answer every anomaly correctly, never get hit, and the
+    // building should still be screaming at you from somewhere else.
+    final n = _night(play: true);
+    expect(n.s.stats.scared, 0,
+        reason: 'this run was supposed to be clean — retune the harness');
+    expect(n.audio.distantScreams.length, greaterThan(6),
+        reason: 'a flawless night was silent: the horror is still gated '
+            'behind losing');
+  });
+
+  test('and they get closer as the night turns', () {
+    final n = _night(play: false);
+    expect(n.audio.distantScreams, isNotEmpty);
+    final worst = n.audio.distantScreams.reduce((a, b) => a > b ? a : b);
+    final first = n.audio.distantScreams.first;
+    expect(worst, greaterThan(first),
+        reason: 'every scream came from the same distance all night');
+    expect(worst, lessThan(1.0),
+        reason: 'it must never actually reach the door');
+  });
+
   test('a short streak is not mourned', () {
     fakeAsync((async) {
       seedRandom(31);
@@ -219,3 +244,11 @@ void main() {
     });
   });
 }
+
+// --- appended: the screams -------------------------------------------------
+//
+// "the sounds got no screams". Literally true in practice: scream() was called
+// from exactly one place, _scareHit(), so it only ever fired when the player
+// FAILED. A competent operator finished an entire career without hearing a
+// single one, and spent every night in a pleasant hum. The horror was gated
+// behind losing, which is the one state a good player never reaches.

@@ -10,6 +10,7 @@
 
 import 'dart:ui' as ui;
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:final_broadcast/src/anomalies.dart';
@@ -33,31 +34,43 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('a scare puts something on the glass, and it stays', () {
-    seedRandom(808);
-    final s = _station();
-    final r = AnomalyRuntime(s, audio: const NullAudio());
-    r.startBroadcast();
-    expect(r.blood.isEmpty, isTrue, reason: 'the booth starts clean');
+    // fakeAsync, because the staged scare beats (BLACKOUT, FALSE CLEAR) land
+    // their hit — and therefore their blood — on a Timer. A plain test never
+    // runs those, so whether this passed depended on which beat the RNG drew,
+    // which made it quietly seed-fragile.
+    fakeAsync((async) {
+      seedRandom(808);
+      final s = _station();
+      final r = AnomalyRuntime(s, audio: const NullAudio());
+      r.startBroadcast();
+      expect(r.blood.isEmpty, isTrue, reason: 'the booth starts clean');
 
-    var t = 0.0;
-    const dt = 1 / 60.0;
-    // never answer anything
-    while (t < 21 * 60 && !r.lost && s.stats.scared < 1) {
-      r.tick(dt);
-      t += dt;
-    }
-    expect(s.stats.scared, greaterThan(0), reason: 'nothing ever landed');
-    expect(r.blood.splats, isNotEmpty);
+      var t = 0.0;
+      const dt = 1 / 60.0;
+      // never answer anything
+      while (t < 21 * 60 && !r.lost && s.stats.scared < 1) {
+        r.tick(dt);
+        t += dt;
+        async.elapse(const Duration(milliseconds: 16));
+      }
+      expect(s.stats.scared, greaterThan(0), reason: 'nothing ever landed');
+      // let any staged beat finish landing
+      async.elapse(const Duration(seconds: 3));
+      for (var i = 0; i < 180; i++) {
+        r.tick(dt);
+      }
+      expect(r.blood.splats, isNotEmpty);
 
-    // and it is still there a long time later
-    final int marked = r.blood.splats.length;
-    var u = 0.0;
-    while (u < 60 && !r.lost) {
-      r.tick(dt);
-      u += dt;
-    }
-    expect(r.blood.splats.length, greaterThanOrEqualTo(marked),
-        reason: 'the glass cleaned itself');
+      // and it is still there a long time later
+      final int marked = r.blood.splats.length;
+      var u = 0.0;
+      while (u < 60 && !r.lost) {
+        r.tick(dt);
+        u += dt;
+      }
+      expect(r.blood.splats.length, greaterThanOrEqualTo(marked),
+          reason: 'the glass cleaned itself');
+    });
   });
 
   test('it accumulates — a bad night is visibly worse than a bad minute', () {

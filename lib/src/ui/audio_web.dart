@@ -1743,6 +1743,11 @@ class WebAudio implements GameAudio {
   /// through three bandpass formants is the actual recipe for a vowel; sweeping
   /// F1/F2 from [ɑ] toward [i] while the pitch tears upward is what makes it
   /// read as a human losing control rather than a synth patch.
+  /// Where scream() sends its output. Normally the master; [distantScream]
+  /// points it at a wall instead so the same voice can be heard from
+  /// elsewhere in the building without duplicating 90 lines of synthesis.
+  _Node? _screamOut;
+
   @override
   void scream(double dur, double f0, double vol) {
     final c = _c, master = _master;
@@ -1752,7 +1757,7 @@ class WebAudio implements GameAudio {
     final v = vol <= 0 ? 1.0 : vol;
     final out = c.createGain();
     out.gain.value = 1;
-    out.connect(master);
+    out.connect(_screamOut ?? master);
 
     // glottal source: saws a few cents apart, pitch tearing up then collapsing
     final src = c.createGain();
@@ -1772,11 +1777,13 @@ class WebAudio implements GameAudio {
     // vibrato that widens as the voice loses control
     final vib = c.createOscillator();
     vib.type = 'sine';
-    vib.frequency.setValueAtTime(4.5, t);
-    vib.frequency.linearRampToValueAtTime(11, t + d);
+    // NOT 4.5-11Hz. That is the speech modulation band and it read as singing.
+    // A tremor this fast is a voice that has stopped being controlled.
+    vib.frequency.setValueAtTime(7.0, t);
+    vib.frequency.linearRampToValueAtTime(26, t + d);
     final vg = c.createGain();
-    vg.gain.setValueAtTime(8, t);
-    vg.gain.linearRampToValueAtTime(58, t + d);
+    vg.gain.setValueAtTime(14, t);
+    vg.gain.linearRampToValueAtTime(120, t + d);
     vib.connect(vg);
     vib.start(t);
     vib.stop(t + d + 0.05);
@@ -1795,6 +1802,63 @@ class WebAudio implements GameAudio {
       ng.connect(out);
     }
 
+    // ---------------------------------------------------------------------
+    // ROUGHNESS. The actual acoustic signature of a scream.
+    //
+    // Arnal et al., Current Biology 2015: what separates a scream from every
+    // other human vocalisation is not pitch, loudness or formants — it is
+    // ROUGHNESS, amplitude modulation in the 30-150Hz band. Normal speech
+    // modulates at 4-5Hz. That band is a privileged acoustic niche, and it is
+    // the one thing that drives the amygdala directly rather than going
+    // through auditory cortex first.
+    //
+    // This scream had formants, a shaper and a pitch arc — a real voice — and
+    // then modulated it with vibrato at 4.5 to 11Hz. Frequency modulation,
+    // squarely in the SPEECH band. It was engineered, precisely, to sound like
+    // someone singing. Which is why the player kept saying there are no
+    // screams in a game that calls scream() six times.
+    //
+    // The modulator sweeps up through the band as the voice loses control, so
+    // it starts merely harsh and ends genuinely wrong.
+    final rough = c.createGain();
+    rough.gain.value = 0.55;
+    final rm = c.createOscillator();
+    rm.type = 'sawtooth'; // richer than a sine — more energy across the band
+    rm.frequency.setValueAtTime(38, t);
+    rm.frequency.linearRampToValueAtTime(132, t + d);
+    final rd = c.createGain();
+    rd.gain.setValueAtTime(0.30 * v, t);
+    rd.gain.linearRampToValueAtTime(0.46 * v, t + d * 0.7);
+    rm.connect(rd);
+    rd.connect(rough.gain);
+    rm.start(t);
+    rm.stop(t + d + 0.05);
+
+    // SUBHARMONIC. Period-doubling — the octave-down component a voice sheds
+    // when it stops being able to hold a single mode. This is the "crack".
+    final sub = c.createOscillator();
+    sub.type = 'square';
+    sub.frequency.setValueAtTime(f0 * 0.36, t);
+    sub.frequency.exponentialRampToValueAtTime(f0 * 0.62, t + d * 0.3);
+    sub.frequency.exponentialRampToValueAtTime(f0 * 0.28, t + d);
+    final subG = c.createGain();
+    subG.gain.setValueAtTime(0.0001, t);
+    subG.gain.exponentialRampToValueAtTime(0.22, t + d * 0.35);
+    subG.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    sub.connect(subG);
+    subG.connect(rough);
+    sub.start(t);
+    sub.stop(t + d + 0.05);
+
+    // CHAOS. Real screams break into deterministic chaos at high effort. A
+    // handful of hard detune steps is enough to stop it sounding synthesised.
+    for (var i = 1; i < 7; i++) {
+      final double when = t + d * (i / 7);
+      for (final o in <_Osc>[sub]) {
+        o.detune.setValueAtTime(rr(-140, 140) * (i / 7), when);
+      }
+    }
+
     // amplitude first, so it gates the formants too
     final env2 = c.createGain();
     env2.gain.setValueAtTime(0.0001, t);
@@ -1802,7 +1866,8 @@ class WebAudio implements GameAudio {
     env2.gain.exponentialRampToValueAtTime(0.55 * v, t + d * 0.55);
     env2.gain.exponentialRampToValueAtTime(0.0001, t + d);
     final sat = _shaper(3.4);
-    src.connect(env2);
+    src.connect(rough);
+    rough.connect(env2);
     if (sat != null) env2.connect(sat);
 
     // three formants sliding [ɑ] -> [i]: F1 down, F2 up hard
@@ -2160,6 +2225,45 @@ class WebAudio implements GameAudio {
   /// gone in 30ms, through a lowpass that slams shut — that closing filter is
   /// what the ear reads as "wet" rather than "sharp"), the BODY under it, and
   /// a fine SPRAY tail of the droplets that carried past.
+
+  /// A SCREAM THROUGH A WALL.
+  ///
+  /// The same voice, put behind the building. Concrete and distance eat the
+  /// top end and most of the roughness, which is precisely why it is worse
+  /// than the full-strength one: the ear knows what it is, cannot resolve it,
+  /// and starts filling in the missing detail on its own.
+  ///
+  /// [near] 0..1 moves it from the far end of the corridor to just outside the
+  /// door. It never reaches the door.
+  @override
+  void distantScream(double near, double side) {
+    final c = _c;
+    if (!_on || c == null || _master == null || _holding) return;
+    final double n = near.clamp(0.0, 1.0);
+
+    final pan = c.createStereoPanner();
+    pan.pan.value = side.clamp(-1.0, 1.0) * (0.5 + n * 0.4);
+
+    // the wall: a steep lowpass, plus a long-ish slap so it arrives with a room
+    final wall = c.createBiquadFilter();
+    wall.type = 'lowpass';
+    wall.frequency.value = 420 + n * 900;
+    wall.q.value = 0.9;
+
+    final duck = c.createGain();
+    duck.gain.value = (0.10 + n * 0.30) * _vol;
+
+    wall.connect(duck);
+    duck.connect(pan);
+    pan.connect(_master!);
+
+    // borrow the real voice, routed into the wall instead of the master
+    final _Node? prev = _screamOut;
+    _screamOut = wall;
+    scream(1.5 + rand() * 0.9, 240 + rand() * 200, 0.85);
+    _screamOut = prev;
+  }
+
   @override
   void bloodImpact(double force) {
     final c = _c, master = _master;

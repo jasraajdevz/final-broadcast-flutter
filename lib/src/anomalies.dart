@@ -144,6 +144,16 @@ abstract class GameAudio {
   /// in the chest as unease and reads on a meter as almost nothing.
   void setSub(double v);
 
+  /// Someone screaming, somewhere else in the building.
+  ///
+  /// Not a threat and not a cue — nothing in the game responds to it and
+  /// there is no key that answers it. That is the entire point: every scream
+  /// in this build was gated behind FAILING, so a competent operator finished
+  /// a whole career without hearing one, and the quiet they spent the night in
+  /// was pleasant. A sound you cannot do anything about is disturbing; a sound
+  /// that punishes you is just a penalty.
+  void distantScream(double near, double side);
+
   /// A wet impact. [force] 0..1.
   void bloodImpact(double force);
 
@@ -232,6 +242,8 @@ class NullAudio implements GameAudio {
   void warn() {}
   @override
   void scare() {}
+  @override
+  void distantScream(double near, double side) {}
   @override
   void bloodImpact(double force) {}
   @override
@@ -634,6 +646,15 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// How long the current hold has lasted, for UNION RULES' 45-second cap.
   double _stallHeld = 0;
+
+  /// Seconds until somebody screams somewhere else in the building.
+  ///
+  /// Deliberately independent of the anomaly scheduler and of dread: it is not
+  /// a cue, it is weather. Every scream in this build fired only from
+  /// _scareHit(), so a competent operator finished a whole career without
+  /// hearing one and spent the night in a pleasant hum. The horror was gated
+  /// behind losing.
+  double screamIn = 42;
 
   /// Seconds until the room tone next STOPS dead for a beat.
   ///
@@ -1316,6 +1337,7 @@ class AnomalyRuntime extends ChangeNotifier {
     s.started = true;
     // Coming back to the desk — mid-night or not — earns the slow opening.
     checks.resetForNight();
+    screamIn = rr(30, 70);
     scars.clear();
     blood.clear();
     nightAnoms = 0;
@@ -2278,6 +2300,23 @@ class AnomalyRuntime extends ChangeNotifier {
       // drift is a continuous tax on a neglected station
       if (checks.drift > 0) {
         s.dread = math.min(100, s.dread + driftDread(checks) * dt);
+      }
+    }
+
+    // SOMEBODY IS SCREAMING. Elsewhere, through a wall, and there is no key
+    // that answers it. It never costs anything and it never means anything,
+    // which is exactly why it is disturbing rather than punishing: the player
+    // cannot make it stop and cannot make it not have happened.
+    if (signedOn && !lost) {
+      screamIn -= dt;
+      if (screamIn <= 0) {
+        final double d = s.dread / 100;
+        screamIn = rr(34, 82) - d * 16;
+        if (scare <= 0 && !paused) {
+          audio.distantScream(0.15 + d * 0.55, rand() < 0.5 ? -1 : 1);
+          // and the room notices, very slightly
+          shake = math.max(shake, 1.6);
+        }
       }
     }
 
