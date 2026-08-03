@@ -657,6 +657,17 @@ class AnomalyRuntime extends ChangeNotifier {
   /// How long the current hold has lasted, for UNION RULES' 45-second cap.
   double _stallHeld = 0;
 
+  /// 0..1 — something is standing behind the operator's chair.
+  ///
+  /// It is never on the tube, it is never announced, no key addresses it and
+  /// no meter counts it. It arrives, it is there for a while, and it goes. The
+  /// entire horror vocabulary of this game was on a 422x278 screen the player
+  /// stares at directly; nothing had ever happened in the ROOM, which is the
+  /// one place a person cannot look at in a fixed first-person shot.
+  double presence = 0;
+  double presenceIn = 88;
+  double presenceSpan = 0;
+
   /// Seconds until somebody screams somewhere else in the building.
   ///
   /// Deliberately independent of the anomaly scheduler and of dread: it is not
@@ -1414,6 +1425,9 @@ class AnomalyRuntime extends ChangeNotifier {
     // Coming back to the desk — mid-night or not — earns the slow opening.
     checks.resetForNight();
     screamIn = rr(30, 70);
+    presence = 0;
+    presenceIn = rr(70, 150);
+    presenceSpan = 0;
     scars.clear();
     blood.clear();
     nightAnoms = 0;
@@ -2376,6 +2390,41 @@ class AnomalyRuntime extends ChangeNotifier {
       // drift is a continuous tax on a neglected station
       if (checks.drift > 0) {
         s.dread = math.min(100, s.dread + driftDread(checks) * dt);
+      }
+    }
+
+    // SOMETHING IS BEHIND YOU.
+    //
+    // Not an anomaly. It has no counter, it takes nothing, it cannot be
+    // banished and it is never mentioned by any readout in the game. It simply
+    // arrives in the room, stays between eight and twenty seconds, and leaves.
+    // The only trace is that the light changes and your own heartbeat comes up
+    // in your ears — which the player will find on their own, or not.
+    if (signedOn && !lost) {
+      if (presence > 0) {
+        presence -= dt / math.max(0.5, presenceSpan);
+        if (presence <= 0) {
+          presence = 0;
+          audio.setHeart(46, 0);
+          // it does not leave quietly
+          if (rand() < 0.4) _later(300, () => audio.creak());
+        }
+      } else {
+        presenceIn -= dt;
+        if (presenceIn <= 0) {
+          final double d = s.dread / 100;
+          presenceIn = rr(80, 190) - d * 40;
+          if (active == null && scare <= 0 && !paused) {
+            presenceSpan = rr(8, 20);
+            presence = 1;
+            // no toast, no lamp, no meter. The heart is the only tell, and it
+            // is YOUR heart, so it reads as the player's own reaction rather
+            // than as a notification.
+            audio.setHeart(96 + d * 30, 0.20 + d * 0.16);
+            audio.breath(rand() < 0.5 ? -1 : 1, 0.9);
+            audio.setSub(math.min(1.0, 0.55 + d * 0.45));
+          }
+        }
       }
     }
 

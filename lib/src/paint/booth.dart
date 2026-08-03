@@ -16,6 +16,7 @@
 // Getting 2 out of order is silent: the tube still draws, it just has no
 // persistence, so nothing smears and the picture looks like a pasted texture.
 
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart';
@@ -138,6 +139,53 @@ class Booth {
       fillRect(g, 0, 0, kRoom.width, kRoom.height,
           rgba(255, 240, 240, runtime.flash * 0.5));
     }
+    // THE SHADOW OF WHAT IS BEHIND YOU.
+    //
+    // A fixed first-person shot has one thing a player can never do: turn
+    // round. So the only honest way to put something behind them is to let it
+    // block the light — the booth is lit from behind the chair, so anything
+    // standing there throws a shape onto the desk and the back wall.
+    //
+    // It is never named, never announced, and no key addresses it. A player
+    // either notices the room has got darker in a person-shaped way, or they
+    // do not. Both outcomes are correct.
+    if (runtime.presence > 0.004) {
+      final double p = runtime.presence;
+      // a soft, wide occlusion — the light going, not a sprite appearing
+      final ui.Paint occ = ui.Paint()
+        ..blendMode = ui.BlendMode.multiply
+        ..shader = ui.Gradient.radial(
+          ui.Offset(kRoom.width * 0.5, kRoom.height * 1.02),
+          kRoom.width * 0.62,
+          <ui.Color>[
+            rgba(30, 28, 30, 1),
+            rgba(120, 116, 120, 1),
+            rgba(255, 255, 255, 1),
+          ],
+          <double>[0.0, 0.55, 1.0],
+        );
+      g.saveLayer(kRoom, ui.Paint()..color = rgba(255, 255, 255, p * 0.85));
+      g.drawRect(kRoom, occ);
+      g.restore();
+
+      // and the head and shoulders of it, on the desk, very faint
+      final double bob = math.sin(t * 0.7) * 3;
+      final ui.Paint sil = ui.Paint()..color = rgba(0, 0, 0, p * 0.30);
+      final double cx = kRoom.width * 0.5;
+      final double base = kRoom.height + 40 + bob;
+      g.drawOval(
+        ui.Rect.fromCenter(
+            center: ui.Offset(cx, base - 250), width: 132, height: 152),
+        sil,
+      );
+      final ui.Path sh = ui.Path()
+        ..moveTo(cx - 210, base)
+        ..quadraticBezierTo(cx - 150, base - 210, cx, base - 214)
+        ..quadraticBezierTo(cx + 150, base - 210, cx + 210, base)
+        ..close();
+      g.drawPath(sh, sil);
+    }
+
     // WHAT IS ON THE GLASS. Last inside the room clip, over the CRT, the desk
     // and every effect — it is on the pane between the player and the booth,
     // and the game never explains how it got on the inside.
