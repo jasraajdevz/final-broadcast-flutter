@@ -96,7 +96,10 @@ Directive primeDirective(GameState s, AnomalyRuntime r) {
     return Directive(
       known && c != null
           ? 'ANSWER IT — ${a.def.nm} DIES TO ${c.nm}  (KEY ${c.key})'
-          : 'ANSWER IT — READ THE BEZEL, THEN THE MANUAL',
+          // The one moment the player has no idea what to press. Telling them
+          // to go and read a manual under a live window was advice they could
+          // not take; hitting the glass is something they can do RIGHT NOW.
+          : 'STRIKE THE TUBE TO HOLD IT BACK — THEN READ THE BEZEL',
       Urgency.urgent,
     );
   }

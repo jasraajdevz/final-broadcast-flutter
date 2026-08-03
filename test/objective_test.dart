@@ -99,7 +99,11 @@ void main() {
       final a = r.active!;
 
       s.seen[a.def.id] = false;
-      expect(primeDirective(s, r).text, contains('MANUAL'));
+      // An uncatalogued thing used to be told to go and read a manual under a
+      // live window — advice the player cannot take. It now names the one
+      // thing they can do RIGHT NOW.
+      expect(primeDirective(s, r).text, contains('STRIKE THE TUBE'));
+      expect(primeDirective(s, r).text, contains('BEZEL'));
 
       s.seen[a.def.id] = true;
       // The keycap name, not the raw id: the ids read "VHOLD" and "HOOK"

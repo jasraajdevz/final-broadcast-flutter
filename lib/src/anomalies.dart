@@ -333,6 +333,16 @@ class ActiveAnom {
   /// live effect at all. Reused rather than adding five more timers.
   double sabIv = 1.2;
 
+  /// Blows landed on the glass this visit. See [AnomalyRuntime.tuneStrike].
+  int blows = 0;
+
+  /// Seconds of window bought back by hitting it. Capped, because buying
+  /// unlimited time would make knowing the counter optional.
+  double bought = 0;
+
+  /// Blows since the last stagger.
+  int sinceStagger = 0;
+
   /// What THE RERUN and THE NIELSEN have taken so far this visit, so both are
   /// budgeted per visit rather than per second — a long window must not be
   /// arbitrarily more expensive than a short one.
@@ -1284,10 +1294,76 @@ class AnomalyRuntime extends ChangeNotifier {
   /// Strike the CRT by hand. Coordinates are in 1280x720 cabinet space and are
   /// expected to be inside SCR — the caller hit-tests, exactly as the HTML's
   /// pointerdown handler does.
+  /// The maximum seconds one visit can be held off by hand.
+  ///
+  /// Bounded on purpose. Fighting has to be a way to survive not knowing the
+  /// answer for a few more seconds, never a replacement for knowing it.
+  static const double kMaxBought = 3.6;
+
+  /// Blows needed to make it flinch.
+  static const int kBlowsPerStagger = 4;
+
   void tuneStrike(double x, double y) {
     if (!signedOn || adPlaying || lost) return;
     audio.init();
     audio.resume();
+
+    // ---------------------------------------------------------------------
+    // YOU CAN FIGHT BACK.
+    //
+    // Striking the tube used to pay exactly the same whether the screen was
+    // empty or something was standing on it, so the instant a thing arrived
+    // the player's ONLY available action was pressing the correct one of eight
+    // keys. If you did not know which, there was nothing to do but watch it
+    // happen. That is not a horror encounter, it is a quiz — and being unable
+    // to do anything at all while something walks toward you is the specific
+    // thing the player described as not being able to fight back.
+    //
+    // The verb already existed and it is the right one: you hit the glass. It
+    // does not kill anything — only the counter does — it buys you SECONDS,
+    // and it costs you, because you are beating on live transmission equipment
+    // instead of broadcasting.
+    final act = active;
+    if (act != null && act.stage >= 1) {
+      act.blows++;
+      act.sinceStagger++;
+      // push the window back, up to a hard ceiling per visit
+      final double room = kMaxBought - act.bought;
+      if (room > 0) {
+        final double push = math.min(room, 0.42);
+        act.t = math.max(0, act.t - push);
+        act.bought += push;
+      }
+      // it is not free: this is panic, not work
+      s.dread = math.min(100, s.dread + 0.9 * cardOf(s).dread);
+      s.tune.strike(x, y, 'HIT', tGlobal);
+      audio.impact();
+      shake = math.max(shake, 6.5);
+      wrongFx = math.max(wrongFx, 0.22);
+
+      if (act.sinceStagger >= kBlowsPerStagger) {
+        // IT FLINCHES. The whole point — a visible, felt answer to the blow,
+        // so hitting it is something you DO rather than something you hope.
+        act.sinceStagger = 0;
+        hitstop = math.max(hitstop, kHitstopPartial);
+        shake = math.max(shake, 16);
+        flash = math.max(flash, 0.18);
+        audio.relay();
+        audio.env('sawtooth', 150, 0.28, 0.16, 52);
+        blood.add(0.14,
+            ox: kScr.center.dx + (rand() - 0.5) * 420,
+            oy: kScr.bottom + 30 + rand() * 70,
+            count: 1);
+        s.toast(
+            act.bought >= kMaxBought
+                ? 'IT WILL NOT BE PUSHED BACK ANY FURTHER'
+                : 'IT GIVES GROUND — ANSWER IT',
+            ToastKind.gold);
+      }
+      notifyListeners();
+      return;
+    }
+
     final g = tuneYield(s, this);
     s.sig += g;
     s.tune.strike(x, y, '+${fmt(g)}', tGlobal);
