@@ -532,6 +532,16 @@ class AnomalyRuntime extends ChangeNotifier {
   /// clamped on read; leaving it at 0 simply removes the inflow.
   double lurkPressure = 0;
 
+  /// Seconds until the room tone next STOPS dead for a beat.
+  ///
+  /// Silence that arrives with no cause is the cheapest dread in the game and
+  /// the bed never once used it: the room hummed at a constant level from
+  /// 23:00 to 06:00, and a room that hums constantly is a room you stop
+  /// hearing. This lives in the SIM rather than in the audio backend because
+  /// it is pacing, and pacing is testable — the version that lived inside
+  /// WebAudio.tick() could only be verified by measuring a live browser.
+  double roomStop = 26;
+
   /// Phase clock for the binaural drift.
   double _drift = 0;
 
@@ -1372,7 +1382,23 @@ class AnomalyRuntime extends ChangeNotifier {
     falseClear = false;
 
     s.stats.scared++;
+    // THE STREAK. streakBroken() is declared, documented ("play the loss of
+    // it, not just the scare on top") and fully implemented in the audio
+    // engine — a descending three-saw glissando through a closing lowpass
+    // onto a floor thud, scaled by how long the run was — and had no call site
+    // anywhere. The game shouts your streak from five places and then took a
+    // mean 7.3-kill run away in silence.
+    //
+    // Captured HERE, before the zeroing, and not in _scareHit: that runs after
+    // this line, so it would have read 0 every time and never fired.
+    final int lostStreak = s.stats.streak;
     s.stats.streak = 0;
+    if (lostStreak > 2) {
+      // in the quiet recovery tail, where the CARRIER RECOVERED toast sits —
+      // the scare is over and this is what it cost you
+      _later(5200, () => audio.streakBroken(lostStreak));
+      s.toasts.pushDelayed(5200, 'STREAK LOST — $lostStreak GONE', ToastKind.bad);
+    }
 
     final ScareBeat beat = beatFor(def);
     scareBeat = beat;
@@ -1468,18 +1494,6 @@ class AnomalyRuntime extends ChangeNotifier {
     // promise of safety over the top of the jumpscare that broke it
     calmGuard = 0;
     calmGuardSpan = 0;
-
-    // THE STREAK. jumpscare() zeroes it and nothing ever acknowledged that.
-    // GameAudio.streakBroken() is declared, documented ("play the loss of it,
-    // not just the scare on top") and fully implemented — a descending
-    // three-saw glissando onto a floor thud, scaled by how long the run was —
-    // and had no call site anywhere in the codebase. The game shouts the
-    // streak from five places and then took a mean 7.3-kill run away in
-    // silence.
-    final int lostStreak = s.stats.streak;
-    if (lostStreak > 2) {
-      _later(5200, () => audio.streakBroken(lostStreak));
-    }
 
     // the channel feed.dart and tube.dart already read: 1.5s, counting down
     scare = 1.5;
@@ -1864,6 +1878,23 @@ class AnomalyRuntime extends ChangeNotifier {
     // moment something is present even on a calm night.
     audio.setSub(math.min(
         1.0, s.dread / 100 * 0.75 + (active != null && active!.stage >= 1 ? 0.55 : 0)));
+
+    // THE ROOM STOPS. No cause, no consequence, nothing to react to — just a
+    // beat where the world is not there. Never while something is on the tube
+    // (that beat belongs to the encounter) and never inside a scare.
+    roomStop -= dt;
+    if (roomStop <= 0) {
+      final double d = s.dread / 100;
+      roomStop = rr(40 - d * 16, 92 - d * 34);
+      if (active == null && scare <= 0 && !lost) {
+        audio.hold((240 + rand() * 420).round());
+        // and sometimes something is in the hole with you
+        if (rand() < 0.22 + d * 0.35) {
+          _later(120 + (rand() * 180).round(),
+              () => audio.breath(rand() < 0.5 ? -1 : 1, 0.55 + d * 0.4));
+        }
+      }
+    }
 
     s.tune.tick(dt, tGlobal);
 

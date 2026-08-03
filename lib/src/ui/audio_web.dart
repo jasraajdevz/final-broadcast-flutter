@@ -189,10 +189,6 @@ class WebAudio implements GameAudio {
   Timer? _holdTimer;
   bool _holding = false;
 
-  /// Seconds until the room tone next STOPS on its own. Silence that arrives
-  /// without a cause is the cheapest dread in the game and the bed never once
-  /// used it — the room hummed at a constant 0.85 from 23:00 to 06:00.
-  double _stop = 26;
 
   // -------------------------------------------------------------------------
   // init / lifecycle
@@ -605,6 +601,14 @@ class WebAudio implements GameAudio {
     _dread += (_dreadT - _dread) * math.min(1.0, dt * 0.5); // mood lags the meter
     final d = _dread, k = _duckV;
 
+    // Nothing writes a bed gain while the hole is open. tick() runs at 10Hz
+    // and would otherwise start filling the silence back in from underneath.
+    if (_holding) {
+      _ev -= dt;
+      return;
+    }
+
+
     _pa += dt;
     if (_pa >= 0.1) {
       // 10Hz — at 60fps this was 360 AudioParam events a second
@@ -672,22 +676,6 @@ class WebAudio implements GameAudio {
       }
     }
 
-    // THE ROOM STOPS. Once every 40-90s the bed simply ceases for a beat,
-    // with no cause and no consequence. A room that hums at a constant level
-    // from 23:00 to 06:00 is a room you stop hearing; a room that stops is a
-    // room you start listening to. Never during a scare or a Dead Air.
-    _stop -= dt;
-    if (_stop <= 0) {
-      _stop = rr(40 - d * 16, 92 - d * 34);
-      if (!_dead && !_holding) {
-        hold((240 + rand() * 420).round());
-        // and sometimes something is in the hole
-        if (rand() < 0.22 + d * 0.35) {
-          _later(120 + (rand() * 180).round(),
-              () => breath(rand() < 0.5 ? -1 : 1, 0.55 + d * 0.4));
-        }
-      }
-    }
   }
 
   @override
@@ -1993,16 +1981,27 @@ class WebAudio implements GameAudio {
     if (!_on || c == null || master == null) return;
     final t = c.currentTime;
     _holding = true;
-    master.gain.cancelScheduledValues(t);
-    master.gain.setValueAtTime(master.gain.value, t);
-    master.gain.linearRampToValueAtTime(0.0, t + 0.012);
-    // the sub bypasses master, so it has to be taken down by hand — otherwise
-    // the "hole" is a hole with a hum still in it, which is just a mix change
-    final sg = _subG;
-    if (sg != null) {
-      sg.gain.cancelScheduledValues(t);
-      sg.gain.setValueAtTime(sg.gain.value, t);
-      sg.gain.linearRampToValueAtTime(0.0, t + 0.012);
+    // EVERY bus, by hand, not just the master.
+    //
+    // Belt and braces on purpose. The sub deliberately bypasses master (it has
+    // its own limiter so the room bed cannot duck the floor), and the bed
+    // buses are re-written by tick() at 10Hz — so a hole that only zeroes the
+    // master is one refactor away from becoming a hum. A hole has to be a
+    // hole: the ear knows the difference between a quiet room and no room, and
+    // that difference is the entire effect.
+    for (final _Gain? g in <_Gain?>[
+      master,
+      _subG,
+      _roomG,
+      _staticG,
+      _droneG,
+      _dreadG,
+      _heartG,
+    ]) {
+      if (g == null) continue;
+      g.gain.cancelScheduledValues(t);
+      g.gain.setValueAtTime(g.gain.value, t);
+      g.gain.linearRampToValueAtTime(0.0, t + 0.012);
     }
     _holdTimer?.cancel();
     _holdTimer = Timer(Duration(milliseconds: ms), () {
@@ -2015,6 +2014,15 @@ class WebAudio implements GameAudio {
       // back FAST. A slow fade-in reads as a mix change; a fast one reads as
       // the world switching back on, which is the part that hurts.
       mm.gain.linearRampToValueAtTime(_vol, tt + 0.03);
+      // the rest are re-armed by the next tick(), which is 100ms away at
+      // worst; the room coming back a beat behind the master is the sound of
+      // it having been switched off rather than turned down.
+      _subG?.gain.cancelScheduledValues(tt);
+      _roomG?.gain.cancelScheduledValues(tt);
+      _staticG?.gain.cancelScheduledValues(tt);
+      _droneG?.gain.cancelScheduledValues(tt);
+      _dreadG?.gain.cancelScheduledValues(tt);
+      _heartG?.gain.cancelScheduledValues(tt);
     });
   }
 
