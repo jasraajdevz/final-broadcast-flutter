@@ -162,17 +162,21 @@ class _ManualSheetState extends State<ManualSheet> {
     // THE FILE. A collection you cannot re-read is not a collection, it is a
     // sequence of modals — so everything recovered from the desk is in here,
     // in order, with the gaps visible. The gaps are the point.
+    // fileRows() owns the ordering AND the night labels, because the personal
+    // file is spliced into the middle and any index arithmetic done out here
+    // would mislabel every page after it.
+    final rows = fileRows(s);
     out.add(RackHead('THE FILE  ·  ${foundCount(s)}/$archiveTotal',
         ui: s.ui, padLeft: 12));
-    for (var i = 0; i < kArchive.length; i++) {
-      final got = docFound(s, nightForDoc(i));
+    for (var i = 0; i < rows.length; i++) {
+      final r = rows[i];
       out.add(_MRow(
         ui: s.ui,
-        label: got ? kArchive[i].head : 'NOT RECOVERED',
-        tag: got ? kArchive[i].kindLabel : 'NIGHT ${nightForDoc(i)}',
+        label: r.found ? r.doc.head : 'NOT RECOVERED',
+        tag: r.found ? r.doc.kindLabel : 'NIGHT ${r.night}',
         on: s.manPage == 'd_$i',
-        unknown: !got,
-        onTap: got ? () => _open('d_$i') : () {},
+        unknown: !r.found,
+        onTap: r.found ? () => _open('d_$i') : () {},
       ));
     }
 
@@ -185,8 +189,11 @@ class _ManualSheetState extends State<ManualSheet> {
     final t = Sty(s.ui);
 
     if (s.manPage.startsWith('d_')) {
-      final i = int.tryParse(s.manPage.substring(2)) ?? 0;
-      final d = kArchive[i.clamp(0, kArchive.length - 1)];
+      final rows = fileRows(s);
+      final i = (int.tryParse(s.manPage.substring(2)) ?? 0)
+          .clamp(0, rows.length - 1);
+      final r = rows[i];
+      final d = r.doc;
       return <Widget>[
         Text(d.kindLabel, style: t.at(11, K.manTag, ls: 3)),
         Padding(
@@ -201,7 +208,9 @@ class _ManualSheetState extends State<ManualSheet> {
           ),
         Padding(
           padding: const EdgeInsets.only(top: 18),
-          child: Text('RECOVERED ON NIGHT ${nightForDoc(i)}',
+          child: Text(
+              // it was never recovered. It was already in the drawer.
+              r.isSelf ? 'ON FILE' : 'RECOVERED ON NIGHT ${r.night}',
               style: t.at(10, K.lbl, ls: 2)),
         ),
       ];

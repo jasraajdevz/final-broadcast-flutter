@@ -82,6 +82,83 @@ void main() {
     expect(archiveLine(s), contains('COMPLETE'));
   });
 
+  group('the personal file', () {
+    GameState _deep() {
+      final s = GameState()..survived = 14..revives = 2;
+      s.stats
+        ..banished = 118
+        ..scared = 9
+        ..wrong = 23
+        ..bestStreak = 17
+        ..clutch = 6;
+      return s;
+    }
+
+    test('is not in the drawer until you are deep enough', () {
+      expect(personalFileOpen(GameState()..survived = 11), isFalse);
+      expect(personalFileOpen(GameState()..survived = 12), isTrue);
+      final shallow = fileRows(GameState()..survived = 3);
+      expect(shallow.any((r) => r.isSelf), isFalse);
+      expect(shallow.length, archiveTotal);
+    });
+
+    test('is filed AMONG the others, not bolted on the end', () {
+      final rows = fileRows(_deep());
+      final i = rows.indexWhere((r) => r.isSelf);
+      expect(i, greaterThan(0));
+      expect(i, lessThan(rows.length - 1),
+          reason: 'appended at the end it reads as a reward screen');
+      expect(rows.length, archiveTotal + 1);
+    });
+
+    test('it is about the reader, in their own numbers', () {
+      final s = _deep();
+      final d = personalFile(s);
+      for (final n in <String>['14', '118', '9', '23', '17', '6', '2']) {
+        expect(d.body, contains(n), reason: 'missing the number $n');
+      }
+      expect(d.head, contains('1987'));
+      // and it never announces what it is
+      expect(d.body.toLowerCase(), isNot(contains('you ')));
+    });
+
+    test('and it is written in the PAST', () {
+      // The whole effect. Present tense would read as a scoreboard; past tense
+      // about things done an hour ago leaves exactly one reading, and the game
+      // never states it.
+      final d = personalFile(_deep());
+      expect(d.body, contains('Held the post'));
+      expect(d.sign, contains('BEFORE HE APPLIED'));
+    });
+
+    test('it is never "recovered" — it was already there', () {
+      final rows = fileRows(_deep());
+      final self = rows.firstWhere((r) => r.isSelf);
+      expect(self.found, isTrue);
+      expect(self.night, -1, reason: 'it must not claim a recovery night');
+    });
+
+    test('it is regenerated, so it follows you', () {
+      final s = _deep();
+      final before = personalFile(s).body;
+      s.stats.banished += 40;
+      final after = personalFile(s).body;
+      expect(after, isNot(before),
+          reason: 'a frozen copy would go stale and stop being about you');
+    });
+
+    test('splicing it never mislabels the pages after it', () {
+      // The failure this refactor exists to prevent: index arithmetic around
+      // the spliced row shifting every night label past it by one.
+      final rows = fileRows(_deep());
+      for (final r in rows.where((x) => !x.isSelf)) {
+        final i = kArchive.indexOf(r.doc);
+        expect(r.night, nightForDoc(i),
+            reason: '\${r.doc.head} is labelled the wrong night');
+      }
+    });
+  });
+
   test('what you have recovered survives a save round-trip', () {
     final s = GameState();
     s.log[nightForDoc(3)] = true;
@@ -93,3 +170,5 @@ void main() {
     expect(foundCount(restored), 2);
   });
 }
+
+// --- appended: the page about the reader ----------------------------------

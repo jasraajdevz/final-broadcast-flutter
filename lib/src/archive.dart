@@ -319,3 +319,111 @@ String archiveLine(GameState s) {
   }
   return '$n OF $archiveTotal RECOVERED FROM THE DESK';
 }
+
+
+// ---------------------------------------------------------------------------
+// THE PERSONAL FILE
+//
+// Every contract this game has offered the player has now been withdrawn — the
+// safe window turns, the presence comes round the front, the carrier can be
+// taken down. One is left, and it is the quietest and the most load-bearing:
+// the paperwork is about OTHER PEOPLE. Twenty-two names, all of them finished,
+// all of them safely in the past.
+//
+// This is the page where that stops being true.
+//
+// It is generated from the player's own save — their nights, their kills,
+// their fumbles, the number of times they have taken the lid off — and set in
+// the payroll's flat administrative voice, dated 1987, filed as though it has
+// been in that drawer for forty years. No jumpscare, no gore, nothing moves.
+// It is just the station demonstrating that it has been keeping records.
+//
+// The specific horror is tense, not content: it is written in the PAST about
+// things the player did an hour ago, which leaves exactly one reading, and the
+// game never states it.
+// ---------------------------------------------------------------------------
+
+/// The night the file turns up. Late enough that the archive's own voice is
+/// established and the player has stopped expecting it to be about them.
+const int kPersonalFileNight = 12;
+
+String _plural(int n, String one, String many) => n == 1 ? one : many;
+
+/// Built fresh every time it is read, so it is always current — reopening it
+/// later shows numbers that have moved on without it ever being rewritten.
+StationDoc personalFile(GameState s) {
+  final st = s.stats;
+  final int errors = st.wrong;
+  final int held = s.survived;
+
+  final b = StringBuffer()
+    ..writeln('OPERATOR 23. No forwarding address on file.')
+    ..writeln()
+    ..write('Held the post for $held ')
+    ..write(_plural(held, 'night', 'nights'))
+    ..write('. Put down ${st.banished} ')
+    ..write(_plural(st.banished, 'signature', 'signatures'))
+    ..write(', missed ${st.scared}, and made $errors ')
+    ..write(_plural(errors, 'error at the desk', 'errors at the desk'))
+    ..writeln('.');
+
+  if (st.bestStreak > 2) {
+    b
+      ..writeln()
+      ..writeln('Longest clean run: ${st.bestStreak}. He was proud of that one.');
+  }
+  if (st.clutch > 0) {
+    b
+      ..writeln()
+      ..write('Answered on the buzzer ${st.clutch} ')
+      ..write(_plural(st.clutch, 'time', 'times'))
+      ..writeln('. We do not encourage it.');
+  }
+  if (s.revives > 0) {
+    b
+      ..writeln()
+      ..write('Took the sponsor\'s money ${s.revives} ')
+      ..write(_plural(s.revives, 'time', 'times'))
+      ..writeln('. It was offered, and it was accepted.');
+  }
+  b
+    ..writeln()
+    ..writeln('He was told the carrier was a lid and he believed it, which is '
+        'the part that made him useful.');
+
+  return StationDoc(
+    kind: DocKind.memo,
+    head: 'KBLK-7 — PERSONNEL, CLOSED FILE — 1987',
+    body: b.toString().trimRight(),
+    sign: 'THIS FILE WAS CLOSED BEFORE HE APPLIED.',
+  );
+}
+
+/// One row of THE FILE: the page, the night it was recovered on, and whether
+/// the reader has it.
+///
+/// Built in one place, with the night attached, because the personal file is
+/// spliced into the middle and any code doing its own index arithmetic around
+/// that would silently mislabel every page after it.
+typedef FileRow = ({StationDoc doc, int night, bool found, bool isSelf});
+
+/// The archive INCLUDING the page about the reader, once they are far enough
+/// in. Everything that lists the file reads this.
+List<FileRow> fileRows(GameState s) {
+  final out = <FileRow>[];
+  final bool self = personalFileOpen(s);
+  // slotted among the others rather than appended, so it does not read as a
+  // reward screen bolted on the end
+  final int at = kArchive.length ~/ 2;
+  for (var i = 0; i < kArchive.length; i++) {
+    if (self && i == at) {
+      out.add((doc: personalFile(s), night: -1, found: true, isSelf: true));
+    }
+    final n = nightForDoc(i);
+    out.add((doc: kArchive[i], night: n, found: docFound(s, n), isSelf: false));
+  }
+  return out;
+}
+
+/// Is the page about the reader open to them yet?
+bool personalFileOpen(GameState s) => s.survived >= kPersonalFileNight;
