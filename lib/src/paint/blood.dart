@@ -217,6 +217,20 @@ ui.Color _bodyOf(double dry) => _lerpC(_kFresh, _kDried, dry);
 void drawBlood(ui.Canvas g, BloodLayer b, double t) {
   if (b.isEmpty) return;
 
+  // THE TUBE IS NEVER COVERED.
+  //
+  // The first version spawned every mark at the centre of kScr and drew it
+  // last, over everything — so a bad night put a large red blob directly on
+  // top of the one surface the player has to read. Baked and looked at: the
+  // picture was gone. That is not atmosphere, that is breaking the game.
+  //
+  // The blood is on the BOOTH glass. The CRT is recessed behind its bezel, so
+  // it is physically the one thing in the room that would NOT catch spatter,
+  // and cutting it out is both the correct fiction and the thing that keeps
+  // the game playable.
+  g.save();
+  g.clipRect(kScr.inflate(6), clipOp: ui.ClipOp.difference);
+
   if (b.wash > 0.004) {
     // not a red filter over the picture — a thin film on the pane, darkest at
     // the edges where it has had somewhere to pool
@@ -247,6 +261,7 @@ void drawBlood(ui.Canvas g, BloodLayer b, double t) {
   for (final h in b.hands) {
     _hand(g, h);
   }
+  g.restore();
 }
 
 /// A palm and four fingers, smeared downward. Deliberately a little too big

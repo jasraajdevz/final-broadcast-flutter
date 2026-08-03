@@ -36,6 +36,7 @@ import 'src/ui/manual.dart';
 import 'src/ui/rack.dart';
 import 'src/paint/booth.dart';
 import 'src/paint/entities.dart' show drawAnom;
+import 'src/ui/scare_overlay.dart';
 import 'src/ui/scene_slot.dart';
 import 'src/ui/setup_screen.dart';
 import 'src/ui/status_bar.dart';
@@ -630,6 +631,17 @@ class _GameRootState extends State<GameRoot>
                     builder: (_, _) => AdSheet(s: s, controller: ad),
                   ),
                 ),
+              // THE SCARE, OVER EVERYTHING. Above the rack, the deck and the
+              // status strip: a jumpscare that a UI panel is painted on top
+              // of is not a jumpscare. Below the modals only, so a sheet can
+              // still be read afterwards.
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: runtime,
+                  builder: (_, _) => ScareOverlay(runtime: runtime),
+                ),
+              ),
+
               if (_pendingLog != null)
                 Positioned.fill(
                   child: LogSheet(

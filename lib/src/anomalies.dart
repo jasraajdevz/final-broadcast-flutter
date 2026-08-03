@@ -1233,7 +1233,10 @@ class AnomalyRuntime extends ChangeNotifier {
     wrongFx = 1;
     // A fumble puts a little of it on the glass too. Being wrong should cost
     // something you can SEE for the rest of the night, not just a number.
-    blood.add(0.12, ox: kScr.center.dx, oy: kScr.center.dy, count: 1);
+    blood.add(0.12,
+        ox: kScr.center.dx + (rand() - 0.5) * 500,
+        oy: kScr.bottom + 30 + rand() * 80,
+        count: 1);
     audio.bloodImpact(0.18);
     wrongFxKey = cid;
     final pen = (s.ups['autocue'] ?? false) ? 0.45 : 0.9;
@@ -1613,7 +1616,7 @@ class AnomalyRuntime extends ChangeNotifier {
       _later(220, () => audio.bloodImpact(0.35));
       _later(760, () => audio.bloodDrip(0.85, 0.8));
     } else if (k == ScarKind.burnIn) {
-      blood.add(0.5, ox: kScr.center.dx, oy: kScr.top + 20);
+      blood.add(0.5, ox: kScr.center.dx, oy: kScr.top - 55, count: 3);
     }
     scars.add(Scar(
       k,
@@ -1784,8 +1787,21 @@ class AnomalyRuntime extends ChangeNotifier {
     _leaveScar(def);
     // AND IT MARKS THE GLASS. Not a red flash that fades — something lands on
     // the pane between you and the room and is still there at 05:00, running.
+    // Around the bezel and up the walls, NOT at the centre of the picture.
+    // Spawning at kScr.center piled every mark onto the screen.
     final double spray = 0.55 + rand() * 0.45;
-    blood.add(spray, ox: kScr.center.dx, oy: kScr.center.dy);
+    for (var i = 0; i < 2; i++) {
+      blood.add(
+        spray * 0.6,
+        ox: rand() < 0.5 ? kScr.left - 40 - rand() * 120 : kScr.right + 30 + rand() * 150,
+        oy: kScr.top - 30 + rand() * (kScr.height + 120),
+        count: 2,
+      );
+    }
+    blood.add(spray * 0.5,
+        ox: kScr.center.dx + (rand() - 0.5) * 260,
+        oy: kScr.bottom + 40 + rand() * 90,
+        count: 2);
     audio.bloodImpact(spray);
 
     // the channel feed.dart and tube.dart already read: 1.5s, counting down
@@ -2216,7 +2232,8 @@ class AnomalyRuntime extends ChangeNotifier {
             // A book left unsigned while something was in the room leaves a
             // mark. Nobody says whose.
             if (active != null) {
-              blood.add(0.2, ox: kScr.center.dx, oy: kScr.bottom - 20, count: 2);
+              blood.add(0.2,
+                  ox: 60 + rand() * 140, oy: 180 + rand() * 300, count: 2);
             }
           case CheckEventKind.falseEntry:
             break; // signBook() handles it; nothing is raised here

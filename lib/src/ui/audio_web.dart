@@ -1981,23 +1981,25 @@ class WebAudio implements GameAudio {
     if (!_on || c == null || master == null) return;
     final t = c.currentTime;
     _holding = true;
-    // EVERY bus, by hand, not just the master.
+    // Master and the sub, and NOTHING else.
     //
-    // Belt and braces on purpose. The sub deliberately bypasses master (it has
-    // its own limiter so the room bed cannot duck the floor), and the bed
-    // buses are re-written by tick() at 10Hz — so a hole that only zeroes the
-    // master is one refactor away from becoming a hum. A hole has to be a
-    // hole: the ear knows the difference between a quiet room and no room, and
-    // that difference is the entire effect.
-    for (final _Gain? g in <_Gain?>[
-      master,
-      _subG,
-      _roomG,
-      _staticG,
-      _droneG,
-      _dreadG,
-      _heartG,
-    ]) {
+    // This used to ramp every bed bus to zero "belt and braces". It was worse
+    // than redundant, it was destructive: room/static/drone/dread/heart all
+    // feed master, so master at 0 already silences them — and the restore only
+    // called cancelScheduledValues(), which cancels FUTURE events and does not
+    // put a value back. tick() rewrites room/dread/sub at 10Hz so those
+    // recovered; nothing ever rewrites _heartG.gain.
+    //
+    // Net effect: the heartbeat — the game's only escalation cue, the thing
+    // that tells you dread is climbing — was permanently muted by the first
+    // spontaneous room-stop, about twenty seconds into every single night.
+    // The player has been telling me it is not scary while the one sound that
+    // signals rising danger was dead for 99% of every shift.
+    //
+    // The sub is the genuine exception: it bypasses master through its own
+    // limiter so the room bed cannot duck the floor, so it has to be taken
+    // down by hand or the hole has a hum in it.
+    for (final _Gain? g in <_Gain?>[master, _subG]) {
       if (g == null) continue;
       g.gain.cancelScheduledValues(t);
       g.gain.setValueAtTime(g.gain.value, t);
@@ -2014,15 +2016,10 @@ class WebAudio implements GameAudio {
       // back FAST. A slow fade-in reads as a mix change; a fast one reads as
       // the world switching back on, which is the part that hurts.
       mm.gain.linearRampToValueAtTime(_vol, tt + 0.03);
-      // the rest are re-armed by the next tick(), which is 100ms away at
-      // worst; the room coming back a beat behind the master is the sound of
-      // it having been switched off rather than turned down.
+      // the sub is re-armed by the next tick(), 100ms away at worst — the
+      // floor coming back a beat behind the master is the sound of the world
+      // having been switched off rather than turned down
       _subG?.gain.cancelScheduledValues(tt);
-      _roomG?.gain.cancelScheduledValues(tt);
-      _staticG?.gain.cancelScheduledValues(tt);
-      _droneG?.gain.cancelScheduledValues(tt);
-      _dreadG?.gain.cancelScheduledValues(tt);
-      _heartG?.gain.cancelScheduledValues(tt);
     });
   }
 
