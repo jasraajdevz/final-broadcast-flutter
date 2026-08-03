@@ -546,7 +546,13 @@ bool quotaMet(GameState s) => s.segSig >= segQuota(s);
 /// How much output the current segment is still short. 0 once it is met.
 double quotaShortfall(GameState s) => math.max(0, segQuota(s) - s.segSig);
 
-/// JS shiftClock() — "23:00" .. "05:59".
+/// JS shiftClock() — "23:00" .. "05:59", and past it during a long night.
+///
+/// s.shiftMin is NOT clamped at kShiftMinutes: on a normal night dawn() fires
+/// the instant it is reached so it never gets further, and during a long night
+/// it simply keeps counting. So this already reads 07:12 on its own, and the
+/// shiftClockLive() helper that added overMin on top of it was double-counting
+/// the same overtime.
 String shiftClock(GameState s) {
   final h = (23 + (s.shiftMin / 60).floor()) % 24;
   final m = (s.shiftMin % 60).floor();

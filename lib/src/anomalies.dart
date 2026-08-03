@@ -701,6 +701,36 @@ class AnomalyRuntime extends ChangeNotifier {
   // you WILL use it, and you will hate that you did.
   // -------------------------------------------------------------------------
 
+  // -------------------------------------------------------------------------
+  // THE LONG NIGHT
+  //
+  // The last safe harbour in this game is that 06:00 always comes. Everything
+  // else has been taken away — the calm window turns, the presence comes round
+  // the front, the paperwork is about you, the clock on the wall is the real
+  // one — but sunrise has never once failed to arrive, and a player can endure
+  // any amount of dread while knowing the night is finite.
+  //
+  // R. HALLORAN's entry has said what this is since the roster was written:
+  // "did not sign off on the morning of the 1,115th night."
+  //
+  // Once in a career, deep in, 06:00 passes and the sheet does not come up.
+  // The clock keeps counting — 06:01, 06:02 — into an hour the rundown has no
+  // segment for. It is finite, because an unwinnable night is a bug rather
+  // than a scare, and surviving it is the largest thing in the game.
+  // -------------------------------------------------------------------------
+
+  /// True once the shift has run past its own end.
+  bool longNight = false;
+
+  /// Minutes of overtime survived.
+  double overMin = 0;
+
+  /// How much overtime this one demands.
+  double overNeed = 0;
+
+  /// 0..1 for anything that wants to draw it.
+  double get overP => overNeed <= 0 ? 0 : (overMin / overNeed).clamp(0.0, 1.0);
+
   /// 0..1 — how far the operator's hand has taken the carrier down.
   double carrierHold = 0;
   bool carrierHolding = false;
@@ -1572,6 +1602,9 @@ class AnomalyRuntime extends ChangeNotifier {
     carrierHold = 0;
     carrierHolding = false;
     carrierDrops = 0;
+    longNight = false;
+    overMin = 0;
+    overNeed = 0;
     mirrorCam = -1;
     mirrorIn = rr(120, 260);
     mirrorLeft = 0;
@@ -2366,6 +2399,48 @@ class AnomalyRuntime extends ChangeNotifier {
     return out;
   }
 
+  /// Is this the one? Once per career, deep enough in that the player has
+  /// stopped counting the minutes to 06:00 and started trusting it.
+  bool _longNightDue() {
+    if (s.longNightDone) return false;
+    if (s.survived < 8) return false;
+    // certain by night 14, so it is a promise the career keeps rather than a
+    // lottery the player may never see
+    return s.survived >= 14 || rand() < 0.22;
+  }
+
+  void _beginLongNight() {
+    longNight = true;
+    overMin = 0;
+    overNeed = rr(55, 95); // roughly one to one and a half more hours
+    s.longNightDone = true;
+
+    // No sheet. No sun. The clock simply does not stop.
+    audio.hold(900);
+    audio.setSub(1.0);
+    audio.deadAir(true);
+    _later(950, () => audio.deadAir(false));
+    _later(1000, () => audio.distantScream(0.6, rand() < 0.5 ? -1 : 1));
+    blackout = math.max(blackout, 1);
+    shake = math.max(shake, 22);
+
+    s.toast('06:00', ToastKind.bad);
+    s.toasts.pushDelayed(1800, 'THE SUN IS NOT UP', ToastKind.bad);
+    s.toasts.pushDelayed(4200, 'NOBODY IS COMING TO TAKE THE DESK',
+        ToastKind.bad);
+
+    // and everything gets worse at once
+    s.dread = math.min(100, math.max(s.dread, 40));
+    calm = 0;
+    calmSpan = 0;
+    calmGuard = 0;
+    calmGuardSpan = 0;
+    presence = 1;
+    presenceSpan = rr(9, 16);
+    scheduleNext();
+    notifyListeners();
+  }
+
   void dawn() {
     if (lost) return;
     lost = true;
@@ -2392,15 +2467,28 @@ class AnomalyRuntime extends ChangeNotifier {
     endScreen = EndScreen.dawn;
     endScreenModel = EndScreenModel(
       win: true,
-      title: '☀ 06:00 — SIGN-OFF',
+      title: s.longNightDone && overNeed > 0
+          ? '☀ THE SUN CAME UP EVENTUALLY'
+          : '☀ 06:00 — SIGN-OFF',
       reviveLabel: null,
       acceptLabel: 'SIGN THE LOG — BANK ${fmt(g)} RP',
       body: <EndPara>[
-        EndPara(<String>[
-          'The test card comes up on its own and the sun takes over the '
-              'holding. Whatever was in the signal goes back down into it, the '
-              'way it does every morning, and the room is just a room again.',
-        ]),
+        if (overNeed > 0)
+          EndPara(<String>[
+            'It took ',
+            '${overMin.round()} minutes',
+            ' longer than it was supposed to. Nobody has said why, nobody is '
+                'going to, and the log has no line for the hour you have just '
+                'sat through — so you will write it in the margin, the way '
+                'HALLORAN did, and the next operator will read it.',
+          ])
+        else
+          EndPara(<String>[
+            'The test card comes up on its own and the sun takes over the '
+                'holding. Whatever was in the signal goes back down into it, '
+                'the way it does every morning, and the room is just a room '
+                'again.',
+          ]),
         EndPara(<String>[
           '',
           'YOU MADE IT TO 06:00.',
@@ -2829,7 +2917,20 @@ class AnomalyRuntime extends ChangeNotifier {
         audio.env('sine', 392, 0.5, 0.10, 392);
         _later(260, () => audio.env('sine', 523, 0.7, 0.10, 523));
       }
-      if (s.shiftMin >= kShiftMinutes) dawn();
+      if (s.shiftMin >= kShiftMinutes) {
+        if (longNight) {
+          // the clock keeps counting into an hour with no segment
+          overMin += dt / kMinReal;
+          if (overMin >= overNeed) {
+            longNight = false;
+            dawn();
+          }
+        } else if (_longNightDue()) {
+          _beginLongNight();
+        } else {
+          dawn();
+        }
+      }
     }
 
     // --- dread decay ---

@@ -86,10 +86,16 @@ class StatusBar extends StatelessWidget {
             ui: s.ui,
             minWidth: 136,
             maxWidth: 195,
-            label: 'SHIFT ENDS 06:00',
+            // The label is a promise, and during the long night the game is
+            // no longer making it.
+            label: runtime.longNight ? 'THE SHIFT HAS NOT ENDED' : 'SHIFT ENDS 06:00',
             value: shiftClock(s),
-            valueColor: s.stalled ? K.red : K.green,
-            sub: '${s.stalled ? "HELD - " : ""}${sg.nm}',
+            valueColor: runtime.longNight
+                ? K.red
+                : (s.stalled ? K.red : K.green),
+            sub: runtime.longNight
+                ? 'NO SEGMENT'
+                : '${s.stalled ? "HELD - " : ""}${sg.nm}',
           ),
           _Rdo(
             ui: s.ui,

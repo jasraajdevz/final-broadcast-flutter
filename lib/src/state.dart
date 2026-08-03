@@ -314,6 +314,11 @@ class GameState extends ChangeNotifier {
   /// again — a wall between a player and the game is worse than a bad mix.
   bool hardwareChecked = false;
 
+  /// Has the shift already failed to end once? Once per career — the whole
+  /// weight of it is that it has never happened before and cannot happen
+  /// again, which is what makes it an event rather than a mechanic.
+  bool longNightDone = false;
+
   /// Which of the previous operator's log pages have been found. Keyed by the
   /// night that hands them over, so it survives a save that predates the log.
   final Map<int, bool> log = <int, bool>{};
@@ -442,6 +447,7 @@ class GameState extends ChangeNotifier {
       'toolCharges': toolCharges,
       'meta': meta,
       'hardwareChecked': hardwareChecked,
+      'longNightDone': longNightDone,
       'log': log.map((k, v) => MapEntry(k.toString(), v)),
       'dawnBonus': dawnBonus,
     };
@@ -496,6 +502,7 @@ class GameState extends ChangeNotifier {
     tab = _str(o['tab'], tab);
     manPage = _str(o['manPage'], manPage);
     hardwareChecked = _bool(o['hardwareChecked'], hardwareChecked);
+    longNightDone = _bool(o['longNightDone'], longNightDone);
     final lg = o['log'];
     if (lg is Map) {
       log.clear();
