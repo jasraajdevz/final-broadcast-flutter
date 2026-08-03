@@ -59,6 +59,44 @@
       if (s) s.remove();
     });
   </script>
+  <!-- ============================================================== -->
+  <!-- SERVICE WORKER KILL-SWITCH                                     -->
+  <!--                                                                 -->
+  <!-- An earlier build of this game registered a Flutter service      -->
+  <!-- worker. Once installed, a service worker is RESIDENT: it keeps  -->
+  <!-- serving its own cached copy of main.dart.js forever, and        -->
+  <!-- building with --pwa-strategy=none only stops NEW registrations  -->
+  <!-- — it does not evict the one already sitting in the browser.     -->
+  <!-- A hard reload does not reliably remove it either.               -->
+  <!--                                                                 -->
+  <!-- Net effect: three consecutive deploys were verified byte-for-   -->
+  <!-- byte correct on the server and the player saw none of them.     -->
+  <!--                                                                 -->
+  <!-- This unregisters every worker, drops every cache, and reloads   -->
+  <!-- exactly once (guarded by sessionStorage so it can never loop).  -->
+  <!-- ============================================================== -->
+  <script>
+  (function () {
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.getRegistrations().then(function (regs) {
+      var had = regs.length > 0;
+      var jobs = regs.map(function (r) { return r.unregister(); });
+      if (window.caches && caches.keys) {
+        jobs.push(caches.keys().then(function (ks) {
+          if (ks.length) had = true;
+          return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+        }));
+      }
+      return Promise.all(jobs).then(function () {
+        if (had && !sessionStorage.getItem('swPurged')) {
+          sessionStorage.setItem('swPurged', '1');
+          location.reload();
+        }
+      });
+    }).catch(function () {});
+  })();
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
