@@ -4,11 +4,14 @@
 // the number from the HTML; nothing has been rounded, retuned or "improved".
 // If a value looks odd, it is odd in the original too.
 //
-// Portable: this file imports only dart:math and dart:ui/painting for Color and
-// Rect. Nothing web-specific.
+// Portable: this file imports only dart:math, dart:ui/painting for Color and
+// Rect, and desk.dart — which is itself pure Dart — for the Rail an anomaly
+// eats. Nothing web-specific.
 
 import 'dart:math' as math;
 import 'dart:ui' show Color, Offset, Rect, Size;
+
+import 'desk.dart' show Rail;
 
 // ---------------------------------------------------------------------------
 // 0. HELPERS  (JS section 0)
@@ -696,6 +699,8 @@ class Anom {
     required this.lore,
     required this.method,
     required this.wrongNote,
+    required this.rail,
+    required this.bite,
   });
   final String id;
   final String nm;
@@ -708,6 +713,27 @@ class Anom {
   final String lore;
   final String method;
   final String wrongNote;
+
+  /// WHICH PART OF THE MACHINE IT EATS.
+  ///
+  /// An arrival used to be a free-floating prompt with a key attached: it
+  /// appeared, you pressed its letter, it went away, and nothing about the
+  /// station was different for it having been there. Now each one has its
+  /// teeth in a named system, so it presents as the machine misbehaving and
+  /// the operator has to work out WHICH before they can answer WHAT.
+  ///
+  /// THE SNOW CRAWLER and DEAD AIR both eat the carrier. MR. SLEEPWELL pulls
+  /// the modulation down and THE TEST CARD GIRL drives it up — the same needle
+  /// off its mark in opposite directions, needing opposite corrections, which
+  /// is the whole diagnosis layer in one pair. THE NIELSEN and THE CALLER go
+  /// for the log, because being watched and being telephoned are both ways of
+  /// stopping a man writing.
+  ///
+  /// THE RERUN has no rail. It uses your hands. See Tape in desk.dart.
+  final Rail? rail;
+
+  /// Units per second it takes off that rail while it is on the air.
+  final double bite;
 }
 
 const List<Anom> kAnoms = [
@@ -724,6 +750,8 @@ const List<Anom> kAnoms = [
     method:
         'Snap the shadow mask with a full DEGAUSS. The magnetic wipe scatters the grain before it can finish assembling a face.',
     wrongNote: 'CUT is the common mistake. It feeds on the dark.',
+    rail: Rail.carrier,
+    bite: 2.6,
   ),
   Anom(
     id: 'sleep',
@@ -739,6 +767,8 @@ const List<Anom> kAnoms = [
         'CUT the feed. He is a performer — with no audience and no light he has no reason to stay.',
     wrongNote:
         'Never answer him with BARS or PATTERN. He takes it as applause.',
+    rail: Rail.modulation,
+    bite: 9.0,
   ),
   Anom(
     id: 'vert',
@@ -753,6 +783,8 @@ const List<Anom> kAnoms = [
     method:
         'Lock the sync with V-HOLD. Close the seam and there is nowhere left for him to be.',
     wrongNote: 'Do not DEGAUSS a rolling picture. It widens the tear.',
+    rail: Rail.plate,
+    bite: 7.0,
   ),
   Anom(
     id: 'dead',
@@ -767,6 +799,8 @@ const List<Anom> kAnoms = [
     method:
         'Put something in the silence. The 1000 Hz emergency TONE is the loudest simple thing the desk can make.',
     wrongNote: 'Every silent option (CUT, TAPE) makes the hole bigger.',
+    rail: Rail.carrier,
+    bite: 3.4,
   ),
   Anom(
     id: 'card',
@@ -781,6 +815,8 @@ const List<Anom> kAnoms = [
     method:
         'Show her the way home. Broadcast BARS and she will step back into the card on her own.',
     wrongNote: 'CUT strands her in the dark and she will scream about it.',
+    rail: Rail.modulation,
+    bite: -8.0,
   ),
   Anom(
     id: 'rerun',
@@ -796,6 +832,8 @@ const List<Anom> kAnoms = [
         'Give the machine something else to play. Roll fresh TAPE and the loop is broken by new footage.',
     wrongNote:
         'Anything live — TONE, BARS, PATTERN — just gets absorbed into the loop.',
+    rail: null,
+    bite: 0.0,
   ),
   Anom(
     id: 'niel',
@@ -811,6 +849,8 @@ const List<Anom> kAnoms = [
         'He requires a valid station ident to close the audit. Broadcast the sign-off PATTERN and he files and departs.',
     wrongNote:
         'He restates the segment output, not the bank. The quota bar walks backward while he files.',
+    rail: Rail.log,
+    bite: 1.6,
   ),
   Anom(
     id: 'call',
@@ -825,6 +865,8 @@ const List<Anom> kAnoms = [
     method:
         'Take it OFF-HOOK and leave the line open. It only needs to be answered, not spoken to.',
     wrongNote: 'Do not CUT the call. It redials angrier, and faster.',
+    rail: Rail.log,
+    bite: 2.2,
   ),
 ];
 
