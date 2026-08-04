@@ -1626,6 +1626,20 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// The SIGN ON button.
   void startBroadcast() {
+    // A NIGHT STARTS AT 23:00.
+    //
+    // GameState.shiftMin is saved and restored; the Rig is not — it is built
+    // fresh with the runtime every time the page loads. So reloading half way
+    // through a shift resumed the CLOCK at 02:37 while handing over a brand
+    // new transmitter with a clean licence: a shorter night with a fresh
+    // slate, which is both an inconsistency and a way to wipe the drums by
+    // pressing F5. Found by playing, twice, before it was recognised as
+    // anything other than a strange starting time.
+    //
+    // The clock follows the machine. If the transmitter is new, so is the
+    // night.
+    s.shiftMin = 0;
+
     // a new shift does not remember what it said on the last one
     s.toasts.newNight();
     audio.init();
