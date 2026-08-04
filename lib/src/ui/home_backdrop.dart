@@ -151,9 +151,71 @@ class _BackdropPainter extends CustomPainter {
       g.drawPath(tree, ui.Paint()..color = const ui.Color(0xFF05090C));
     }
 
-    // --- the station building, low right ---
-    final double bx = w * 0.60, by = horizon + h * 0.045;
-    final double bw = w * 0.17, bh = h * 0.085;
+    // --- the mast, on the ridge, right of the type ---
+    final double mx = w * 0.815;
+    final double mTop = horizon - h * 0.40;
+    final double mBase = horizon + h * 0.035;
+    final ui.Paint lat = ui.Paint()
+      ..style = ui.PaintingStyle.stroke
+      ..strokeWidth = 1.1
+      ..color = rgba(120, 146, 158, 0.55);
+    final double spread = h * 0.030;
+    g.drawPath(
+      ui.Path()
+        ..moveTo(mx - spread, mBase)
+        ..lineTo(mx, mTop)
+        ..lineTo(mx + spread, mBase),
+      lat,
+    );
+    for (var i = 0; i < 13; i++) {
+      final double f = i / 12;
+      final double y = mBase + (mTop - mBase) * f;
+      final double sp = spread * (1 - f);
+      g.drawLine(ui.Offset(mx - sp, y), ui.Offset(mx + sp, y), lat);
+      // the cross-bracing, which is what makes a lattice read as a lattice
+      if (i < 12) {
+        final double y2 = mBase + (mTop - mBase) * ((i + 1) / 12);
+        final double sp2 = spread * (1 - (i + 1) / 12);
+        g.drawLine(ui.Offset(mx - sp, y), ui.Offset(mx + sp2, y2), lat);
+      }
+    }
+    // guy wires
+    for (final d in <double>[-1, 1]) {
+      g.drawLine(
+        ui.Offset(mx + d * spread * 0.4, mTop + (mBase - mTop) * 0.28),
+        ui.Offset(mx + d * w * 0.075, mBase),
+        ui.Paint()
+          ..style = ui.PaintingStyle.stroke
+          ..strokeWidth = 0.8
+          ..color = rgba(90, 110, 120, 0.22),
+      );
+    }
+    // the beacon. Its own rate, sharing no multiple with anything else here.
+    final double bl =
+        (math.sin(t * 0.83) * 0.5 + 0.5) * (math.sin(t * 0.19) * 0.25 + 0.75);
+    g.drawCircle(ui.Offset(mx, mTop - 2), 2.4,
+        ui.Paint()..color = rgba(255, 70, 48, 0.35 + bl * 0.6));
+    g.drawCircle(
+      ui.Offset(mx, mTop - 2),
+      10 + bl * 7,
+      ui.Paint()
+        ..blendMode = ui.BlendMode.plus
+        ..shader = ui.Gradient.radial(
+          ui.Offset(mx, mTop - 2),
+          10 + bl * 7,
+          <ui.Color>[rgba(255, 60, 40, 0.22 * bl), rgba(255, 60, 40, 0)],
+        ),
+    );
+
+    // --- the transmitter hall, at the foot of its own mast ---
+    //
+    // Drawn AFTER the mast so the lattice rises from behind the roof,
+    // which is how a transmitter site is actually laid out and also the
+    // only band of the frame with no interface in it: at w*0.60 the lit
+    // window landed underneath the AUDIO / SCREEN CHECK panel and read as
+    // a stray orange rectangle rather than as a window in a building.
+    final double bx = w * 0.755, by = horizon + h * 0.048;
+    final double bw = w * 0.165, bh = h * 0.082;
     final double fl = math.sin(t * 0.37) * 0.5 + 0.5;
     final double wx = bx + bw * 0.62, wy = by + bh * 0.28;
     final double wW = bw * 0.14, wH = bh * 0.26;
@@ -226,61 +288,6 @@ class _BackdropPainter extends CustomPainter {
       g.restore();
     }
 
-    // --- the mast, on the ridge, right of the type ---
-    final double mx = w * 0.815;
-    final double mTop = horizon - h * 0.40;
-    final double mBase = horizon + h * 0.035;
-    final ui.Paint lat = ui.Paint()
-      ..style = ui.PaintingStyle.stroke
-      ..strokeWidth = 1.1
-      ..color = rgba(120, 146, 158, 0.55);
-    final double spread = h * 0.030;
-    g.drawPath(
-      ui.Path()
-        ..moveTo(mx - spread, mBase)
-        ..lineTo(mx, mTop)
-        ..lineTo(mx + spread, mBase),
-      lat,
-    );
-    for (var i = 0; i < 13; i++) {
-      final double f = i / 12;
-      final double y = mBase + (mTop - mBase) * f;
-      final double sp = spread * (1 - f);
-      g.drawLine(ui.Offset(mx - sp, y), ui.Offset(mx + sp, y), lat);
-      // the cross-bracing, which is what makes a lattice read as a lattice
-      if (i < 12) {
-        final double y2 = mBase + (mTop - mBase) * ((i + 1) / 12);
-        final double sp2 = spread * (1 - (i + 1) / 12);
-        g.drawLine(ui.Offset(mx - sp, y), ui.Offset(mx + sp2, y2), lat);
-      }
-    }
-    // guy wires
-    for (final d in <double>[-1, 1]) {
-      g.drawLine(
-        ui.Offset(mx + d * spread * 0.4, mTop + (mBase - mTop) * 0.28),
-        ui.Offset(mx + d * w * 0.075, mBase),
-        ui.Paint()
-          ..style = ui.PaintingStyle.stroke
-          ..strokeWidth = 0.8
-          ..color = rgba(90, 110, 120, 0.22),
-      );
-    }
-    // the beacon. Its own rate, sharing no multiple with anything else here.
-    final double bl =
-        (math.sin(t * 0.83) * 0.5 + 0.5) * (math.sin(t * 0.19) * 0.25 + 0.75);
-    g.drawCircle(ui.Offset(mx, mTop - 2), 2.4,
-        ui.Paint()..color = rgba(255, 70, 48, 0.35 + bl * 0.6));
-    g.drawCircle(
-      ui.Offset(mx, mTop - 2),
-      10 + bl * 7,
-      ui.Paint()
-        ..blendMode = ui.BlendMode.plus
-        ..shader = ui.Gradient.radial(
-          ui.Offset(mx, mTop - 2),
-          10 + bl * 7,
-          <ui.Color>[rgba(255, 60, 40, 0.22 * bl), rgba(255, 60, 40, 0)],
-        ),
-    );
 
     // --- the fence in the near ground ---
     final double fy = h * 0.945;
