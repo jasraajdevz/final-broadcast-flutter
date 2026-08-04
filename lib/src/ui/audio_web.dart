@@ -465,20 +465,50 @@ class WebAudio implements GameAudio {
     rn.connect(rlp);
     rlp.connect(rg);
     rg.connect(room);
+    // The air handler breathed on a clean 0.055Hz sine — an 18 second cycle,
+    // exactly repeated, forever. A predictable breath is a lullaby. This one
+    // is two incommensurate rates summed, so it never breathes the same way
+    // twice and there is no period to settle into.
     final rl = c.createOscillator();
     rl.type = 'sine';
     rl.frequency.value = 0.055;
     final rlg = c.createGain();
-    rlg.gain.value = 52;
+    rlg.gain.value = 40;
+    final rl2 = c.createOscillator();
+    rl2.type = 'sine';
+    rl2.frequency.value = 0.0237; // no common multiple with 0.055
+    final rlg2 = c.createGain();
+    rlg2.gain.value = 26;
+    rl2.connect(rlg2);
+    rlg2.connect(rlp.frequency);
+    rl2.start(t);
     rl.connect(rlg);
     rlg.connect(rlp.frequency);
     rl.start(t);
 
-    // three room modes — an empty concrete studio ringing at its own dimensions
+    // THREE ROOM MODES — an empty concrete studio ringing at its own
+    // dimensions. This is the bed the player spends the entire night inside,
+    // so what it does when nothing is happening IS the game's baseline mood.
+    //
+    // It was 186 / 281 / 433 at Q 13-21, which is very close to F#3, C#4 and
+    // A4 — a stack a third of the way to a chord — held at high resonance and
+    // breathing on a clean 18-second sine. Resonant, near-harmonic, perfectly
+    // periodic: that is a meditation track. A room that repeats itself is a
+    // room you stop listening to and start being soothed by.
+    //
+    // Now deliberately INHARMONIC — every ratio irrational, so no two modes
+    // ever beat into a recognisable interval — at lower Q so they read as
+    // concrete rather than as tone, and with LFO rates that share no common
+    // multiple, so the bed never returns to a state it has been in before.
+    // Nothing about it is predictable and nothing about it resolves.
+    // Ratios 1.623 and 1.413 — near the golden ratio and root two, chosen
+    // because they are as far from a fifth, a fourth and an octave as the
+    // range allows. My first attempt at "inharmonic" was 173/268/419, which
+    // is 1.549 and 1.563: two near-perfect fifths. The guard caught it.
     const modes = <List<double>>[
-      <double>[186, 13, 0.26, 0.019],
-      <double>[281, 17, 0.17, 0.032],
-      <double>[433, 21, 0.09, 0.045],
+      <double>[167, 9.5, 0.26, 0.0163],
+      <double>[271, 11.0, 0.17, 0.0271],
+      <double>[383, 12.5, 0.09, 0.0389],
     ];
     for (final m in modes) {
       final n2 = c.createBufferSource();
@@ -1684,7 +1714,61 @@ class WebAudio implements GameAudio {
   }
 
   @override
-  void click() => env('square', 900, 0.045, 0.09, 420);
+  /// A KEY GOING DOWN.
+  ///
+  /// This was env('square', 900, 0.045, 0.09, 420): a square wave sweeping
+  /// 900Hz down to 420Hz. A pitched tone — on every key press, every rack row,
+  /// every panel button — so touching anything repeatedly produced a chain of
+  /// clean descending blips. That is a UI sound from a phone game, and with
+  /// the strike now fixed it was the loudest remaining pleasant thing in the
+  /// build.
+  ///
+  /// A key on a 1980s broadcast desk is a moulded cap over a metal dome. It
+  /// does not have a pitch. It has a dry snap, a little plastic body under it,
+  /// and it is fractionally different every time because the caps are worn to
+  /// different depths.
+  @override
+  void click() {
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final t = c.currentTime;
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+
+    // the dome snapping through — broadband, 8ms, gone
+    final n = _noise(t, 0.02);
+    if (n != null) {
+      final bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.q.value = 1.1;
+      bp.frequency.value = 2200 + rand() * 1400; // worn differently each time
+      final g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.075, t + 0.0015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.018);
+      n.connect(bp);
+      bp.connect(g);
+      g.connect(out);
+    }
+
+    // the cap bottoming out on the frame — body, not tone
+    final o = c.createOscillator();
+    o.type = 'triangle';
+    final double body = 150 + rand() * 70;
+    o.frequency.setValueAtTime(body, t);
+    o.frequency.exponentialRampToValueAtTime(body * 0.55, t + 0.03);
+    final og = c.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.035, t + 0.002);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.038);
+    o.connect(og);
+    og.connect(out);
+    o.start(t);
+    o.stop(t + 0.05);
+
+    _kill(out, 0.12);
+  }
 
   /// STRIKING THE SET.
   ///
