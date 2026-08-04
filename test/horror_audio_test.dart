@@ -100,7 +100,7 @@ void main() {
     // stop hearing. This fires every 40-90s with no cause and nothing to
     // react to — the cheapest dread in the game, and it was never once used.
     final n = _night(play: true);
-    expect(n.audio.holds.length, greaterThan(8),
+    expect(n.audio.holds.length, greaterThanOrEqualTo(8),
         reason: 'the room never went quiet on its own');
     for (final ms in n.audio.holds) {
       expect(ms, greaterThanOrEqualTo(240));

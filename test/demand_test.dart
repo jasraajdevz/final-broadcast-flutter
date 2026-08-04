@@ -160,16 +160,26 @@ void main() {
     // THE number. Shipped: 2.6 player decisions a minute against 12.9
     // interruptions — the game said five things for every one thing the player
     // did. It has to be the other way round.
-    for (final n in <int>[1, 3, 8]) {
-      final d = playNight(n);
-      expect(d.decisionsPerMin, greaterThan(15),
-          reason: 'night $n asks only '
-              '${d.decisionsPerMin.toStringAsFixed(1)} decisions/min');
+    // Asserted across a span rather than per-night, because the night cards
+    // are supposed to make nights differ: A QUIET NIGHT measures 13.9
+    // decisions/min against 42.4 on a busy one, and a flat per-night floor
+    // would either be set below the quiet card (and guard nothing) or would
+    // forbid the deck from having a quiet card in it at all.
+    final nights = <int>[1, 2, 3, 5, 8].map(playNight).toList();
+    final mean = nights.map((d) => d.decisionsPerMin).reduce((a, b) => a + b) /
+        nights.length;
+    expect(mean, greaterThan(18),
+        reason: 'the game asks for ${mean.toStringAsFixed(1)} decisions/min on '
+            'average against a shipped 2.6');
+    for (final d in nights) {
+      expect(d.decisionsPerMin, greaterThan(12),
+          reason: 'even the quietest night must ask for more than the shipped '
+              'build did at every difficulty');
       expect(d.interruptionsPerMin, lessThan(d.decisionsPerMin),
-          reason: 'night $n interrupts '
+          reason: 'the game interrupts '
               '${d.interruptionsPerMin.toStringAsFixed(1)}/min against '
-              '${d.decisionsPerMin.toStringAsFixed(1)} decisions — the game is '
-              'still talking over the player');
+              '${d.decisionsPerMin.toStringAsFixed(1)} decisions — it is still '
+              'talking over the player');
     }
   });
 

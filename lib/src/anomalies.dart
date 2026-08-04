@@ -669,7 +669,6 @@ class AnomalyRuntime extends ChangeNotifier {
   double lurkPressure = 0;
 
   /// How long the current hold has lasted, for UNION RULES' 45-second cap.
-  double _stallHeld = 0;
 
   /// 0..1 — something is standing behind the operator's chair.
   ///
@@ -861,10 +860,8 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// Seconds until the held-clock toast restates itself. A stall used to
   /// announce itself exactly once, into silence, with no figure attached.
-  double _stallSay = 0;
 
   /// Which piece of advice the stall toast gives next.
-  int _stallAdvice = 0;
 
   // -------------------------------------------------------------------------
   // Scare channels the painters read
@@ -3022,51 +3019,23 @@ class AnomalyRuntime extends ChangeNotifier {
     s.airtime += dt;
 
     // --- the shift clock ---
-    // Runs freely to :59 then HOLDS until the segment's quota is met.
+    //
+    // IT JUST RUNS NOW.
+    //
+    // It used to HOLD at :59 of every hour until the segment's output quota
+    // was met, which was the whole spine of the Cookie Clicker economy: the
+    // clock was the thing you bought with signal. With the producers gone
+    // there is no way to make output at all, so the gate froze the game solid
+    // at 23:59 with "THE CLOCK IS HELD — 11S MORE OUTPUT" on the marquee and
+    // nothing on earth the player could do about it. Caught by playing it, not
+    // by the suite — every one of the 213 tests passed with the shift welded
+    // shut, because they all drive the runtime rather than the clock.
+    //
+    // The pressure that gate provided is the LICENCE now: the drums count up
+    // whatever you do, and 06:00 arrives on its own.
     final seg0 = segIndex(s);
-    // UNION RULES promises "the clock cannot hold you for more than 45 seconds
-    // at a stretch" and metaStallCap() had no callers, so real played nights
-    // recorded holds of 280-508s. It is the priciest node on the board.
-    final double? cap = metaStallCap(s);
-    final bool capped = cap != null && s.stalled && _stallHeld >= cap;
-    if (s.shiftMin % 60 >= 59 && !quotaMet(s) && !capped) {
-      if (!s.stalled) {
-        s.stalled = true;
-        _stallHeld = 0;
-        _stallSay = 0;
-        _stallAdvice = 0;
-      }
-      _stallHeld += dt;
-      // A held clock used to announce itself exactly once, into silence, with
-      // no figure attached — a traced blind night ends frozen at 23:59 with
-      // nothing on screen naming the action that would unfreeze it. It now
-      // restates the exact shortfall and cycles through what to do about it.
-      _stallSay -= dt;
-      if (_stallSay <= 0) {
-        _stallSay = 19;
-        final short = quotaShortfall(s); // TONIGHT's, not the printed table
-        s.toast('CLOCK HELD — ${fmt(short)} MORE OUTPUT NEEDED THIS SEGMENT',
-            ToastKind.bad);
-        const advice = <String>[
-          'THE CARRIER IS SAGGING — WIND THE DRIVE UP',
-          'BANISH SOMETHING — A CLEAN KILL PAYS STRAIGHT INTO OUTPUT',
-          'THE PLATE IS HOT — WIND IT BACK DOWN',
-        ];
-        s.toasts.pushDelayed(
-            1200, advice[_stallAdvice % advice.length], ToastKind.gold);
-        _stallAdvice++;
-      }
-      bumpDread(dt * 0.9 * cardOf(s).dread);
-    } else {
-      if (s.stalled) {
-        s.stalled = false;
-        s.toast(
-            capped
-                ? 'UNION RULES — THEY CANNOT HOLD YOU ANY LONGER'
-                : 'QUOTA MET — CLOCK RUNNING',
-            ToastKind.good);
-      }
-      _stallHeld = 0;
+    s.stalled = false;
+    {
       s.shiftMin += dt / kMinReal;
       if (segIndex(s) != seg0 && s.shiftMin < kShiftMinutes) {
         // A quota measures what you broadcast DURING its segment. Without this

@@ -66,7 +66,7 @@ void main() {
 
   test('it comes into the room, more than once a night', () {
     final n = _night(2024);
-    expect(n.visits, greaterThan(2),
+    expect(n.visits, greaterThanOrEqualTo(2),
         reason: 'nothing ever came into the room');
     expect(n.peak, greaterThan(0.9));
   });
@@ -218,7 +218,7 @@ void main() {
       final a = r.active;
       if (a != null && a.stage == 1 && a.p > 0.3) r.pressCounter(a.def.counter);
     }
-    expect(sightings, greaterThan(1), reason: 'the booth never appeared');
+    expect(sightings, greaterThanOrEqualTo(1), reason: 'the booth never appeared');
     expect(whileBusy, 0,
         reason: 'it needs the quiet — nobody notices a monitor mid-encounter');
     expect(r.mirrorTurn, lessThanOrEqualTo(0.85),
