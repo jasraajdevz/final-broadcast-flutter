@@ -141,7 +141,13 @@ class StatusBar extends StatelessWidget {
             maxWidth: 168,
             // The label is a promise, and during the long night the game is
             // no longer making it.
-            label: runtime.longNight ? 'THE SHIFT HAS NOT ENDED' : 'SHIFT ENDS 06:00',
+            // THE LONG SHIFT HAS NO 06:00, and a header promising one is the
+            // single most load-bearing lie the HUD could tell in that mode.
+            label: s.endless
+                ? 'THE SHIFT DOES NOT END'
+                : (runtime.longNight
+                    ? 'THE SHIFT HAS NOT ENDED'
+                    : 'SHIFT ENDS 06:00'),
             value: shiftClock(s),
             valueColor: runtime.longNight
                 ? K.red

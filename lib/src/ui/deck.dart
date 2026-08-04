@@ -144,6 +144,9 @@ class Deck extends StatelessWidget {
     return Pressable(
       forceDown: kbDown == c.id,
       tooltip: c.ds,
+      // The deck sits over the picture for the whole shift, and the key
+      // already prints what it answers underneath.
+      tooltipInPlay: false,
       onTap: () {
         runtime.audio.init();
         runtime.audio.resume();

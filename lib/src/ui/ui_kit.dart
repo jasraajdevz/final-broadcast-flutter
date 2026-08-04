@@ -221,6 +221,7 @@ class Pressable extends StatefulWidget {
     this.enabled = true,
     this.forceDown = false,
     this.tooltip,
+    this.tooltipInPlay = true,
     this.cursor = SystemMouseCursors.click,
   });
 
@@ -232,6 +233,10 @@ class Pressable extends StatefulWidget {
   /// Keyboard-driven depress (the deck keys get `.down` for 90ms).
   final bool forceDown;
   final String? tooltip;
+
+  /// Whether this control may raise a floating tooltip. False for anything
+  /// that sits over the picture during a shift.
+  final bool tooltipInPlay;
   final MouseCursor cursor;
 
   @override
@@ -247,7 +252,19 @@ class _PressableState extends State<Pressable> {
     final on = widget.enabled && widget.onTap != null;
     Widget child = widget.builder(
         context, on && _hover, (on && _down) || widget.forceDown);
-    if (widget.tooltip != null) {
+    // NO HOVER TOOLTIPS DURING PLAY.
+    //
+    // Fixed once with a showDuration and it did not work, because in Flutter
+    // that governs how long a tooltip LINGERS AFTER THE POINTER LEAVES — it
+    // does not bound one that is being hovered. A cursor resting anywhere on
+    // the deck therefore kept "Wipes the shadow mask clean with a magnetic
+    // snap" across the bottom of the cabinet indefinitely, over the room, over
+    // the blood, and over a full-cabinet jumpscare.
+    //
+    // The deck already prints what each key answers directly under it. A
+    // second copy of the same sentence, floating, permanent, and on top of the
+    // horror, is not help.
+    if (widget.tooltip != null && widget.tooltipInPlay) {
       child = Tooltip(
         message: widget.tooltip!,
         waitDuration: const Duration(milliseconds: 500),
