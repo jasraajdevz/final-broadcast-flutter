@@ -143,7 +143,21 @@ const double kTripLockout = 3.2;
 const double kTripPlateAfter = 44.0;
 
 /// One correction on the modulation pot.
-const double kNudgeMod = 17.0;
+///
+/// MUST BE SMALLER THAN THE GREEN BAND. At 17 against a band of plus or minus
+/// 15 a single press could carry the needle from one edge straight past the
+/// middle to the other — found by playing, where two presses took it from +27
+/// to -23 and there was no dial position that read as correct. A control whose
+/// step is coarser than its target cannot be used to aim, only to oscillate,
+/// and the player reads that as the game not responding properly rather than
+/// as their own hand.
+///
+/// And it must not be much smaller either. At 8 the needle was aimable but
+/// needed constant fiddling — modulation went to 67% of every action the
+/// operator took in a night, which is one gauge wearing the whole shift. At 11
+/// a single press from either edge of the band lands inside it, and the share
+/// comes back to something like a third.
+const double kNudgeMod = 11.0;
 
 /// Outside this the transmitter is splattering across the band.
 const double kModTripLow = 4.0;

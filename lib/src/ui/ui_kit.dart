@@ -251,6 +251,16 @@ class _PressableState extends State<Pressable> {
       child = Tooltip(
         message: widget.tooltip!,
         waitDuration: const Duration(milliseconds: 500),
+        // AND IT HAS TO GO AWAY ON ITS OWN.
+        //
+        // Without a showDuration a web tooltip stays up until the pointer
+        // moves off the thing that raised it. Found by playing: the cursor was
+        // resting on the DEGAUSS key, and "Wipes the shadow mask clean with a
+        // magnetic snap" sat across the bottom of the cabinet for the entire
+        // shift — over the room, over the blood, and over a full-cabinet
+        // jumpscare, where a cheerful line of help text about magnetic snaps
+        // is the single most effective way to kill a scare stone dead.
+        showDuration: const Duration(milliseconds: 2200),
         child: child,
       );
     }
