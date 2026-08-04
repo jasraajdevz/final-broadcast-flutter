@@ -458,7 +458,7 @@ final List<Upgrade> kUpgrades = [
       id: 'preheat',
       nm: 'TUBE PREHEAT',
       cost: 6.5e3,
-      ds: 'Signal output +30%.',
+      ds: 'The plate runs 12% cooler.',
       req: (s) => true),
   Upgrade(
       id: 'phosphor',
@@ -476,7 +476,7 @@ final List<Upgrade> kUpgrades = [
       id: 'halide',
       nm: 'SILVER HALIDE',
       cost: 9.0e5,
-      ds: 'Output +60% while a quota is unmet.',
+      ds: 'The carrier tracks the dial faster.',
       req: (s) => true),
   Upgrade(
       id: 'failsafe',
@@ -500,7 +500,7 @@ final List<Upgrade> kUpgrades = [
       id: 'comp',
       nm: 'SIGNAL COMPRESSOR',
       cost: 3.0e9,
-      ds: 'Signal output +120%.',
+      ds: 'Modulation drifts more slowly.',
       req: (s) => true),
   Upgrade(
       id: 'cam2',
@@ -518,7 +518,7 @@ final List<Upgrade> kUpgrades = [
       id: 'halo',
       nm: 'CARRIER HALO',
       cost: 8.0e11,
-      ds: 'Segment output can no longer be restated.',
+      ds: 'The licence allows 20 more seconds.',
       req: (s) => s.stats.scared >= 6),
 ];
 

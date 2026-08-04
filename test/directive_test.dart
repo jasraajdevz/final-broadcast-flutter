@@ -37,7 +37,7 @@ void main() {
     expect(d.text, isNot(contains('BEHIND')));
     expect(d.urgency, Urgency.calm,
         reason: 'second zero must read as an instruction, not an alarm');
-    expect(d.text, contains('THE CARRIER IS FALLING'),
+    expect(d.text, contains('ALL CLEAR'),
         reason: 'the true first action, since 15 SIGNAL is unaffordable at 0');
   });
 
@@ -51,13 +51,20 @@ void main() {
     expect(d.urgency, Urgency.urgent);
   });
 
-  test('being behind late in a segment does warn', () {
+  test('a healthy desk on frame one is not an alarm', () {
+    // Replaces 'being behind late in a segment does warn'. There is no quota
+    // to be behind: the directive strip now names whichever needle is off its
+    // mark, and says ALL CLEAR when none of them is. A warning about a target
+    // that cannot be filled is worse than no warning at all.
     final s = _fresh();
-    s.prod['rabbit'] = 1; // a station that HAS started, and is still short
-    s.shiftMin = 55; // 5 minutes of segment left
-    expect(onPaceForQuota(s), isFalse);
-    final d = primeDirective(s, AnomalyRuntime(s));
-    expect(d.text, contains('BEHIND THE QUOTA'));
+    final r = AnomalyRuntime(s, audio: const NullAudio());
+    r.startBroadcast();
+    expect(primeDirective(s, r).text, contains('ALL CLEAR'));
+    r.rig.plate = 95;
+    expect(primeDirective(s, r).text, contains('PLATE'));
+    r.rig.plate = 30;
+    r.rig.carrier = 20;
+    expect(primeDirective(s, r).text, contains('CARRIER'));
   });
 
   test('a station that will clearly make it is left alone', () {

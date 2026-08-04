@@ -12,6 +12,7 @@
 
 import 'anomalies.dart';
 import 'consts.dart';
+import 'desk.dart';
 import 'economy.dart';
 import 'meta.dart';
 import 'state.dart';
@@ -142,19 +143,32 @@ Directive primeDirective(GameState s, AnomalyRuntime r) {
   // false by construction and the strip opened the game on a warning. A
   // station that has not started is not behind — it has not started. Say the
   // first action instead.
-  final int owned = kProducers.fold<int>(0, (a, p) => a + (s.prod[p.id] ?? 0));
-  if (owned == 0) {
-    final double first = costOf(s, kProducers.first);
-    return Directive(
-        s.sig >= first
-            ? 'BUY ${kProducers.first.nm} — THE RACK IS ON YOUR RIGHT'
-            : 'THE CARRIER IS FALLING — UP RAISES THE DRIVE',
-        Urgency.calm);
+  // THE DESK, in the order a pair of hands would reach for it. These replaced
+  // "BUY RABBIT EARS — THE RACK IS ON YOUR RIGHT", which pointed at a shop
+  // that no longer exists, and "BEHIND THE QUOTA", which named a target
+  // nothing can fill.
+  if (r.rig.lockout > 0) {
+    return const Directive('CONTACTOR OUT — IT COMES BACK ON ITS OWN',
+        Urgency.urgent);
   }
-
-  // 6. Behind, with the segment running out.
-  if (!quotaMet(s) && !onPaceForQuota(s)) {
-    return Directive('BEHIND THE QUOTA — ${fmt(quotaShortfall(s))} TO GO',
+  if (r.rig.plate > 88) {
+    return const Directive('PLATE IS COOKING — WIND THE DRIVE DOWN',
+        Urgency.urgent);
+  }
+  if (r.rig.lowPower) {
+    return const Directive('THE CARRIER IS SAGGING — UP RAISES THE DRIVE',
+        Urgency.watch);
+  }
+  if ((r.rig.modulation - 50).abs() > kModGreen) {
+    return Directive(
+        r.rig.modulation > 50
+            ? 'OVERMODULATING — LEFT TRIMS IT BACK'
+            : 'LOW MODULATION — RIGHT BRINGS IT UP',
+        Urgency.watch);
+  }
+  if (r.rig.attached.isNotEmpty) {
+    return Directive(
+        '${r.rig.attached.length} STILL ATTACHED — THEY ARE COSTING YOU',
         Urgency.watch);
   }
   // 5. Nothing is wrong. Bank the quiet.
