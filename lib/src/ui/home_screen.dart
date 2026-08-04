@@ -90,9 +90,9 @@ class HomeScreen extends StatelessWidget {
                 Text(kBootStationLine,
                     textAlign: TextAlign.center,
                     style: t.at(11, K.bootSig, ls: 8)),
-                const SizedBox(height: 14),
+                const SizedBox(height: 8),
                 _Title(ui: s.ui),
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
 
                 // WHO YOU ARE. On night one this is a promise; later it is a record.
                 if (_returning)
@@ -100,12 +100,12 @@ class HomeScreen extends StatelessWidget {
                 else
                   _Brief(ui: s.ui),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: 11),
                 // TONIGHT'S CARD. The answer to "night 6 is night 1 with
                 // bigger numbers": every night after the first has a name and
                 // a shape, and you know both before you sign on.
                 if (s.night > 1) _Card(ui: s.ui, night: s.night),
-                if (s.night > 1) const SizedBox(height: 16),
+                if (s.night > 1) const SizedBox(height: 11),
                 if (s.night <= 1) const SizedBox(height: 6),
                 _Big(
                   ui: s.ui,
@@ -115,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                       : 'YOUR FIRST SHIFT',
                   onTap: onSignOn,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 // THE SHIFT THAT DOES NOT END.
                 //
                 // The career tops out — the carrier decay is capped so the
@@ -134,7 +134,7 @@ class HomeScreen extends StatelessWidget {
                         : 'NO 06:00. IT JUST KEEPS GOING.',
                     onTap: onEndless,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                 ],
                 _Secondary(
                   ui: s.ui,
@@ -150,7 +150,7 @@ class HomeScreen extends StatelessWidget {
                   label: 'AUDIO / SCREEN CHECK',
                   onTap: onSetup,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 11),
                 Text(
                   _returning
                       ? 'The eight keys under the tube are the only thing that '
@@ -160,7 +160,7 @@ class HomeScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: t.at(12, K.bootBody, h: 1.9),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(kBootFine,
                     textAlign: TextAlign.center,
                     style: t.at(9, K.bootFine, ls: 2)),
@@ -235,7 +235,7 @@ class _Brief extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: t.at(13, K.bootBody, h: 1.75)),
             ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           _RuleRow(ui: ui, k: 'ARROW KEYS', v: 'hold the carrier, mind the plate'),
           _RuleRow(ui: ui, k: 'KEYS 1-8', v: 'each banishes exactly one thing'),
           _RuleRow(ui: ui, k: 'DREAD 100', v: 'and it comes out here instead'),
@@ -310,7 +310,7 @@ class _Ledger extends StatelessWidget {
         // bar that always starts empty and always fills — a bar stuck at 94%
         // for six nights tells the player nothing, so it measures from the
         // PREVIOUS rung rather than from zero.
-        const SizedBox(height: 14),
+        const SizedBox(height: 8),
         Text(rankOf(s),
             textAlign: TextAlign.center,
             style: display(20 * s.ui, K.ink, letterSpacing: 6)),
@@ -321,7 +321,7 @@ class _Ledger extends StatelessWidget {
         const SizedBox(height: 12),
         _NextRung(s: s),
         if (held.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 700),
             child: Text(
