@@ -425,4 +425,24 @@ void main() {
     expect(r.logDue, lessThan(dueBefore),
         reason: 'the Rerun signed the book for the operator');
   });
+
+  test('the ledger can say what it spent, and on what', () {
+    // The point of a score that only counts up is that at the end it can tell
+    // you EXACTLY what it counted. Every charge is recorded with its shift
+    // time and coalesced by cause, and the death sheet prints the worst six.
+    // This was built and then not shown for two commits, so the sheet still
+    // read like the old game's: a score and a sales pitch for a revive.
+    final r = playNight(16, missRate: 0.4);
+    expect(r.rig.invoice, isNotEmpty,
+        reason: 'a whole night cost nothing anybody can name');
+    final total =
+        r.rig.invoice.fold<double>(0, (a, d) => a + d.amount);
+    expect(total, closeTo(r.rig.offAir, 0.5),
+        reason: 'the invoice totals ${total.toStringAsFixed(1)} against drums '
+            'reading ${r.rig.offAir.toStringAsFixed(1)} — the sheet would be '
+            'itemising a different night from the one that was played');
+    // and it must be readable: coalesced, not four thousand rows of 0.03
+    expect(r.rig.invoice.length, lessThan(40),
+        reason: '${r.rig.invoice.length} lines is a log, not an invoice');
+  });
 }

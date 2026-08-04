@@ -574,6 +574,16 @@ double quotaShortfall(GameState s) => math.max(0, segQuota(s) - s.segSig);
 /// it simply keeps counting. So this already reads 07:12 on its own, and the
 /// shiftClockLive() helper that added overMin on top of it was double-counting
 /// the same overtime.
+/// The same clock, for an arbitrary moment in the shift. The invoice records
+/// its charges in REAL seconds since sign-on, and the sheet has to print them
+/// as times on the station clock or they mean nothing to the reader.
+String shiftClockAt(double realSeconds) {
+  final double shiftMin = realSeconds / kMinReal;
+  final h = (23 + (shiftMin / 60).floor()) % 24;
+  final m = (shiftMin % 60).floor();
+  return '${pad2(h)}:${pad2(m)}';
+}
+
 String shiftClock(GameState s) {
   final h = (23 + (s.shiftMin / 60).floor()) % 24;
   final m = (s.shiftMin % 60).floor();

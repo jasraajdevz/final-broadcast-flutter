@@ -347,6 +347,9 @@ class Rig {
   final Map<String, double> offAirBy = <String, double>{};
   final List<Debit> invoice = <Debit>[];
 
+  /// Index of the line each cause is currently accumulating into.
+  final Map<String, int> _openLine = <String, int>{};
+
   // --- state ---
   double dread = 0;
   double busy = 0;
@@ -447,12 +450,20 @@ class Rig {
     if (amount <= 0) return;
     offAir += amount;
     offAirBy[what] = (offAirBy[what] ?? 0) + amount;
-    final last = invoice.isNotEmpty ? invoice.last : null;
-    // Per-second tariffs coalesce into one line, or the invoice is 4,000 rows
-    // of "DEAD AIR 0.03" and nobody can read what killed them.
-    if (last != null && last.what == what && _t - last.at < 12) {
-      last.amount += amount;
+    // Per-second tariffs coalesce into one line per cause, or the invoice is
+    // thousands of rows of "DEAD AIR 0.03" and nobody can read what killed
+    // them.
+    //
+    // COALESCING AGAINST THE LAST LINE ONLY DOES NOT WORK, and the guard in
+    // desk_test caught it at 4,418 lines for one night. Several causes charge
+    // in the SAME FRAME — low power and overmodulation and attachments all at
+    // once — so they interleave, the last line is never the one you want, and
+    // every single frame opens three new rows.
+    final int? open = _openLine[what];
+    if (open != null && _t - invoice[open].at < 12) {
+      invoice[open].amount += amount;
     } else {
+      _openLine[what] = invoice.length;
       invoice.add(Debit(_t, what, amount));
     }
   }

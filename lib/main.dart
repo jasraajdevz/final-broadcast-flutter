@@ -423,6 +423,14 @@ class _GameRootState extends State<GameRoot>
     if (page != null && unlocked(s, 'archive') && !docFound(s, s.night)) {
       s.log[s.night] = true;
       s.save();
+      // BELT AND BRACES. The page from the desk is read with the controls
+      // covered, and a modal that takes the operator's hands away must not let
+      // the drums turn — measured in play, sixteen seconds went onto the
+      // licence behind this sheet. The night is not supposed to have started
+      // yet at all here, so this should be redundant; it is set anyway,
+      // because "should be redundant" is how the first sixteen seconds got
+      // charged.
+      runtime.paused = true;
       setState(() => _pendingLog = page);
       return; // the night starts when the drawer closes
     }
@@ -431,6 +439,7 @@ class _GameRootState extends State<GameRoot>
   }
 
   void _closeLog() {
+    runtime.paused = false;
     setState(() => _pendingLog = null);
     runtime.startBroadcast();
   }

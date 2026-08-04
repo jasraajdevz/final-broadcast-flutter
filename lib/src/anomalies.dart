@@ -2403,6 +2403,32 @@ class AnomalyRuntime extends ChangeNotifier {
           'NIGHT ${s.night}  ·  BANISHED ${s.stats.banished}'
               '  ·  BEST STREAK ${s.stats.bestStreak}',
         ]),
+        // THE INVOICE.
+        //
+        // The whole point of a ledger that only counts up is that at the end
+        // it can tell you EXACTLY what it counted. This was built — every
+        // charge is recorded with its shift time and coalesced by cause — and
+        // then never shown, so the sheet still read like the old one: a score
+        // and a sales pitch for a revive. A player who cannot see what killed
+        // them blames the game; a player looking at four lines with times
+        // against them blames themselves, which is the entire difference
+        // between a loss that stings and a loss that stops you playing.
+        ...(() {
+          final lines = rig.invoice.toList()
+            ..sort((a, b) => b.amount.compareTo(a.amount));
+          if (lines.isEmpty) return <EndPara>[];
+          return <EndPara>[
+            EndPara(<String>[
+              'THE LICENCE ALLOWED ${rig.ceiling.toStringAsFixed(0)} SECONDS '
+                  'OFF THE AIR. THIS IS WHERE THEY WENT.',
+            ]),
+            for (final d in lines.take(6))
+              EndPara(<String>[
+                '${shiftClockAt(d.at)}   ${d.what}',
+                '   ${d.amount.toStringAsFixed(1)}',
+              ], ParaStyle.dim),
+          ];
+        })(),
         EndPara(<String>[
           'An ',
           'emergency sponsor',
