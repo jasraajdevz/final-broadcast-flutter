@@ -41281,7 +41281,8 @@ r.ex(150,0.3)
 j.a9t()}else if(p<=0){j.k1=0;++j.k4
 r.ex(46,0)
 if($.C().v()<0.4)A.d_(A.b7(0,300),new A.Ry(j),t.H)}}else if((j.k2-=s)<=0){l=q.CW/100
-j.k2=80+$.C().v()*110-l*40
+if(!(j.r==null&&j.ay<=0&&!j.go))j.k2=4
+else j.k2=80+$.C().v()*110-l*40
 if(j.r==null&&j.ay<=0&&!j.go){j.k3=8+$.C().v()*12
 j.k1=1
 j.ok=j.k4>=2&&$.C().v()<0.06+j.k4*0.035+l*0.1
@@ -41941,73 +41942,74 @@ s=p.Q
 q=s.length!==0?B.b.gan(s):null
 if(q!=null&&q.b===a&&p.cx-q.a<12)q.c+=b
 else s.push(new A.Dy(p.cx,a,b))},
-abI(a,b){var s,r,q,p,o,n,m,l,k=this
-if(k.ch)return
-s=B.d.a2(k.cx/480,0,1)
-r=k.d
-r+=(k.c-r)*0.5*k.db*a
-k.d=r
-q=Math.pow(k.a,0.85)
-p=k.cx
-p=r-((2.9+q*0.42)*(0.72+0.62*s)+(Math.sin(p*0.31)+Math.sin(p*0.097)*0.8)*2.3)*a
-k.d=p
-s=k.id
-q=s.h(0,B.hj)
-r=q==null?0:q
-r=k.d=p-(r+k.ta(B.hj))*a
-q=k.ax
-if(q>0){r=k.d=r-26*a
-k.ax=q-a}k.d=B.d.a2(r,0,100)
-o=(k.ax>0?0:k.c)/100
-r=k.f=k.f+o*o*13.6*a
-r-=(2+r*0.06)*k.cy*a
-k.f=r
-q=s.h(0,B.kf)
-if(q==null)q=0
-q=r+(q+k.ta(B.kf))*a
-k.f=q
-q=B.d.a2(q,0,140)
-k.f=q
-if(q>=100&&k.ax<=0){++k.ay
-k.ax=3.2
-k.f=44
-k.kr("OVERLOAD RECYCLE",2.5)}r=k.e
-q=k.cx
-q=r+(Math.sin(q*0.34)+Math.sin(q*0.11)*0.7+Math.sin(q*0.83)*0.7)*4.8*k.dx*a
-k.e=q
-r=s.h(0,B.hk)
-if(r==null)r=0
-r=q-(r+k.ta(B.hk))*a
-k.e=r
-r=k.e=B.d.a2(r,0,100)
-if(r<4||r>96){if((k.CW+=a)>1.5){k.CW=0
-k.e=50
-k.kr("SPLATTER",25)}}else k.CW=0
-r=k.r-=a
+abI(a,b){var s,r,q,p,o,n,m,l,k,j=this
+if(j.ch)return
+s=B.d.a2(j.cx/480,0,1)
+r=j.d
+r+=(j.c-r)*0.5*j.db*a
+j.d=r
+q=j.a
+p=Math.pow(q,0.85)
+o=j.cx
+o=r-((2.9+p*0.42)*(0.72+0.62*s)+(Math.sin(o*0.31)+Math.sin(o*0.097)*0.8)*3.6)*a
+j.d=o
+s=j.id
+p=s.h(0,B.hj)
+r=p==null?0:p
+r=j.d=o-(r+j.ta(B.hj))*a
+p=j.ax
+if(p>0){r=j.d=r-26*a
+j.ax=p-a}j.d=B.d.a2(r,0,100)
+n=(j.ax>0?0:j.c)/100
+r=j.f=j.f+n*n*13.6*a
+r-=(2+r*0.06)*j.cy*a
+j.f=r
+p=s.h(0,B.kf)
+if(p==null)p=0
+p=r+(p+j.ta(B.kf))*a
+j.f=p
+p=B.d.a2(p,0,140)
+j.f=p
+if(p>=100&&j.ax<=0){++j.ay
+j.ax=3.2
+j.f=44
+j.kr("OVERLOAD RECYCLE",2.5)}r=j.e
+p=j.cx
+q=r+(Math.sin(p*0.34)+Math.sin(p*0.11)*0.7+Math.sin(p*0.83)*0.7)*4.8*j.dx*B.d.a2(0.58+q*0.03,0,1)*a
+j.e=q
+p=s.h(0,B.hk)
+r=p==null?0:p
+r=q-(r+j.ta(B.hk))*a
+j.e=r
+r=j.e=B.d.a2(r,0,100)
+if(r<4||r>96){if((j.CW+=a)>1.5){j.CW=0
+j.e=50
+j.kr("SPLATTER",25)}}else j.CW=0
+r=j.r-=a
 s=s.h(0,B.hl)
 if(s==null)s=0
-s=r-(s+k.ta(B.hl))*a
-k.r=s
-if(s<-25){k.r=k.fr
-k.kr("LOG NOT SIGNED",20)}if(k.k1)for(s=k.fy.aaE(k.cx,12,a),r=s.length,n=0;n<s.length;s.length===r||(0,A.v)(s),++n)k.Fp(s[n],!0)
-k.fy.abX(0,k.cx,16)
-if(k.ax>0)k.kr("LOCKOUT",a)
-else{s=k.d
-if(s<=0.5)k.kr("DEAD AIR",a)
-else if(s<52)k.kr("LOW POWER",0.5*a)}s=k.e
+s=r-(s+j.ta(B.hl))*a
+j.r=s
+if(s<-25){j.r=j.fr
+j.kr("LOG NOT SIGNED",20)}if(j.k1)for(s=j.fy.aaE(j.cx,12,a),r=s.length,m=0;m<s.length;s.length===r||(0,A.v)(s),++m)j.Fp(s[m],!0)
+j.fy.abX(0,j.cx,16)
+if(j.ax>0)j.kr("LOCKOUT",a)
+else{s=j.d
+if(s<=0.5)j.kr("DEAD AIR",a)
+else if(s<52)j.kr("LOW POWER",0.5*a)}s=j.e
 if(Math.abs(s-50)>15){s=s>50?"OVERMODULATION":"LOW MODULATION"
-k.kr(s,0.35*a)}if(k.gzj()){s=k.y+=a
-if(s>4){m=Math.min(220,180+B.d.bb((s-4)/12))
-if(m>k.x)k.x=m}}else k.y=0
-if(k.w>=k.x+k.dy)k.ch=!0
-s=k.at
-k.at=s+((b?1:0)-s)*a/3
-l=(B.d.a2(1-k.d/100,0,1)*0.34+B.d.a2(k.f/100,0,1)*0.2+B.d.a2(Math.abs(k.e-50)/42,0,1)*0.14+B.d.a2(k.at,0,1)*0.32-0.36)*14
-s=k.as
-s+=(l<0?l*3*k.fx:l)*a
-k.as=s
-k.as=B.d.a2(s,0,100)
-k.cx+=a},
+j.kr(s,0.35*a)}if(j.gzj()){s=j.y+=a
+if(s>4){l=Math.min(220,180+B.d.bb((s-4)/12))
+if(l>j.x)j.x=l}}else j.y=0
+if(j.w>=j.x+j.dy)j.ch=!0
+s=j.at
+j.at=s+((b?1:0)-s)*a/3
+k=(B.d.a2(1-j.d/100,0,1)*0.34+B.d.a2(j.f/100,0,1)*0.2+B.d.a2(Math.abs(j.e-50)/42,0,1)*0.14+B.d.a2(j.at,0,1)*0.32-0.36)*14
+s=j.as
+s+=(k<0?k*3*j.fx:k)*a
+j.as=s
+j.as=B.d.a2(s,0,100)
+j.cx+=a},
 Fp(a,b){var s=this
 switch(a){case"drive+":s.c=Math.min(100,s.c+6)
 break
