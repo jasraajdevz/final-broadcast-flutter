@@ -673,7 +673,7 @@ class RoomScene {
 
       final warnHot = runtime.warn > 0 || runtime.active != null;
       // lineCap is still "round" here, leaked from the cable runs.
-      final art = stroke(rgba(90, 180, 150, warnHot ? 0.35 : 0.22), 1,
+      final art = stroke(rgba(144, 162, 180, warnHot ? 0.35 : 0.22), 1,
           cap: ui.StrokeCap.round);
 
       if (i == 0) {
@@ -728,7 +728,7 @@ class RoomScene {
               center: ui.Offset(m.dx + sw * 0.5, m.dy + sh * 0.46),
               width: sw * 0.62,
               height: sh * 0.30),
-          fill(rgba(40, 90, 70, 0.35)),
+          fill(rgba(72, 81, 90, 0.35)),
         );
         // the chair back
         _fillRect(g, m.dx + sw * 0.30, m.dy + sh * 0.44, sw * 0.40, sh * 0.34,

@@ -1671,7 +1671,8 @@ class AnomalyRuntime extends ChangeNotifier {
     audio.env('sine', 1000, 0.5, 0.12, 1000);
     s.toast('KBLK-7 IS ON AIR — GOOD LUCK, OPERATOR', ToastKind.gold);
     s.toasts
-        .pushDelayed(1600, 'THE CARRIER FALLS ON ITS OWN — UP / DOWN', ToastKind.gold);
+        // (was a third copy of what the marquee already says)
+        .pushDelayed(1600, 'KBLK-7 IS ON AIR', ToastKind.gold);
     notifyListeners();
   }
 

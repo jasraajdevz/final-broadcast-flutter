@@ -1170,15 +1170,15 @@ void _drawVert(ui.Canvas g, double t, double p) {
         <double>[0, 0.55, 1],
       ),
     );
-    final line = stroke(rgba(120, 220, 170, 0.20), 1);
+    final line = stroke(rgba(176, 198, 220, 0.20), 1);
     for (var i = 0.0; i < _fw; i += 24) {
       g.drawLine(ui.Offset(i, 0), ui.Offset(i, _fh), line);
     }
     for (var j = 140.0; j < _fh; j += 26) {
       g.drawLine(ui.Offset(0, j), ui.Offset(_fw, j), line);
     }
-    fillRect(g, 30, 96, 54, 44, rgba(140, 240, 190, 0.30));
-    fillRect(g, 232, 104, 50, 36, rgba(140, 240, 190, 0.30));
+    fillRect(g, 30, 96, 54, 44, rgba(192, 216, 240, 0.30));
+    fillRect(g, 232, 104, 50, 36, rgba(192, 216, 240, 0.30));
     g.restore();
   }
 
@@ -1311,10 +1311,10 @@ void _drawDead(ui.Canvas g, double t, double p) {
       _fw,
       _fh,
       radialR0(const ui.Offset(_fw / 2, _fh * 0.58), 6, 140,
-          <ui.Color>[rgba(16, 62, 38, 0.55 * ghost), rgba(0, 0, 0, 0)],
+          <ui.Color>[rgba(49, 55, 62, 0.55 * ghost), rgba(0, 0, 0, 0)],
           <double>[0, 1]),
     );
-    final hz = stroke(rgba(70, 150, 110, 0.16 * ghost), 1);
+    final hz = stroke(rgba(120, 135, 150, 0.16 * ghost), 1);
     for (var k = 0; k < 3; k++) {
       final y = _fh * 0.62 + k * 9.0;
       g.drawLine(ui.Offset(0, y), ui.Offset(_fw, y), hz);
@@ -1333,11 +1333,11 @@ void _drawDead(ui.Canvas g, double t, double p) {
     if (bite < p * 0.82) continue;
     final wob = math.sin(u * 30 + t * 2.2) * (0.5 + p * 1.7);
     fillRect(g, i * segW, ly + wob - 0.8, segW + 0.6, 1.6,
-        rgba(80, 255, 140, bright));
+        rgba(204, 229, 255, bright));
   }
   // the last of it, refusing
   fillRect(g, _fw / 2 - 3, ly - 1, 6, 2,
-      rgba(150, 255, 190, clampD(0.50 + math.sin(t * 5) * 0.40, 0, 1)));
+      rgba(204, 229, 255, clampD(0.50 + math.sin(t * 5) * 0.40, 0, 1)));
 
   const full = '— NO CARRIER —';
   final keep = clampD((1 - p * 0.95) * full.length, 0, full.length * 1.0).round();
@@ -1346,7 +1346,7 @@ void _drawDead(ui.Canvas g, double t, double p) {
       g,
       full.substring(0, keep),
       const ui.Offset(_fw / 2, _fh - 34),
-      mono(9, rgba(90, 150, 115, clampD(0.34 + math.sin(t * 2) * 0.14, 0, 1))),
+      mono(9, rgba(120, 135, 150, clampD(0.34 + math.sin(t * 2) * 0.14, 0, 1))),
       anchor: TextAnchor.center,
       cache: feedText,
     );
@@ -1362,14 +1362,14 @@ void _drawDead(ui.Canvas g, double t, double p) {
   g.drawRect(ui.Rect.fromLTWH(_fw - ix, 0, ix, _fh), black);
   if (sq > 0.02) {
     g.drawRect(ui.Rect.fromLTWH(ix, iy, _fw - ix * 2, _fh - iy * 2),
-        stroke(rgba(120, 220, 170, clampD(0.08 + p * 0.26, 0, 1)), 1));
+        stroke(rgba(176, 198, 220, clampD(0.08 + p * 0.26, 0, 1)), 1));
   }
 
   // and every so often the tube discharges across what is left
   final flash = _spike(t, 2.3, 26) * p;
   if (flash > 0.01) {
     fillRect(g, ix, ly - 1.5 - 6 * flash, _fw - ix * 2, 3 + 12 * flash,
-        rgba(220, 255, 235, clampD(flash * 0.9, 0, 1)));
+        rgba(204, 229, 255, clampD(flash * 0.9, 0, 1)));
   }
 }
 
@@ -1391,7 +1391,7 @@ void _drawCard(ui.Canvas g, double t, double p) {
     ui.Color(0xFFC0C0C0),
     ui.Color(0xFFC0C000),
     ui.Color(0xFF00C0C0),
-    ui.Color(0xFF00C000),
+    ui.Color(0xFF99ACC0),
     ui.Color(0xFFC000C0),
     ui.Color(0xFFC00000),
     ui.Color(0xFF0000C0),
@@ -1636,7 +1636,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
     _fw,
     horizon,
     linear(ui.Offset.zero, const ui.Offset(0, horizon),
-        <ui.Color>[rgba(9, 34, 23, 1), rgba(4, 18, 12, 1)], <double>[0, 1]),
+        <ui.Color>[rgba(27, 30, 34, 1), rgba(4, 18, 12, 1)], <double>[0, 1]),
   );
   fillRectShader(
     g,
@@ -1645,10 +1645,10 @@ void _drawRerun(ui.Canvas g, double t, double p) {
     _fw,
     _fh - horizon,
     linear(const ui.Offset(0, horizon), const ui.Offset(0, _fh),
-        <ui.Color>[rgba(16, 52, 36, 1), rgba(3, 14, 9, 1)], <double>[0, 1]),
+        <ui.Color>[rgba(41, 46, 52, 1), rgba(3, 14, 9, 1)], <double>[0, 1]),
   );
   const vp = ui.Offset(_fw * 0.54, horizon);
-  final fl = stroke(rgba(90, 200, 145, 0.14), 1);
+  final fl = stroke(rgba(160, 180, 200, 0.14), 1);
   for (var i = -7; i <= 7; i++) {
     g.drawLine(vp, ui.Offset(_fw * 0.5 + i * 58.0, _fh), fl);
   }
@@ -1658,21 +1658,21 @@ void _drawRerun(ui.Canvas g, double t, double p) {
     g.drawLine(ui.Offset(0, y), ui.Offset(_fw, y), fl);
   }
   // lighting grid and a boom hanging in from the top-left
-  final rig = stroke(rgba(120, 220, 170, 0.16), 2);
+  final rig = stroke(rgba(176, 198, 220, 0.16), 2);
   g.drawLine(const ui.Offset(0, 16), const ui.Offset(_fw, 22), rig);
   for (var i = 0; i < 5; i++) {
     final lx = 24 + i * 68.0;
     g.drawRect(ui.Rect.fromLTWH(lx - 5, 18, 10, 9),
-        fill(rgba(150, 240, 190, 0.22)));
+        fill(rgba(192, 216, 240, 0.22)));
   }
   final boom = ui.Path()
     ..moveTo(-4, 2)
     ..lineTo(74, 40);
-  g.drawPath(boom, stroke(rgba(150, 240, 190, 0.24), 2));
-  drawEllipse(g, 76, 41, 4.5, 2.6, 0.5, fill(rgba(150, 240, 190, 0.26)));
+  g.drawPath(boom, stroke(rgba(192, 216, 240, 0.24), 2));
+  drawEllipse(g, 76, 41, 4.5, 2.6, 0.5, fill(rgba(192, 216, 240, 0.26)));
   // the tape mark he snaps back to
   final markX = walkX(0), markY = walkY(0);
-  final mk = stroke(rgba(200, 255, 225, 0.28), 1.2);
+  final mk = stroke(rgba(204, 229, 255, 0.28), 1.2);
   g.drawLine(ui.Offset(markX - 5, markY), ui.Offset(markX + 5, markY), mk);
   g.drawLine(ui.Offset(markX, markY - 3), ui.Offset(markX, markY + 3), mk);
 
@@ -1681,7 +1681,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
   for (var k = takes - 1; k >= 1; k--) {
     final uu = (u + k / takes) % 1.0;
     _walker(g, walkX(uu), walkY(uu), walkS(uu),
-        rgba(140, 240, 195, clampD(0.10 + p * 0.14, 0, 1)), uu * 5);
+        rgba(192, 216, 240, clampD(0.10 + p * 0.14, 0, 1)), uu * 5);
   }
 
   // --- the one that does not walk --------------------------------------
@@ -1693,7 +1693,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
     if (still > 0.72) {
       // a sliver of cheek. Not a face — it has not turned that far yet.
       drawEllipse(g, _fw * 0.74 + 2.6, sy - 62 * 0.40, 1.6, 3.0, 0,
-          fill(rgba(196, 244, 218, clampD((still - 0.72) * 3, 0, 0.60))));
+          fill(rgba(195, 219, 244, clampD((still - 0.72) * 3, 0, 0.60))));
     }
   }
 
@@ -1704,7 +1704,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
       drawImageStretch(tc, prev, _feedRect, nearestPaint());
     }
     fillRect(tc, 0, 0, _fw, _fh, rgba(2, 7, 5, 0.055 + p * 0.020));
-    _walker(tc, walkX(u), walkY(u), walkS(u), rgba(170, 255, 210, 0.42), u * 5);
+    _walker(tc, walkX(u), walkY(u), walkS(u), rgba(204, 229, 255, 0.42), u * 5);
     if (u < 0.05) {
       fillRect(tc, 0, 0, _fw, _fh, rgba(2, 7, 5, 1)); // hard cut on the splice
     }
@@ -1720,7 +1720,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
       nearestPaint(alpha: 0.26, mode: ui.BlendMode.plus));
 
   // the solid, current pass
-  _walker(g, walkX(u), walkY(u), walkS(u), rgba(206, 255, 228, 0.94), u * 5);
+  _walker(g, walkX(u), walkY(u), walkS(u), rgba(204, 229, 255, 0.94), u * 5);
 
   // --- the machine -------------------------------------------------------
   final secs = ((loop % 1) * 30).floor().toString().padLeft(2, '0');
@@ -1736,7 +1736,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
       const ui.Color(0xFF2E2E2E));
 }
 
-final TextStyle _rerunTc = mono(11, rgba(120, 255, 180, 0.8));
+final TextStyle _rerunTc = mono(11, rgba(204, 229, 255, 0.8));
 
 /// A figure walking AWAY: shoulders wider than the head, no features, legs and
 /// arms out of phase with each other.
@@ -1796,7 +1796,7 @@ void _walker(
 /// remainder(), not %, so that stays true.
 final List<TextStyle> _nielStyles = <TextStyle>[
   for (final rem in const <int>[-1, 0, 1, 2])
-    mono(11, rgba(130, 255, 180, clampD(0.30 + rem * 0.22, 0, 1)),
+    mono(11, rgba(204, 229, 255, clampD(0.30 + rem * 0.22, 0, 1)),
         weight: FontWeight.bold),
 ];
 final TextStyle _nielHead =
@@ -1883,11 +1883,11 @@ void _drawNiel(ui.Canvas g, double t, double p) {
       ..lineTo(bx + sg * 11 * s, shoulderY + 70 * s)
       ..close();
     g.drawPath(lap, fill(rgba(52, 62, 74, 0.9)));
-    g.drawPath(lap, stroke(rgba(120, 190, 160, 0.22), 1));
+    g.drawPath(lap, stroke(rgba(152, 171, 190, 0.22), 1));
   }
   g.restore();
   g.drawPath(
-      suit, stroke(rgba(150, 255, 190, clampD(0.26 + p * 0.24, 0, 1)), 1.2));
+      suit, stroke(rgba(204, 229, 255, clampD(0.26 + p * 0.24, 0, 1)), 1.2));
 
   // the head. It is a bar chart, and it is falling.
   const barH = <double>[46, 38, 30, 21, 12, 5];

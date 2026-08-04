@@ -141,23 +141,41 @@ const List<String> kMonoFallback = ['Roboto', 'Courier', 'monospace'];
 
 class K {
   K._();
-  static const Color amber = Color(0xFFFFB347); // --amber
-  static const Color amberDim = Color(0xFF8A5B1E); // --amber-dim
-  static const Color green = Color(0xFF6DFF9A); // --green
-  static const Color greenDim = Color(0xFF1F6B39); // --green-dim
-  static const Color red = Color(0xFFFF3B30); // --red
-  static const Color redDim = Color(0xFF701410); // --red-dim
-  static const Color cyan = Color(0xFF57E6FF); // --cyan
-  static const Color panel = Color(0xFF0D0F10); // --panel
-  static const Color panel2 = Color(0xFF151A1B); // --panel-2
-  static const Color edge = Color(0xFF2A3234); // --edge
-  static const Color ink = Color(0xFFC9D6D4); // --ink
+
+  // THE STATION IS NOT GREEN ANY MORE.
+  //
+  // It was a warm phosphor-green terminal for the whole of its life — 6DFF9A
+  // on a teal-black panel — and green is the colour of a machine that is
+  // WORKING. It reads as go, as healthy, as the little screen in a cosy
+  // spaceship. Eight minutes a night of a soothing colour is not something a
+  // jump scare can undo, and it is the same mistake the audio made when the
+  // click was an ascending pentatonic ladder.
+  //
+  // This is the same building lit by the tubes themselves: cold bone-white
+  // phosphor, sodium orange for anything on fire, and a panel that is
+  // blue-black rather than green-black. Nothing in the room is warm except
+  // the things that are going wrong.
+  //
+  // The names are kept — `green` is still called green — because two hundred
+  // call sites read them and renaming every one to `bone` would be a large
+  // diff that changes no pixel. The value is the change.
+  static const Color amber = Color(0xFFFF9E3D); // sodium, and it means TROUBLE
+  static const Color amberDim = Color(0xFF7A4212);
+  static const Color green = Color(0xFFC8DCE4); // cold phosphor, near-white
+  static const Color greenDim = Color(0xFF2E4650);
+  static const Color red = Color(0xFFFF2E22);
+  static const Color redDim = Color(0xFF6B0F0B);
+  static const Color cyan = Color(0xFF7FB8D4); // the meters
+  static const Color panel = Color(0xFF07090C);
+  static const Color panel2 = Color(0xFF0E1319);
+  static const Color edge = Color(0xFF232C34);
+  static const Color ink = Color(0xFFBFCBD4);
 
   // Secondary tones lifted straight out of the stylesheet.
   static const Color black = Color(0xFF000000);
-  static const Color bg = Color(0xFF05070A); // theme-color
-  static const Color lbl = Color(0xFF7D9294); // .rdo .lbl
-  static const Color subGreen = Color(0xFF5FAE7F); // .rdo .sub
+  static const Color bg = Color(0xFF04060A); // theme-color
+  static const Color lbl = Color(0xFF6E7F8C); // .rdo .lbl
+  static const Color subGreen = Color(0xFF8AA4B2); // .rdo .sub
   static const Color dreadLbl = Color(0xFF9C7676);
   static const Color dreadTrack = Color(0xFF160C0C);
   static const Color dreadBorder = Color(0xFF3A1A1A);
@@ -168,26 +186,26 @@ class K {
   static const Color onAirOffBorder = Color(0xFF4A1010);
   static const Color onAirLive = Color(0xFFFF5B50);
   static const Color onAirLiveBg = Color(0xFF3A0A0A);
-  static const Color statusTop = Color(0xFF12181A);
-  static const Color statusBot = Color(0xFF080B0C);
-  static const Color statusInset = Color(0xFF2C3739);
-  static const Color rackTop = Color(0xFF101617);
-  static const Color rackBot = Color(0xFF070A0B);
-  static const Color tabBg = Color(0xFF0A0E0F);
-  static const Color tabInk = Color(0xFF54666A);
-  static const Color tabOnBg = Color(0xFF161C1D);
+  static const Color statusTop = Color(0xFF0D141B);
+  static const Color statusBot = Color(0xFF05080C);
+  static const Color statusInset = Color(0xFF26313C);
+  static const Color rackTop = Color(0xFF0B1218);
+  static const Color rackBot = Color(0xFF04070B);
+  static const Color tabBg = Color(0xFF070C11);
+  static const Color tabInk = Color(0xFF4C5C6A);
+  static const Color tabOnBg = Color(0xFF111921);
   static const Color tabHover = Color(0xFF9FB3B2);
-  static const Color itemBorder = Color(0xFF202A2C);
-  static const Color itemTop = Color(0xFF12181A);
-  static const Color itemBot = Color(0xFF0C1112);
-  static const Color itemAfford = Color(0xFF2F5A3D);
-  static const Color itemOwned = Color(0xFF2A3A2E);
-  static const Color itemName = Color(0xFFD8E6E4);
-  static const Color itemDesc = Color(0xFF849699);
-  static const Color itemStat = Color(0xFF68907D);
-  static const Color itemQty = Color(0xFF3D6165);
-  static const Color headInk = Color(0xFF6B8082);
-  static const Color headRule = Color(0xFF1B2324);
+  static const Color itemBorder = Color(0xFF1C2530);
+  static const Color itemTop = Color(0xFF0D141B);
+  static const Color itemBot = Color(0xFF080D13);
+  static const Color itemAfford = Color(0xFF2B4A5E);
+  static const Color itemOwned = Color(0xFF27343E);
+  static const Color itemName = Color(0xFFD2DEE6);
+  static const Color itemDesc = Color(0xFF7A8996);
+  static const Color itemStat = Color(0xFF7E97A6);
+  static const Color itemQty = Color(0xFF3A5566);
+  static const Color headInk = Color(0xFF63767F);
+  static const Color headRule = Color(0xFF18212B);
   static const Color noteInk = Color(0xFF8496A0);
   static const Color keyTop = Color(0xFF232B2D);
   static const Color keyBot = Color(0xFF141A1B);

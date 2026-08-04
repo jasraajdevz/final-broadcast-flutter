@@ -314,11 +314,11 @@ ui.Color _anomGlow(String id) {
     case 'vert':
       return const ui.Color(0xFF78AAFF);
     case 'dead':
-      return const ui.Color(0xFF3CFF8C);
+      return const ui.Color(0xFFCCE5FF);
     case 'card':
       return const ui.Color(0xFFFF5AA0);
     case 'rerun':
-      return const ui.Color(0xFF78FFBE);
+      return const ui.Color(0xFFCCE5FF);
     case 'niel':
       return const ui.Color(0xFFFF5A46);
     case 'call':
@@ -475,7 +475,7 @@ void drawMainCRT(ui.Canvas g, GameState s, AnomalyRuntime a, ui.Image feed,
   // legible at a glance instead of being a hidden multiplier.
   final int lockTier = s.tune.tier.clamp(0, 4);
   const List<ui.Color> lockInk = <ui.Color>[
-    ui.Color(0xFFB4FFD7),
+    ui.Color(0xFFCCE5FF),
     ui.Color(0xFF8FF0FF),
     ui.Color(0xFF7FD8FF),
     ui.Color(0xFFFFC46B),
@@ -554,7 +554,7 @@ void drawMainCRT(ui.Canvas g, GameState s, AnomalyRuntime a, ui.Image feed,
         g,
         'SECOND CAMERA READS -> ${hint.nm}  [KEY ${hint.key}]',
         ui.Offset(cx + 24, cy + chh - 16),
-        mono(9, rgba(109, 255, 154, .9), weight: ui.FontWeight.bold));
+        mono(9, rgba(204, 229, 255, .9), weight: ui.FontWeight.bold));
   } else {
     fillText(g, 'MERIDIAN CATHODE  ·  MODEL 7',
         ui.Offset(cx + 24, cy + chh - 16), mono(11, rgba(180, 220, 215, .35)));
@@ -564,7 +564,7 @@ void drawMainCRT(ui.Canvas g, GameState s, AnomalyRuntime a, ui.Image feed,
   g.drawCircle(
       ui.Offset(cx + cw - 30, cy + chh - 19),
       3.5,
-      fill(a.lost ? rgba(255, 50, 40, .9) : rgba(90, 255, 150, .9)));
+      fill(a.lost ? rgba(255, 50, 40, .9) : rgba(204, 229, 255, .9)));
 
   // ---- banish window ring around the bezel ----
   if (act != null) {

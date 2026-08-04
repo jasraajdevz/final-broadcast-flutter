@@ -663,8 +663,8 @@ class WindowScene {
                 ui.Offset(wx, wy + wh * 0.30),
                 ui.Offset(wx + ww, wy + wh * 0.62),
                 <ui.Color>[
-                  rgba(80, 150, 110, 0.10),
-                  rgba(80, 150, 110, 0),
+                  rgba(120, 135, 150, 0.10),
+                  rgba(120, 135, 150, 0),
                 ],
                 const <double>[0, 0.45]));
     });

@@ -39,11 +39,9 @@ const ui.Rect _feedRect = ui.Rect.fromLTWH(0, 0, _fw, _fh);
 // ---------------------------------------------------------------------------
 
 final TextStyle _identStyle =
-    mono(15, rgba(190, 255, 215, 0.92), weight: FontWeight.bold);
-final TextStyle _subIdentStyle = mono(8, rgba(150, 220, 180, 0.7));
-final TextStyle _hintStyle = mono(9, rgba(150, 220, 185, 0.8));
-final TextStyle _manualStyle = mono(9, rgba(150, 220, 185, 0.75));
-final TextStyle _tickerStyle = mono(9, rgba(190, 255, 215, 0.85));
+    mono(15, rgba(204, 229, 255, 0.92), weight: FontWeight.bold);
+final TextStyle _subIdentStyle = mono(8, rgba(176, 198, 220, 0.7));
+final TextStyle _tickerStyle = mono(9, rgba(204, 229, 255, 0.85));
 final TextStyle _sponsorStyle =
     mono(9, rgba(255, 179, 71, 0.9), weight: FontWeight.bold);
 final TextStyle _maskedStyle =
@@ -111,7 +109,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     _fw,
     _fh,
     radialR0(const ui.Offset(_fw / 2, _fh * 0.72), 8, 150,
-        <ui.Color>[rgba(40, 70, 30, 0.42), rgba(2, 10, 6, 0)], <double>[0, 1]),
+        <ui.Color>[rgba(56, 63, 70, 0.42), rgba(2, 10, 6, 0)], <double>[0, 1]),
   );
 
   // --- the sky ---
@@ -125,7 +123,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     _fw,
     120,
     linear(const ui.Offset(0, 60), const ui.Offset(0, 180),
-        <ui.Color>[rgba(8, 26, 18, 0), rgba(16, 44, 28, 0.55)],
+        <ui.Color>[rgba(8, 26, 18, 0), rgba(35, 39, 44, 0.55)],
         <double>[0, 1]),
   );
 
@@ -138,7 +136,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     final bool out = sy > 140 && i % 3 == 0 && _townLit(s) < 7;
     if (out) continue;
     final double tw = 0.30 + math.sin(t * (0.7 + i % 5 * 0.3) + i) * 0.18;
-    fillRect(f, sx, sy, 1, 1, rgba(190, 255, 220, tw * 0.5));
+    fillRect(f, sx, sy, 1, 1, rgba(204, 229, 255, tw * 0.5));
   }
 
   // --- a second transmitter, much further out ---
@@ -151,7 +149,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
       ..lineTo(fx - 4, 178)
       ..moveTo(fx, 150)
       ..lineTo(fx + 4, 178),
-    stroke(rgba(50, 120, 80, 0.28), 1),
+    stroke(rgba(96, 108, 120, 0.28), 1),
   );
   final fb = math.sin(t * 1.13 + 2.1) * 0.5 + 0.5;
   fillRect(f, fx - 1, 148, 2, 2, rgba(255, 70, 45, 0.18 + fb * 0.42));
@@ -170,7 +168,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
   }
   ridge.lineTo(_fw, _fh);
   ridge.close();
-  f.drawPath(ridge, fill(const ui.Color(0xFF02170D)));
+  f.drawPath(ridge, fill(const ui.Color(0xFF121417)));
 
   // --- the town, going out ---
   final lit = _townLit(s);
@@ -195,7 +193,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     mast.moveTo(px - sp, y);
     mast.lineTo(px + sp, y);
   }
-  f.drawPath(mast, stroke(rgba(70, 170, 110, 0.42), 1));
+  f.drawPath(mast, stroke(rgba(136, 153, 170, 0.42), 1));
 
   // the beacon, on a slow irregular period rather than a clean sine
   final bl = (math.sin(t * 1.7) * 0.5 + 0.5) * (math.sin(t * 0.41) * 0.3 + 0.7);
@@ -221,7 +219,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         ..shader = ui.Gradient.radial(
           ui.Offset(px, cy - 2),
           14,
-          <ui.Color>[rgba(96, 196, 138, 0.20), rgba(96, 196, 138, 0)],
+          <ui.Color>[rgba(156, 176, 196, 0.20), rgba(156, 176, 196, 0)],
         ),
     );
 
@@ -252,9 +250,9 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     38,
     linear(ui.Offset(0, _fh * 0.70), ui.Offset(0, _fh * 0.70 + 38),
         <ui.Color>[
-          rgba(120, 200, 160, 0),
-          rgba(120, 200, 160, 0.055 + math.sin(t * 0.13) * 0.02),
-          rgba(120, 200, 160, 0),
+          rgba(160, 180, 200, 0),
+          rgba(160, 180, 200, 0.055 + math.sin(t * 0.13) * 0.02),
+          rgba(160, 180, 200, 0),
         ],
         <double>[0, 0.5, 1]),
   );
@@ -270,7 +268,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         math.sin(t * 0.6 + i * 3) * 1.2;
     wire.lineTo(wx, 108 + sag);
   }
-  f.drawPath(wire, stroke(rgba(40, 110, 74, 0.5), 1));
+  f.drawPath(wire, stroke(rgba(88, 99, 110, 0.5), 1));
   // and a bird on it that has not moved all night.
   //
   // Three pixels square read as a domino. It gets a head and a tail so that
@@ -291,7 +289,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     final double sx = ((i * 67) % 317).toDouble() +
         math.sin(t * 0.4 + i) * 3;
     final double sy = ((i * 41) + t * sp) % 240;
-    fillRect(f, sx, sy, 1, 1, rgba(210, 255, 230, 0.10 + (i % 5) * 0.035));
+    fillRect(f, sx, sy, 1, 1, rgba(204, 229, 255, 0.10 + (i % 5) * 0.035));
   }
 
   // --- the waveform ---
@@ -322,7 +320,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
       wave.lineTo(i.toDouble(), 52 + amp);
     }
   }
-  f.drawPath(wave, stroke(rgba(120, 255, 170, profile ? 0.95 : 0.8), 1));
+  f.drawPath(wave, stroke(rgba(204, 229, 255, profile ? 0.95 : 0.8), 1));
 
   // station ident text
   fillText(f, 'KBLK-7', const ui.Offset(_fw / 2, 26), _identStyle,
@@ -331,41 +329,16 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
       const ui.Offset(_fw / 2, 38), _subIdentStyle,
       anchor: TextAnchor.center, cache: feedText);
 
-  // the carrier needs holding by hand until the transmitters can do it
-  var owned = 0;
-  for (final p in kProducers) {
-    owned += s.prod[p.id] ?? 0;
-  }
-  if (owned < 3) {
-    final pulse = 0.55 + math.sin(t * 4) * 0.45;
-    fillRect(f, 28, _fh * 0.38, _fw - 56, 44, rgba(0, 0, 0, 0.55));
-    f.drawRect(
-        ui.Rect.fromLTWH(28.5, _fh * 0.38 + 0.5, _fw - 57, 43),
-        stroke(rgba(140, 255, 200, clampD(0.35 + pulse * 0.4, 0, 1)), 1));
-    fillText(
-      f,
-      'HOLD THE CARRIER — UP AND DOWN',
-      ui.Offset(_fw / 2, _fh * 0.38 + 20),
-      mono(13, rgba(200, 255, 225, clampD(0.6 + pulse * 0.4, 0, 1)),
-          weight: FontWeight.bold),
-      anchor: TextAnchor.center,
-      cache: feedText,
-    );
-    fillText(
-      f,
-      s.tune.strikes < 1
-          ? '>> UP RAISES THE DRIVE. IT HEATS THE PLATE. <<'
-          : 'LEFT AND RIGHT TRIM THE MODULATION',
-      ui.Offset(_fw / 2, _fh * 0.38 + 35),
-      _hintStyle,
-      anchor: TextAnchor.center,
-      cache: feedText,
-    );
-  } else if (s.tune.rate > 0) {
-    fillText(f, 'MANUAL HOLD  ${s.tune.rate}/s',
-        ui.Offset(_fw / 2, _fh * 0.38 + 8), _manualStyle,
-        anchor: TextAnchor.center, cache: feedText);
-  }
+  // NO TUTORIAL BOX.
+  //
+  // There were THREE of these running at once, all saying the same sentence,
+  // all on top of the picture: this panel, the directive marquee across the
+  // top, and a toast. The whole session was spent cutting the game's habit of
+  // talking over the player and then three overlapping tutorials went in that
+  // covered the one thing they are supposed to be looking at.
+  //
+  // The directive strip already names whichever needle is off its mark, in
+  // words, permanently, in the place the player's eye goes. That is enough.
 
   // ticker
   final tick = '  SIGNAL ${fmt(s.sig)}   THIS SEGMENT ${fmt(s.segSig)}'
@@ -432,7 +405,7 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     if (dyingNoise != null) {
       drawImageStretch(f, dyingNoise, _feedRect, nearestPaint(alpha: 0.25 + e * 0.5));
     }
-    fillRect(f, 0, 0, _fw, _fh, rgba(190, 255, 215, (1 - e) * 0.34),
+    fillRect(f, 0, 0, _fw, _fh, rgba(204, 229, 255, (1 - e) * 0.34),
         mode: ui.BlendMode.plus);
   }
   if (act != null) {
@@ -594,7 +567,7 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     }
     if (a.banishFx > 0) {
       fillRect(f, 0, 0, _fw, _fh,
-          rgba(140, 255, 190, clampD(a.banishFx * 0.35, 0, 1)));
+          rgba(204, 229, 255, clampD(a.banishFx * 0.35, 0, 1)));
     }
   }
 

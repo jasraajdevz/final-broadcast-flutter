@@ -25,7 +25,7 @@ class UX {
   // status strip
   static const Color rdoRule = Color(0xFF1E2628); // .rdo border-right
   static const Color qBarBg = Color(0xFF0E1A16);
-  static const Color qBarBorder = Color(0xFF1D3A2C);
+  static const Color qBarBorder = Color(0xFF2E343A);
 
   // rack
   static const Color tabRule = Color(0xFF232C2E); // #tabs border-bottom
@@ -46,7 +46,7 @@ class UX {
   static const Color keyHoverTop = Color(0xFF2B3436);
   static const Color keyHoverBot = Color(0xFF1A2122);
   static const Color keyHoverInk = Color(0xFFCFE0DE);
-  static const Color keyGoodEdge = Color(0xFF2F8A55);
+  static const Color keyGoodEdge = Color(0xFF6E7C8A);
   static const Color keyBadEdge = Color(0xFF8A2F2F);
   static const Color skeyTopEdge = Color(0xFF5A4416);
   static const Color skeyHoverTop = Color(0xFF332409);
@@ -62,7 +62,7 @@ class UX {
   static const Color mrowHoverBg = Color(0xFF111819);
   static const Color mrowOnBg = Color(0xFF161E1F);
   static const Color previewBorder = Color(0xFF263031);
-  static const Color ctagBg = Color(0xFF04180D);
+  static const Color ctagBg = Color(0xFF131518);
   static const Color ctagUnkBorder = Color(0xFF3A3A3A);
   static const Color ctagUnkInk = Color(0xFF4A5456);
   static const Color ctagUnkBg = Color(0xFF0D0F10);
@@ -90,13 +90,13 @@ class UX {
   static const Color winTopA = Color(0xFF06140B);
   static const Color winTopB = Color(0xFF030803);
   static const Color winHeadBg = Color(0xFF040C07);
-  static const Color winHeadRule = Color(0xFF1B3A26);
-  static const Color winAcceptBg = Color(0xFF06210F);
+  static const Color winHeadRule = Color(0xFF2E343A);
+  static const Color winAcceptBg = Color(0xFF1A1D21);
 
   // boot
   static const Color bootBtnBg = Color(0xFF0A1A10);
-  static const Color bootBtnBorder = Color(0xFF2F7A4C);
-  static const Color bootBtnHover = Color(0xFF0E2A18);
+  static const Color bootBtnBorder = Color(0xFF616D7A);
+  static const Color bootBtnHover = Color(0xFF21252A);
   static const Color bootBody2 = Color(0xFF6B7D80);
   static const Color rotSub = Color(0xFF4A5A5C);
 
