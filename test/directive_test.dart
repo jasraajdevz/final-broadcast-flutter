@@ -111,7 +111,7 @@ void main() {
     final d = primeDirective(s, r);
     expect(d.text, contains(c.nm),
         reason: 'the strip must say what the keycap says');
-    expect(d.text, contains('KEY ' + c.key));
+    expect(d.text, contains('KEY ${c.key}'));
     // and it must name a key that is actually LIVE
     expect(a.liveKeys, contains(c.id));
   });

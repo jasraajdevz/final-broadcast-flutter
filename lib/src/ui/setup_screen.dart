@@ -182,7 +182,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 s.save();
                 widget.onDone();
               },
-              builder: (_, hover, __) => Container(
+              builder: (_, hover, _) => Container(
                 width: 420,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
@@ -236,7 +236,7 @@ class _Check extends StatelessWidget {
     final t = Sty(ui);
     return Pressable(
       onTap: onTap,
-      builder: (_, hover, __) => Container(
+      builder: (_, hover, _) => Container(
         width: 165,
         padding: const EdgeInsets.symmetric(vertical: 11),
         decoration: BoxDecoration(

@@ -14,6 +14,7 @@ import 'package:flutter/widgets.dart';
 import '../consts.dart';
 import '../meta.dart';
 import '../career.dart';
+import 'home_backdrop.dart';
 import '../nights.dart';
 import '../story.dart';
 import '../state.dart';
@@ -44,18 +45,15 @@ class HomeScreen extends StatelessWidget {
       color: K.black,
       child: Stack(
         children: <Widget>[
-          // the station's own vignette, so the screen is part of the room
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(0, -0.15),
-                  radius: 0.95,
-                  colors: <Color>[Color(0xFF0A0C0D), Color(0xFF000000)],
-                ),
-              ),
-            ),
-          ),
+          // THE STATION, FROM OUTSIDE, AT THREE IN THE MORNING.
+          //
+          // This was a radial gradient. It is the first thing anybody sees and
+          // the place the decision to play another night gets made, and it
+          // looked like a settings page. Everything in the backdrop is drawn,
+          // sits in the outer thirds, and lives under a vignette — a handsome
+          // home screen that makes SIGN ON hard to read is worse than the
+          // gradient was.
+          Positioned.fill(child: HomeBackdrop(s: s)),
           // MUST be Positioned.fill, not a bare child. A Stack hands its
           // non-positioned children LOOSE constraints, so this Padding
           // shrink-wrapped the Column and the Stack pinned the result to its
@@ -432,7 +430,7 @@ class _Tertiary extends StatelessWidget {
     final t = Sty(ui);
     return Pressable(
       onTap: onTap,
-      builder: (_, hover, __) => Padding(
+      builder: (_, hover, _) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
         child: Text(label,
             style: t.at(10, hover ? K.ink : K.lbl, ls: 2.5)),

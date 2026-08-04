@@ -100,7 +100,7 @@ class LogSheet extends StatelessWidget {
             ),
             Pressable(
               onTap: onDone,
-              builder: (_, hover, __) => Container(
+              builder: (_, hover, _) => Container(
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 decoration: BoxDecoration(
                   color: hover

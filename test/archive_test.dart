@@ -83,7 +83,7 @@ void main() {
   });
 
   group('the personal file', () {
-    GameState _deep() {
+    GameState deep() {
       final s = GameState()..survived = 14..revives = 2;
       s.stats
         ..banished = 118
@@ -103,7 +103,7 @@ void main() {
     });
 
     test('is filed AMONG the others, not bolted on the end', () {
-      final rows = fileRows(_deep());
+      final rows = fileRows(deep());
       final i = rows.indexWhere((r) => r.isSelf);
       expect(i, greaterThan(0));
       expect(i, lessThan(rows.length - 1),
@@ -112,7 +112,7 @@ void main() {
     });
 
     test('it is about the reader, in their own numbers', () {
-      final s = _deep();
+      final s = deep();
       final d = personalFile(s);
       for (final n in <String>['14', '118', '9', '23', '17', '6', '2']) {
         expect(d.body, contains(n), reason: 'missing the number $n');
@@ -126,20 +126,20 @@ void main() {
       // The whole effect. Present tense would read as a scoreboard; past tense
       // about things done an hour ago leaves exactly one reading, and the game
       // never states it.
-      final d = personalFile(_deep());
+      final d = personalFile(deep());
       expect(d.body, contains('Held the post'));
       expect(d.sign, contains('BEFORE HE APPLIED'));
     });
 
     test('it is never "recovered" — it was already there', () {
-      final rows = fileRows(_deep());
+      final rows = fileRows(deep());
       final self = rows.firstWhere((r) => r.isSelf);
       expect(self.found, isTrue);
       expect(self.night, -1, reason: 'it must not claim a recovery night');
     });
 
     test('it is regenerated, so it follows you', () {
-      final s = _deep();
+      final s = deep();
       final before = personalFile(s).body;
       s.stats.banished += 40;
       final after = personalFile(s).body;
@@ -150,7 +150,7 @@ void main() {
     test('splicing it never mislabels the pages after it', () {
       // The failure this refactor exists to prevent: index arithmetic around
       // the spliced row shifting every night label past it by one.
-      final rows = fileRows(_deep());
+      final rows = fileRows(deep());
       for (final r in rows.where((x) => !x.isSelf)) {
         final i = kArchive.indexOf(r.doc);
         expect(r.night, nightForDoc(i),

@@ -55,65 +55,274 @@ final TextStyle _cutStyle = mono(9, rgba(255, 180, 180, 0.8));
 // ---------------------------------------------------------------------------
 
 /// JS `drawFeedNormal(t)`. [f] is the 320x240 feed canvas.
+// ---------------------------------------------------------------------------
+// WHAT KBLK-7 IS PUTTING OUT
+//
+// This is the picture the player looks at for ninety percent of a night, and
+// it was PRETTY: a soft green horizon glow, rolling hills, a transmitter mast
+// panning gently across, a beacon blinking on a sine. A calm nighttime
+// landscape with a nice waveform over it — a screensaver.
+//
+// It is the same failure the audio had. The most-looked-at thing in a horror
+// game was soothing, and no amount of jumpscare fixes that, because the
+// jumpscare is two seconds and this is eight minutes.
+//
+// The replacement is not louder or gorier. It is a picture that is quietly
+// WRONG, and gets more wrong the longer the night runs:
+//
+//   THE MAST does not pan. It stands still, because a thing that drifts is
+//   scenery and a thing that stands still is a landmark you keep checking.
+//
+//   SOMETHING IS ON IT. The archive says there are handholds worn into the
+//   ladder above the two hundred foot mark, on the inside face, where nobody
+//   climbing would put their hands. It is on the mast, it is a little higher
+//   every time an anomaly is dealt with, and it is NEVER seen moving.
+//
+//   THE TOWN GOES OUT. A row of lit windows on the horizon. One goes dark
+//   every couple of minutes and never comes back on. By 06:00 the field is
+//   black, and nothing in the game ever mentions it.
+//
+//   THE WAVEFORM LIES. Almost always an honest trace of your output. Rarely,
+//   for about a second, it resolves into the profile of a face and then goes
+//   back to being a waveform.
+// ---------------------------------------------------------------------------
+
+/// Windows still lit on the horizon, 12 down to 0 across a night.
+int _townLit(GameState s) {
+  final double p = (s.shiftMin / kShiftMinutes).clamp(0.0, 1.0);
+  return (12 * (1 - p)).round();
+}
+
+/// How far up the mast it has got, 0..1. Driven by how much of the night has
+/// been survived rather than by time, so it is progress and not a clock.
+double _climb(GameState s) =>
+    ((s.stats.banished + s.stats.scared) / 26.0).clamp(0.0, 0.92);
+
 void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
   fillRect(f, 0, 0, _fw, _fh, const ui.Color(0xFF04120A));
 
-  // horizon glow
+  // A low, dirty glow on the horizon — sodium lamps in a town that is going
+  // out, not a sunrise. Sits under the treeline so it silhouettes rather than
+  // illuminates.
   fillRectShader(
     f,
     0,
     0,
     _fw,
     _fh,
-    radialR0(const ui.Offset(_fw / 2, _fh * 0.55), 10, 190,
-        <ui.Color>[rgba(20, 90, 50, 0.55), rgba(2, 10, 6, 0)], <double>[0, 1]),
+    radialR0(const ui.Offset(_fw / 2, _fh * 0.72), 8, 150,
+        <ui.Color>[rgba(40, 70, 30, 0.42), rgba(2, 10, 6, 0)], <double>[0, 1]),
   );
 
-  // slow-panning transmitter silhouette
-  final px = (t * 7) % (_fw + 140) - 70;
+  // --- the sky ---
+  // A cold band above the horizon so the treeline has something to be a
+  // silhouette against. Without it the top of frame is flat black and the
+  // whole picture reads as two stripes.
+  fillRectShader(
+    f,
+    0,
+    60,
+    _fw,
+    120,
+    linear(const ui.Offset(0, 60), const ui.Offset(0, 180),
+        <ui.Color>[rgba(8, 26, 18, 0), rgba(16, 44, 28, 0.55)],
+        <double>[0, 1]),
+  );
+
+  // stars, and some of them are not there any more. Deterministic per index so
+  // the sky is the same sky all night rather than a snowstorm.
+  for (var i = 0; i < 46; i++) {
+    final double sx = ((i * 79) % 311).toDouble();
+    final double sy = 62 + ((i * 53) % 96).toDouble();
+    // the ones low in the sky go out with the town
+    final bool out = sy > 140 && i % 3 == 0 && _townLit(s) < 7;
+    if (out) continue;
+    final double tw = 0.30 + math.sin(t * (0.7 + i % 5 * 0.3) + i) * 0.18;
+    fillRect(f, sx, sy, 1, 1, rgba(190, 255, 220, tw * 0.5));
+  }
+
+  // --- a second transmitter, much further out ---
+  // Depth, and a second beacon that is NOT in sync with ours — two lights
+  // blinking at different rates is unsettling in a way one never is.
+  const double fx = _fw * 0.17;
+  f.drawPath(
+    ui.Path()
+      ..moveTo(fx, 150)
+      ..lineTo(fx - 4, 178)
+      ..moveTo(fx, 150)
+      ..lineTo(fx + 4, 178),
+    stroke(rgba(50, 120, 80, 0.28), 1),
+  );
+  final fb = math.sin(t * 1.13 + 2.1) * 0.5 + 0.5;
+  fillRect(f, fx - 1, 148, 2, 2, rgba(255, 70, 45, 0.18 + fb * 0.42));
+
+  // --- the treeline ---
   final ridge = ui.Path()
     ..moveTo(0, _fh)
-    ..lineTo(0, 168);
-  for (var i = 0.0; i <= _fw; i += 16) {
-    ridge.lineTo(
-        i,
-        168 +
-            math.sin((i + t * 8) * 0.05) * 7 +
-            math.sin(i * 0.013) * 10);
+    ..lineTo(0, 172);
+  for (var i = 0.0; i <= _fw; i += 8) {
+    // static, not scrolling — a horizon that moves is a vehicle window
+    final h = 172 +
+        math.sin(i * 0.052) * 6 +
+        math.sin(i * 0.011) * 11 +
+        (math.sin(i * 0.31).abs() > 0.86 ? -7 : 0); // the odd taller tree
+    ridge.lineTo(i, h);
   }
   ridge.lineTo(_fw, _fh);
   ridge.close();
   f.drawPath(ridge, fill(const ui.Color(0xFF02170D)));
 
+  // --- the town, going out ---
+  final lit = _townLit(s);
+  for (var i = 0; i < 12; i++) {
+    if (i >= lit) continue;
+    final double wx = 18 + i * 24.0 + (i.isEven ? 3 : 0);
+    final double wy = 176 + (i % 3) * 4.0;
+    // the last few flicker
+    final double fl = i >= lit - 2 ? (0.45 + math.sin(t * 9 + i) * 0.4) : 1.0;
+    fillRect(f, wx, wy, 2, 2, rgba(255, 190, 90, 0.55 * fl));
+  }
+
+  // --- the mast, standing still ---
+  const double px = _fw * 0.72;
   final mast = ui.Path()
-    ..moveTo(px, 176)
-    ..lineTo(px - 9, _fh - 24)
-    ..moveTo(px, 176)
-    ..lineTo(px + 9, _fh - 24);
-  for (var y = 190.0; y < _fh - 24; y += 16) {
-    final sp = (y - 176) / (_fh - 200) * 9;
+    ..moveTo(px, 96)
+    ..lineTo(px - 11, 178)
+    ..moveTo(px, 96)
+    ..lineTo(px + 11, 178);
+  for (var y = 104.0; y < 178; y += 13) {
+    final sp = (y - 96) / 82 * 11;
     mast.moveTo(px - sp, y);
     mast.lineTo(px + sp, y);
   }
-  f.drawPath(mast, stroke(rgba(80, 200, 130, 0.5), 1));
+  f.drawPath(mast, stroke(rgba(70, 170, 110, 0.42), 1));
 
-  final bl = math.sin(t * 3) * 0.5 + 0.5;
-  fillRect(f, px - 2, 172, 4, 4,
-      rgba(255, 60, 40, clampD(0.35 + bl * 0.65, 0, 1)));
+  // the beacon, on a slow irregular period rather than a clean sine
+  final bl = (math.sin(t * 1.7) * 0.5 + 0.5) * (math.sin(t * 0.41) * 0.3 + 0.7);
+  fillRect(f, px - 1.5, 93, 3, 3,
+      rgba(255, 60, 40, clampD(0.25 + bl * 0.7, 0, 1)));
 
-  // waveform of current output
+  // --- and something on the ladder ---
+  // Never drawn mid-move. Its height is a pure function of the night's
+  // progress, so between two glances it has simply changed.
+  final double cl = _climb(s);
+  if (cl > 0.02) {
+    final double cy = 176 - cl * 78;
+    final double sp = (cy - 96) / 82 * 11;
+
+    // The sky up there is near-black and so is the figure, so drawn plainly it
+    // was invisible — measured off a baked frame, not guessed. The camera's
+    // gain is riding up on an empty picture, so the air immediately around it
+    // lifts, and the shape falls out of the lift.
+    f.drawCircle(
+      ui.Offset(px, cy - 2),
+      14,
+      ui.Paint()
+        ..shader = ui.Gradient.radial(
+          ui.Offset(px, cy - 2),
+          14,
+          <ui.Color>[rgba(96, 196, 138, 0.20), rgba(96, 196, 138, 0)],
+        ),
+    );
+
+    const ui.Color k = ui.Color(0xF0000000);
+    fillRect(f, px - 2.6, cy - 6.0, 5.2, 7.6, k); // torso
+    fillRect(f, px - 1.4, cy - 8.6, 2.8, 2.7, k); // head
+    fillRect(f, px - 2.3, cy + 1.4, 1.8, 4.2, k); // legs, on a rung
+    fillRect(f, px + 0.5, cy + 1.4, 1.8, 4.2, k);
+    // and it has thrown a hand out past the frame of the tower
+    fillRect(f, px + sp * 0.55, cy - 4.0, 3.4, 1.5, rgba(0, 0, 0, 0.85));
+
+    // Near the top it is inside the beacon's throw, and takes the red on one
+    // side every time the lamp comes round.
+    if (cl > 0.60) {
+      fillRect(f, px - 2.9, cy - 8.6, 1.1, 10.2,
+          rgba(255, 70, 45, clampD(0.08 + bl * 0.26, 0, 1)));
+    }
+  }
+
+  // --- fog in the field ---
+  // Sits between the treeline and the camera, so the town and the far mast are
+  // behind something. One band, drifting very slowly.
+  fillRectShader(
+    f,
+    0,
+    _fh * 0.70,
+    _fw,
+    38,
+    linear(ui.Offset(0, _fh * 0.70), ui.Offset(0, _fh * 0.70 + 38),
+        <ui.Color>[
+          rgba(120, 200, 160, 0),
+          rgba(120, 200, 160, 0.055 + math.sin(t * 0.13) * 0.02),
+          rgba(120, 200, 160, 0),
+        ],
+        <double>[0, 0.5, 1]),
+  );
+
+  // --- the feeder line ---
+  // A cable running from the mast off the left of frame, sagging. Period
+  // correct, and it gives the empty middle of the picture something to cross.
+  final wire = ui.Path()..moveTo(px, 108);
+  for (var i = 0.0; i <= 1.0; i += 0.05) {
+    final double wx = px - i * (px + 10);
+    // catenary sag, plus a very slight sway
+    final double sag = math.sin(i * math.pi) * 26 +
+        math.sin(t * 0.6 + i * 3) * 1.2;
+    wire.lineTo(wx, 108 + sag);
+  }
+  f.drawPath(wire, stroke(rgba(40, 110, 74, 0.5), 1));
+  // and a bird on it that has not moved all night.
+  //
+  // Three pixels square read as a domino. It gets a head and a tail so that
+  // at native CRT scale the shape is a bird and not a speck of dirt on the
+  // lens — which is the whole point of it, since a bird that never once
+  // shifts its weight is only unsettling if you can tell it is a bird.
+  final double by = 108 + math.sin(0.42 * math.pi) * 26 - 3;
+  const ui.Color bk = ui.Color(0xE6000000);
+  fillRect(f, px - 74, by, 3, 2.6, bk); // body
+  fillRect(f, px - 74.6, by - 1.4, 1.6, 1.6, bk); // head, turned this way
+  fillRect(f, px - 71.4, by + 0.2, 2.2, 1, bk); // tail
+
+  // --- weather ---
+  // Snow, matching the window. Falls on a fixed lattice so it costs almost
+  // nothing and never strobes.
+  for (var i = 0; i < 34; i++) {
+    final double sp = 9 + (i % 5) * 4.0;
+    final double sx = ((i * 67) % 317).toDouble() +
+        math.sin(t * 0.4 + i) * 3;
+    final double sy = ((i * 41) + t * sp) % 240;
+    fillRect(f, sx, sy, 1, 1, rgba(210, 255, 230, 0.10 + (i % 5) * 0.035));
+  }
+
+  // --- the waveform ---
   final rate = sigRate(s, a);
+  // Rarely, and briefly, it is not a waveform. Driven off a slow clock so it
+  // cannot be triggered or predicted, and short enough to be deniable.
+  final double faceWin = math.sin(t * 0.083);
+  final bool profile = faceWin > 0.9945;
   final wave = ui.Path();
   for (var i = 0; i < _fw; i++) {
-    final amp = math.sin(i * 0.09 + t * 4) * 10 +
-        math.sin(i * 0.31 + t * 7) * 4 * math.min(1.0, rate / 50 + 0.2);
+    final double x = i / _fw;
+    double amp;
+    if (profile) {
+      // a brow, an eye socket, a nose, lips, a chin — read as a trace
+      amp = -18 * math.exp(-math.pow((x - 0.30) / 0.055, 2)) +
+          9 * math.exp(-math.pow((x - 0.38) / 0.030, 2)) -
+          21 * math.exp(-math.pow((x - 0.47) / 0.028, 2)) +
+          6 * math.exp(-math.pow((x - 0.55) / 0.025, 2)) -
+          11 * math.exp(-math.pow((x - 0.63) / 0.045, 2)) +
+          math.sin(i * 0.7) * 0.8;
+    } else {
+      amp = math.sin(i * 0.09 + t * 4) * 10 +
+          math.sin(i * 0.31 + t * 7) * 4 * math.min(1.0, rate / 50 + 0.2);
+    }
     if (i == 0) {
       wave.moveTo(i.toDouble(), 52 + amp);
     } else {
       wave.lineTo(i.toDouble(), 52 + amp);
     }
   }
-  f.drawPath(wave, stroke(rgba(120, 255, 170, 0.8), 1));
+  f.drawPath(wave, stroke(rgba(120, 255, 170, profile ? 0.95 : 0.8), 1));
 
   // station ident text
   fillText(f, 'KBLK-7', const ui.Offset(_fw / 2, 26), _identStyle,

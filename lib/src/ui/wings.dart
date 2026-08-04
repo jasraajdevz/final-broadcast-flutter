@@ -381,6 +381,7 @@ class _Meter extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
             Flexible(
               child: Text(label,
@@ -395,7 +396,6 @@ class _Meter extends StatelessWidget {
             Text(right,
                 maxLines: 1, softWrap: false, style: t.at(9.5, fill, ls: 0.5)),
           ],
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
         ),
         const SizedBox(height: 3),
         _Bar(value: value, fill: fill),
