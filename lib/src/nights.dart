@@ -27,6 +27,9 @@ class NightCard {
     this.rp = 1.0,
     this.dread = 1.0,
     this.banishPay = 1.0,
+    this.decay = 1.0,
+    this.drift = 1.0,
+    this.ceiling = 1.0,
   });
 
   final String id;
@@ -55,6 +58,26 @@ class NightCard {
 
   /// Multiplier on the SIGNAL a banish pays.
   final double banishPay;
+
+  // --- WHAT A CARD DOES TO THE RIG ---
+  //
+  // OUTPUT, QUOTA and BANISH PAY are all multipliers on the producer economy,
+  // and every card in the deck printed at least one of them on its face. With
+  // the economy gone they are numbers about nothing — a card promising
+  // "OUTPUT x1.5" is telling the operator a lie in the same breath as it tells
+  // them what tonight is. They stay on the class because the sign-off sheets
+  // still read them; nothing sets them any more.
+  //
+  // These three are the honest replacements, and they are the rig's own dials.
+
+  /// How fast the carrier falls tonight.
+  final double decay;
+
+  /// How much the programme audio wanders.
+  final double drift;
+
+  /// How many seconds off the air the licence allows.
+  final double ceiling;
 }
 
 /// Seven cards. Small on purpose — a deck you can memorise is a deck you can
@@ -63,60 +86,64 @@ const List<NightCard> kNightCards = <NightCard>[
   NightCard(
     id: 'storm',
     nm: 'STORM FRONT',
-    ds: 'Weather over the mast all night. The carrier runs hot and everything '
-        'arrives faster. OUTPUT x1.5, GAP x0.75.',
-    output: 1.5,
+    ds: 'Weather over the mast all night. The carrier will not stay where you '
+        'put it and everything arrives faster — but nobody drives out to a '
+        'transmitter in this. RP x1.4, CARRIER DECAY x1.35, GAP x0.75.',
     gap: 0.75,
+    decay: 1.35,
+    rp: 1.4,
   ),
   NightCard(
     id: 'skeleton',
     nm: 'SKELETON CREW',
-    ds: 'Nobody else came in. The rundown was cut to match, but you answer '
-        'everything alone. QUOTA x0.7, WINDOW x0.85.',
-    quota: 0.7,
+    ds: 'Nobody else came in. Head office is not watching the log as closely, but '
+        'you answer everything alone. LICENCE x1.25, WINDOW x0.85.',
     window: 0.85,
+    ceiling: 1.25,
   ),
   NightCard(
     id: 'sweep',
     nm: 'RATINGS SWEEP',
-    ds: 'Head office is measuring tonight. Everything counts double and '
-        'everything costs you more. RP x2.0, DREAD x1.35.',
+    ds: 'Head office is measuring tonight. Everything counts double and everything '
+        'costs you more. RP x2.0, DREAD x1.35.',
     rp: 2.0,
     dread: 1.35,
   ),
   NightCard(
     id: 'quiet',
     nm: 'A QUIET NIGHT',
-    ds: 'Long stretches of nothing. You will have time to think, which is '
-        'worse. GAP x1.4, OUTPUT x0.75, DREAD x1.2.',
+    ds: 'Long stretches of nothing. You will have time to think, which is worse. '
+        'GAP x1.4, MODULATION DRIFT x0.7, DREAD x1.2.',
     gap: 1.4,
-    output: 0.75,
+    drift: 0.7,
     dread: 1.2,
   ),
   NightCard(
     id: 'bounty',
     nm: "THE ENGINEER'S STANDING BOUNTY",
-    ds: 'He left money in the drawer for anything you put down. BANISH PAY '
-        'x2.2, QUOTA x1.25.',
-    banishPay: 2.2,
-    quota: 1.25,
+    ds: 'He left money in the drawer for anything you put down, and spent the rest '
+        'of it on himself. RP x1.8, LICENCE x0.8.',
+    rp: 1.8,
+    ceiling: 0.8,
   ),
   NightCard(
     id: 'ferrite',
     nm: 'FRESH CORES',
-    ds: 'The store room was restocked for once. Every answer has room to '
-        'breathe. WINDOW x1.3, OUTPUT x0.85.',
+    ds: 'The store room was restocked for once. Every answer has room to breathe, '
+        'and the mains sags for it. WINDOW x1.3, CARRIER DECAY x1.15.',
     window: 1.3,
-    output: 0.85,
+    decay: 1.15,
   ),
   NightCard(
     id: 'openline',
     nm: 'OPEN LINE',
-    ds: 'The phones are live and it is not the public calling. GAP x0.7, '
-        'BANISH PAY x1.6, WINDOW x0.9.',
+    ds: 'The phones are live and it is not the public calling. Head office '
+        'counts a night like this for more than it is worth. RP x1.5, '
+        'GAP x0.7, MODULATION DRIFT x1.3, WINDOW x0.9.',
     gap: 0.7,
-    banishPay: 1.6,
+    drift: 1.3,
     window: 0.9,
+    rp: 1.5,
   ),
 ];
 

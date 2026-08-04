@@ -94,15 +94,41 @@ void main() {
   });
 
   test('every card is a trade, never a free ride or a pure tax', () {
+    // Scored against the LIVE dials. It used to read output, quota and
+    // banishPay — all multipliers on the producer economy — so after that came
+    // out it was grading every card on three numbers that no longer did
+    // anything, and would happily have passed a deck of cards that were
+    // entirely inert.
     for (final c in kNightCards) {
-      final gifts = <double>[
-        c.output, c.rp, c.banishPay, c.window, c.gap, 1 / c.quota, 1 / c.dread,
-      ].where((v) => v > 1.0001).length;
-      final bills = <double>[
-        c.output, c.rp, c.banishPay, c.window, c.gap, 1 / c.quota, 1 / c.dread,
-      ].where((v) => v < 0.9999).length;
-      expect(gifts, greaterThan(0), reason: '${c.nm} is pure tax');
-      expect(bills, greaterThan(0), reason: '${c.nm} is a free ride');
+      // everything expressed so that ABOVE ONE IS GOOD FOR THE OPERATOR
+      final dials = <double>[
+        c.rp,
+        c.window,
+        c.gap,
+        c.ceiling,
+        1 / c.dread,
+        1 / c.decay,
+        1 / c.drift,
+      ];
+      expect(dials.where((v) => v > 1.0001).length, greaterThan(0),
+          reason: '${c.nm} is pure tax');
+      expect(dials.where((v) => v < 0.9999).length, greaterThan(0),
+          reason: '${c.nm} is a free ride');
+    }
+  });
+
+  test('no card promises anything the game stopped doing', () {
+    // Every card in the deck printed at least one of OUTPUT, QUOTA or BANISH
+    // PAY on its face, and all three are multipliers on an economy that has
+    // been deleted. A card telling the operator what tonight is, in the same
+    // breath as a number about nothing, is the worst place in the game to
+    // lie — it is the last thing read before taking the shift.
+    const gone = <String>['OUTPUT', 'QUOTA', 'BANISH PAY'];
+    for (final c in kNightCards) {
+      for (final phrase in gone) {
+        expect(c.ds.contains(phrase), isFalse,
+            reason: '${c.nm} still promises $phrase');
+      }
     }
   });
 

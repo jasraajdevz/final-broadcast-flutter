@@ -342,7 +342,7 @@ class Rig {
   double _ceiling = kCeiling0;
 
   /// The licence allowance, including anything the station equipment bought.
-  double get ceiling => _ceiling + ceilingBonus;
+  double get ceiling => _ceiling * ceilingMul + ceilingBonus;
   double inSpec = 0;
   final Map<String, double> offAirBy = <String, double>{};
   final List<Debit> invoice = <Debit>[];
@@ -384,6 +384,11 @@ class Rig {
 
   /// TAPE VAULT — the hour comes due less often.
   double logPeriod = kLogPeriod;
+
+  // --- tonight's card ---
+  double decayMul = 1.0;
+  double cardDriftMul = 1.0;
+  double ceilingMul = 1.0;
 
   /// HOW MUCH THE PROGRAMME AUDIO WANDERS ON AN EARLY NIGHT.
   ///
@@ -475,7 +480,7 @@ class Rig {
 
     // --- the carrier tracks the dial, and everything pulls it down ---
     carrier += (drive - carrier) * kTrack * trackMul * dt;
-    carrier -= (carrierDecay(night) * ramp + lineWander(_t)) * dt;
+    carrier -= (carrierDecay(night) * ramp * decayMul + lineWander(_t)) * dt;
     carrier -= ((bite[Rail.carrier] ?? 0) + attachedOn(Rail.carrier)) * dt;
     if (lockout > 0) {
       // contactor out: the dial is not connected to anything
@@ -498,7 +503,8 @@ class Rig {
     }
 
     // --- modulation ---
-    modulation += modDrift(_t) * driftMul * nightDriftScale * dt;
+    modulation +=
+        modDrift(_t) * driftMul * cardDriftMul * nightDriftScale * dt;
     modulation -=
         ((bite[Rail.modulation] ?? 0) + attachedOn(Rail.modulation)) * dt;
     modulation = modulation.clamp(0.0, 100.0);

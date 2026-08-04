@@ -3024,6 +3024,14 @@ class AnomalyRuntime extends ChangeNotifier {
     rig.driftMul = (ups['comp'] ?? false) ? 0.75 : 1.0;
     rig.ceilingBonus = (ups['halo'] ?? false) ? 20.0 : 0.0;
     rig.logPeriod = vaultLogPeriod(s);
+    // TONIGHT'S CARD. Its old OUTPUT / QUOTA / BANISH PAY multipliers were all
+    // on the producer economy, so every card in the deck was printing a
+    // promise about a system that no longer exists. These three are the rig's
+    // own dials and are what the faces now name.
+    final card = cardOf(s);
+    rig.decayMul = card.decay;
+    rig.cardDriftMul = card.drift;
+    rig.ceilingMul = card.ceiling;
 
     rig.recoveryScale = ((s.ups['failsafe'] ?? false) ? 1.6 : 0.8) *
         recordDecayMul(s) *
