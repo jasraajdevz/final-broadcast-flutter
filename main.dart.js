@@ -40745,49 +40745,51 @@ if(r!=null&&r.a===B.mf){q.dj(2.2)
 q.b.b6("square",180,0.22,0.07,120)
 q.as=Math.max(q.as,3)
 s.p2.aJ("## NOBODY ASKED YOU TO SIGN ANYTHING",B.O)}q.a6()},
-vU(){var s,r,q,p=this,o=p.a,n=o.p2
-n.d.M(0)
-n.c=-999
-s=p.b
-s.bS()
-s.fj()
-s.nN(o.id)
-r=A.aFl(o)
-if(r!=null){n.eq(2600,r,B.O)
-A.d0(A.b7(0,2700),new A.Rx(p),t.H)}o.k3=p.a_=!0
-q=p.db
-q.a=null
-q.c=q.b=0
-q.d=12
-q.x=q.w=q.r=q.f=q.e=0
-q.y=!1
-q.z=0
-p.x2=30+$.C().v()*40
-p.k1=0
-p.k2=70+$.C().v()*80
-p.k4=p.k3=0
-p.ok=!1
-p.p4=0
-p.R8=!1
-p.RG=0
-p.p1=!1
-p.p3=p.p2=0
-p.rx=-1
-p.ry=120+$.C().v()*140
-p.x1=p.to=0
-B.b.M(p.dy)
-q=p.dx
-B.b.M(q.a)
-B.b.M(q.b)
-B.b.M(q.e)
-B.b.M(q.d)
-p.a3=p.T=p.ac=p.a8=p.ag=q.c=0
-p.lT()
-o.cg()
-s.b6("sine",1000,0.5,0.12,1000)
-n.aJ("KBLK-7 IS ON AIR \u2014 GOOD LUCK, OPERATOR",B.a5)
-n.eq(1600,"KBLK-7 IS ON AIR",B.a5)
-p.a6()},
+vU(){var s,r,q,p,o=this,n=o.a
+n.cx=0
+s=n.p2
+s.d.M(0)
+s.c=-999
+r=o.b
+r.bS()
+r.fj()
+r.nN(n.id)
+q=A.aFl(n)
+if(q!=null){s.eq(2600,q,B.O)
+A.d0(A.b7(0,2700),new A.Rx(o),t.H)}n.k3=o.a_=!0
+p=o.db
+p.a=null
+p.c=p.b=0
+p.d=12
+p.x=p.w=p.r=p.f=p.e=0
+p.y=!1
+p.z=0
+o.x2=30+$.C().v()*40
+o.k1=0
+o.k2=70+$.C().v()*80
+o.k4=o.k3=0
+o.ok=!1
+o.p4=0
+o.R8=!1
+o.RG=0
+o.p1=!1
+o.p3=o.p2=0
+o.rx=-1
+o.ry=120+$.C().v()*140
+o.x1=o.to=0
+B.b.M(o.dy)
+p=o.dx
+B.b.M(p.a)
+B.b.M(p.b)
+B.b.M(p.e)
+B.b.M(p.d)
+o.a3=o.T=o.ac=o.a8=o.ag=p.c=0
+o.lT()
+n.cg()
+r.b6("sine",1000,0.5,0.12,1000)
+s.aJ("KBLK-7 IS ON AIR \u2014 GOOD LUCK, OPERATOR",B.a5)
+s.eq(1600,"KBLK-7 IS ON AIR",B.a5)
+o.a6()},
 q7(a,b){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e=this,d=e.r
 if(d==null)return
 s=d.dx.length
