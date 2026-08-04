@@ -32,6 +32,18 @@
 
 import 'dart:math' as math;
 
+/// Something that got its teeth in and did not let go.
+class Attach {
+  Attach(this.id, this.rail, this.rate);
+
+  /// The entity that left it.
+  final String id;
+  final Rail rail;
+
+  /// Units per second it takes off that rail, forever.
+  final double rate;
+}
+
 /// Which of the desk's systems something is attacking. The eight entities each
 /// bite a named system now, so an arrival presents as a machine misbehaving
 /// rather than as a free-floating prompt with a key attached.
@@ -213,6 +225,25 @@ class Desk {
   /// a key — it is a thing chewing on a named part of the machine.
   final Map<Rail, double> bite = <Rail, double>{};
 
+  /// WHAT A MISSED WINDOW LEAVES BEHIND.
+  ///
+  /// In the shipped build a missed anomaly cost some dread and the moment
+  /// passed — which is why nothing in a night ever felt like it accumulated,
+  /// and why losing never felt like the player's own fault. An attachment
+  /// does not leave. It sits on its rail for the rest of the shift, draining
+  /// quietly, so by 05:00 the machine is carrying every mistake made since
+  /// 23:00 and the operator can point at each one.
+  ///
+  /// This is also what makes the difficulty personal rather than scheduled:
+  /// two players on the same night are fighting different machines by the end
+  /// of it.
+  final List<Attach> attached = <Attach>[];
+
+  /// Total drain currently attached to a rail.
+  double attachedOn(Rail r) => attached
+      .where((a) => a.rail == r)
+      .fold(0.0, (sum, a) => sum + a.rate);
+
   double get t => _t;
 
   /// 0..1. How badly the operator is keeping up, right now.
@@ -241,10 +272,12 @@ class Desk {
     s.modulation += modDrift(_t) * dt;
     s.logDue -= dt;
 
-    // whatever is currently chewing on the machine
-    s.carrier -= (bite[Rail.carrier] ?? 0) * dt;
-    s.modulation -= (bite[Rail.modulation] ?? 0) * dt;
-    s.plate += (bite[Rail.plate] ?? 0) * dt;
+    // whatever is currently chewing on the machine, plus everything that has
+    // already got its teeth in and stayed
+    s.carrier -= ((bite[Rail.carrier] ?? 0) + attachedOn(Rail.carrier)) * dt;
+    s.modulation -=
+        ((bite[Rail.modulation] ?? 0) + attachedOn(Rail.modulation)) * dt;
+    s.plate += ((bite[Rail.plate] ?? 0) + attachedOn(Rail.plate)) * dt;
 
     s.busy += ((handsCommitted ? 1.0 : 0.0) - s.busy) * dt / kBusyTau;
 
@@ -285,4 +318,17 @@ class Desk {
 
   /// Sign the hour.
   void sign() => s.logDue = kLogPeriod;
+
+  /// A window went unanswered. It does not leave.
+  void attach(String id, Rail rail, double rate) =>
+      attached.add(Attach(id, rail, rate));
+
+  /// Prised off — the only way an attachment ever goes, and it costs a whole
+  /// action while everything else keeps falling.
+  bool detach(String id) {
+    final i = attached.indexWhere((a) => a.id == id);
+    if (i < 0) return false;
+    attached.removeAt(i);
+    return true;
+  }
 }

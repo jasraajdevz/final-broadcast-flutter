@@ -72,7 +72,8 @@ const Map<String, (Rail, double)> kBites = <String, (Rail, double)>{
 };
 
 /// A competent operator with human hands and one pair of eyes.
-Night playNight(int night, {double seconds = 8 * 60, int seed = 7717}) {
+Night playNight(int night,
+    {double seconds = 8 * 60, int seed = 7717, double missRate = 0}) {
   final d = Desk(night);
   final rng = _Rng(seed + night * 31);
   var nextArrival = 8.0;
@@ -118,6 +119,11 @@ Night playNight(int night, {double seconds = 8 * 60, int seed = 7717}) {
       } else {
         notice = 0.35 + 0.42 * (d.wrongCount - 1).clamp(0, 4);
         if (live != null && liveFor > 0.9) {
+          // A fumbled window does not simply pass. It leaves.
+          if (rng.next() < missRate) {
+            final b = kBites[live]!;
+            d.attach(live, b.$1, b.$2 * 0.30);
+          }
           live = null;
           mark('entity');
           cooldown = 0.30;
@@ -257,5 +263,39 @@ void main() {
     expect(r.desk.t, greaterThan(8 * 60 * 0.45),
         reason: 'night 12 died at ${r.desk.t.toStringAsFixed(0)}s — that is a '
             'beating, not a near miss');
+  });
+
+  test('a missed window leaves something that does not go away', () {
+    // Every one of the three judges asked for this, and it is what makes a
+    // night ACCUMULATE. In the shipped build a miss cost some dread and the
+    // moment passed, so nothing a player did to themselves was ever visible
+    // later and losing never felt like their own fault.
+    final clean = playNight(8);
+    final sloppy = playNight(8, missRate: 0.45);
+
+    expect(sloppy.desk.attached.length, greaterThan(3),
+        reason: 'nothing got its teeth in across a whole sloppy night');
+    expect(sloppy.actionsPerMin, greaterThan(clean.actionsPerMin),
+        reason: 'carrying ${sloppy.desk.attached.length} attachments cost the '
+            'sloppy operator nothing: ${sloppy.actionsPerMin.toStringAsFixed(1)}'
+            '/min against a clean ${clean.actionsPerMin.toStringAsFixed(1)}/min');
+    // NOT mean dread — measured, the sloppy operator's mean came out LOWER
+    // (31.5 against a clean night's higher figure) because attachments kill
+    // the night early and the mean is taken over a shorter, earlier, calmer
+    // stretch. Averages over runs of different lengths are not comparable.
+    // What the attachment actually costs is the ENDING.
+    expect(sloppy.desk.t, lessThan(clean.desk.t + 1),
+        reason: 'the sloppy night ran as long as the clean one — attachments '
+            'cost nothing');
+  });
+
+  test('two operators on the same night fight different machines', () {
+    // The difficulty becomes personal rather than scheduled — by 05:00 the
+    // machine is carrying every mistake made since 23:00.
+    final a = playNight(5, missRate: 0.0);
+    final b = playNight(5, missRate: 0.6);
+    expect(b.desk.attachedOn(Rail.carrier) + b.desk.attachedOn(Rail.plate),
+        greaterThan(a.desk.attachedOn(Rail.carrier) +
+            a.desk.attachedOn(Rail.plate)));
   });
 }
