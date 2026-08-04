@@ -32,6 +32,46 @@
 
 import 'dart:math' as math;
 
+/// THE TAPE.
+///
+/// Every hand the operator puts on the desk is written down with the time it
+/// happened. THE RERUN plays it back.
+///
+/// This is the one horror beat all three judges in the design pass picked out
+/// independently, and it is the user's own phrase made literal — "the fists of
+/// your entities". In telegraphy an operator's FIST is their keying signature,
+/// the thing another operator recognises them by down the wire. The Rerun does
+/// not have a fist of its own. It uses yours, twelve seconds late.
+///
+/// It is frightening for a mechanical reason rather than a theatrical one:
+/// the replayed inputs were CORRECT when you made them and are wrong now. The
+/// push that saved the carrier twelve seconds ago heats a plate that is
+/// already hot. You cannot play around it by playing well — playing well is
+/// what loads the gun.
+class Tape {
+  final List<(double, String)> _hits = <(double, String)>[];
+
+  void write(double t, String act) => _hits.add((t, act));
+
+  /// Everything the operator did in the window ending [delay] seconds ago,
+  /// consumed as it is read so nothing plays twice.
+  List<String> playback(double t, double delay, double dt) {
+    final hi = t - delay;
+    final lo = hi - dt;
+    final out = <String>[];
+    for (final h in _hits) {
+      if (h.$1 > lo && h.$1 <= hi) out.add(h.$2);
+    }
+    return out;
+  }
+
+  /// Nothing older than this can still come back.
+  void trim(double t, double keep) =>
+      _hits.removeWhere((h) => h.$1 < t - keep);
+
+  int get length => _hits.length;
+}
+
 /// Something that got its teeth in and did not let go.
 class Attach {
   Attach(this.id, this.rail, this.rate);
@@ -239,6 +279,17 @@ class Desk {
   /// of it.
   final List<Attach> attached = <Attach>[];
 
+  /// What the operator did, and when. See [Tape].
+  final Tape tape = Tape();
+
+  /// Seconds behind the operator the Rerun's hands are. Twelve is long enough
+  /// that the replayed input is answering a situation that no longer exists,
+  /// and short enough that the player still remembers making it.
+  static const double kGhostDelay = 12.0;
+
+  /// True while the Rerun is on the air and using your hands.
+  bool ghosting = false;
+
   /// Total drain currently attached to a rail.
   double attachedOn(Rail r) => attached
       .where((a) => a.rail == r)
@@ -281,6 +332,14 @@ class Desk {
 
     s.busy += ((handsCommitted ? 1.0 : 0.0) - s.busy) * dt / kBusyTau;
 
+    // your own hands, twelve seconds late
+    if (ghosting) {
+      for (final act in tape.playback(_t, kGhostDelay, dt)) {
+        _apply(act, ghost: true);
+      }
+    }
+    tape.trim(_t, kGhostDelay + 4);
+
     if (s.carrier <= 0) _die(Rail.carrier);
     if (s.plate >= 100) _die(Rail.plate);
     if (s.modulation < kModTripLow || s.modulation > kModTripHigh) {
@@ -304,20 +363,35 @@ class Desk {
   // --- the operator's four hands ---
 
   /// Work the tube. Holds the carrier up; heats the plate.
-  void push() {
-    s.carrier = math.min(100, s.carrier + kPushCarrier);
-    s.plate += kPushPlate;
-  }
+  void push() => _apply('push');
 
   /// Bleed the plate. Costs you every second you are not holding the carrier.
-  void vent() => s.plate = math.max(0, s.plate - kVentPlate);
+  void vent() => _apply('vent');
 
   /// Correct the modulation, in whichever direction it has drifted.
-  void nudge(int dir) =>
-      s.modulation = (s.modulation + kNudgeMod * dir).clamp(0.0, 100.0);
+  void nudge(int dir) => _apply(dir > 0 ? 'mod+' : 'mod-');
 
   /// Sign the hour.
-  void sign() => s.logDue = kLogPeriod;
+  void sign() => _apply('sign');
+
+  /// One hand on the desk. Written to the tape unless it IS the tape.
+  void _apply(String act, {bool ghost = false}) {
+    switch (act) {
+      case 'push':
+        s.carrier = math.min(100, s.carrier + kPushCarrier);
+        s.plate += kPushPlate;
+      case 'vent':
+        s.plate = math.max(0, s.plate - kVentPlate);
+      case 'mod+':
+        s.modulation = (s.modulation + kNudgeMod).clamp(0.0, 100.0);
+      case 'mod-':
+        s.modulation = (s.modulation - kNudgeMod).clamp(0.0, 100.0);
+      case 'sign':
+        // The Rerun cannot sign for you. It can only do the things that cost.
+        if (!ghost) s.logDue = kLogPeriod;
+    }
+    if (!ghost) tape.write(_t, act);
+  }
 
   /// A window went unanswered. It does not leave.
   void attach(String id, Rail rail, double rate) =>

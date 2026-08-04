@@ -298,4 +298,62 @@ void main() {
         greaterThan(a.desk.attachedOn(Rail.carrier) +
             a.desk.attachedOn(Rail.plate)));
   });
+
+  /// Ticks while keeping every rail EXCEPT the one under test alive.
+  ///
+  /// Both Rerun tests failed first because they left the desk unattended and
+  /// asserted about a corpse: modulation drifts at up to 7.65/s and with
+  /// nobody correcting it, it crosses its trip in about ten seconds and tick()
+  /// returns early forever after. That is the desk working — it just makes an
+  /// unattended desk useless as a test rig.
+  void steady(Desk d, int frames, {bool push = false, int every = 60}) {
+    const dt = 1 / 30.0;
+    for (var i = 0; i < frames; i++) {
+      if (d.s.modulation > 56) d.nudge(-1);
+      if (d.s.modulation < 44) d.nudge(1);
+      if (d.s.carrier < 60 && !push) d.push();
+      if (d.s.plate > 70) d.vent();
+      if (push && i % every == 0) d.push();
+      d.tick(dt);
+      if (d.s.lost) return;
+    }
+  }
+
+  test('THE RERUN uses your own hands, twelve seconds late', () {
+    // The horror beat all three judges picked out independently, and the
+    // user's own phrase made literal: in telegraphy an operator's FIST is
+    // their keying signature. The Rerun has none of its own. It uses yours.
+    final d = Desk(3);
+    steady(d, 400, push: true, every: 45);
+    expect(d.s.lost, isFalse, reason: 'the rig killed the desk');
+    expect(d.tape.length, greaterThan(20), reason: 'nothing reached the tape');
+
+    // hands entirely off, and it comes on the air
+    final plateBefore = d.s.plate;
+    d.ghosting = true;
+    const dt = 1 / 30.0;
+    for (var i = 0; i < 120 && !d.s.lost; i++) {
+      d.tick(dt);
+    }
+    expect(d.s.plate, greaterThan(plateBefore),
+        reason: 'the operator took their hands off the desk and the plate did '
+            'not heat — the Rerun is replaying nothing');
+  });
+
+  test('the Rerun can only do the things that cost you', () {
+    // It can push the carrier and heat the plate. It cannot sign the book,
+    // because an entity that does your paperwork is a helper.
+    final d = Desk(3);
+    d.sign();
+    steady(d, 400);
+    expect(d.s.lost, isFalse, reason: 'the rig killed the desk');
+    final dueBefore = d.s.logDue;
+    d.ghosting = true;
+    const dt = 1 / 30.0;
+    for (var i = 0; i < 90 && !d.s.lost; i++) {
+      d.tick(dt);
+    }
+    expect(d.s.logDue, lessThan(dueBefore),
+        reason: 'the Rerun signed the book for the operator');
+  });
 }
