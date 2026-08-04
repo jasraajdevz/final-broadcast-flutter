@@ -1581,6 +1581,8 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// The SIGN ON button.
   void startBroadcast() {
+    // a new shift does not remember what it said on the last one
+    s.toasts.newNight();
     audio.init();
     audio.resume();
     audio.setVol(s.sfx);
@@ -1714,11 +1716,15 @@ class AnomalyRuntime extends ChangeNotifier {
             ToastKind.gold);
       }
       if (!silent) audio.banishStinger(fast || clutch, s.stats.streak);
-      s.toast(
-          '${clutch ? "LAST SECOND — " : (fast ? "CLEAN KILL — " : "BANISHED — ")}'
-          '${a.def.nm}  +${fmt(bonus)} SIG'
-          '${s.stats.streak > 2 ? "   ×${s.stats.streak} STREAK" : ""}',
-          clutch ? ToastKind.gold : ToastKind.good);
+      // NO TOAST FOR A KILL. The player watched it die, heard its stinger and
+      // saw the flash — a line of text arriving afterwards to confirm it is
+      // the game reading its own screen aloud. Measured, the kill family was
+      // roughly a fifth of all 103 interruptions in a night. A clutch kill
+      // still speaks, because beating a window by 200ms is a thing the player
+      // cannot see and deserves to be told.
+      if (clutch) {
+        s.toast('LAST SECOND — ${a.def.nm}', ToastKind.gold);
+      }
 
       // --- the ALL CLEAR ---
       // The whole point of the deck: if you got it right, you are SAFE, and
@@ -2679,8 +2685,12 @@ class AnomalyRuntime extends ChangeNotifier {
             s.dread = math.min(100, s.dread + kMissDread * cardOf(s).dread);
             audio.env('sawtooth', 120, 0.5, 0.10, 44);
             shake = math.max(shake, 6);
-            s.toast('## ${ev.check!.nm} — NOT SIGNED. THE STATION IS DRIFTING.',
-                ToastKind.bad);
+            // The book going unsigned is ALREADY on the screen, in the room,
+            // as the thing you did not do. Measured over one night this fired
+            // nine times against nine of the matching "[ENTER]" prompt: the
+            // game asked for the same chore nine times and told the player off
+            // nine times for not doing it. That is what "there's too much shit
+            // popping up" was describing.
             // A book left unsigned while something was in the room leaves a
             // mark. Nobody says whose.
             if (active != null) {

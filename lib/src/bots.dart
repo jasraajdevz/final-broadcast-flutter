@@ -558,7 +558,7 @@ class BotRuntime extends ChangeNotifier {
       if (id != null) {
         if (s.stats.banished > _banishedSeen && !beaten(id)) {
           s.ups[botBeatKey(id)] = true;
-          s.toast('LOGGED AS BEATEN — ${kAnomBy[id]?.nm ?? id}', ToastKind.gold);
+          // bookkeeping, not news — it is in the archive when they want it
         }
         _lastActiveId = null;
       }

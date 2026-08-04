@@ -32,18 +32,73 @@ class Toast {
 }
 
 /// JS toast(): appended to a stack capped at 3, held 2.6s, then a 0.4s fade.
+///
+/// NOW WITH A DOOR ON IT.
+///
+/// Measured over one competent 8-minute night: 103 interruptions, 12.9 a
+/// minute, one every 4.7 seconds, against 21 actual player decisions. The game
+/// said five things for every one thing the player did, and the single worst
+/// offender was a nag loop — nine of "TURN THE TAPE ... [ENTER]" paired with
+/// nine of "TURN THE TAPE — NOT SIGNED. THE STATION IS DRIFTING." It asked for
+/// the same chore nine times and told the player off nine times for not doing
+/// it.
+///
+/// Two rules, both about respect for the player's attention:
+///
+///   THE SAME SENTENCE IS NOT SAID TWICE. Repeating yourself is nagging, and
+///   a player who ignored it the first time is not persuaded by the fourth.
+///
+///   NOTHING LANDS ON TOP OF SOMETHING UNREAD. A message needs a beat of quiet
+///   either side or it is noise, whatever it says.
+///
+/// GOLD is exempt from the spacing rule and not from the repeat rule: the
+/// gold kind is reserved for things that happen once and matter — a first
+/// sighting, a kill, the hour turning — and those may interrupt.
 class ToastBus extends ChangeNotifier {
   static const double holdSeconds = 2.6;
   static const double fadeSeconds = 0.4;
 
+  /// How long the same sentence stays silent after it has been said.
+  static const double repeatSilence = 45.0;
+
+  /// The quiet a message needs around it.
+  static const double minSpacing = 2.2;
+
   final List<Toast> items = <Toast>[];
 
+  double _clock = 0;
+  double _lastPush = -999;
+  final Map<String, double> _saidAt = <String, double>{};
+
+  /// Interruptions actually delivered, and interruptions refused. Read by
+  /// test/demand_test.dart, which is the only reason the defect was found.
+  int delivered = 0;
+  int suppressed = 0;
+
   void push(String msg, [ToastKind kind = ToastKind.plain]) {
+    final said = _saidAt[msg];
+    if (said != null && _clock - said < repeatSilence) {
+      suppressed++;
+      return;
+    }
+    if (kind != ToastKind.gold && _clock - _lastPush < minSpacing) {
+      suppressed++;
+      return;
+    }
+    _saidAt[msg] = _clock;
+    _lastPush = _clock;
+    delivered++;
     items.add(Toast(msg, kind));
     while (items.length > 3) {
       items.removeAt(0);
     }
     notifyListeners();
+  }
+
+  /// A new shift forgets what was said on the last one.
+  void newNight() {
+    _saidAt.clear();
+    _lastPush = -999;
   }
 
   /// JS `setTimeout(()=>toast(...), ms)`.
@@ -58,6 +113,7 @@ class ToastBus extends ChangeNotifier {
   }
 
   void tick(double dt) {
+    _clock += dt;
     if (items.isEmpty) return;
     var dirty = false;
     for (final t in items) {

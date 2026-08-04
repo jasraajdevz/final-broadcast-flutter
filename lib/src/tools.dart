@@ -680,14 +680,25 @@ class Tools {
     s.toast(msg, ToastKind.bad);
   }
 
-  /// Reaching for something that is not yours yet. Deliberately NOT the reject
-  /// buzz — you did not make a mistake, the stock room simply has not signed
-  /// it out, and punishing curiosity in the opening five minutes is how the
-  /// deck got a reputation for being confusing.
-  void _sealed(ToolDef d) {
-    runtime.audio.env('square', 190, 0.09, 0.06, 150);
-    s.toast(
-        '${d.nm} — SEALED. THE STOCK ROOM SIGNS IT OUT ON NIGHT ${d.night}.',
-        ToastKind.plain);
-  }
+  /// Reaching for something that is not yours yet.
+  ///
+  /// THIS NOW DOES NOTHING AT ALL, ON PURPOSE.
+  ///
+  /// It used to make a noise and say "SEALED — THE STOCK ROOM SIGNS IT OUT ON
+  /// NIGHT n", every single press. The player's words: "notifications telling
+  /// me that I don't have a key — which I don't believe." They were right not
+  /// to believe it, because the button is right there under their finger, and
+  /// on night one four of the five chips are like this.
+  ///
+  /// The chip already prints NIGHT n where its price would be. The information
+  /// is on the screen, in the place a player looks when they want it. Saying
+  /// it again out loud every time they touch the thing is not informing them,
+  /// it is telling them off for being curious — and being told off for
+  /// exploring the controls in your first five minutes is how a deck gets a
+  /// reputation for being confusing.
+  ///
+  /// Kept as a named no-op rather than deleted at the call sites, so the two
+  /// guards above still read as deliberate refusals rather than as a missing
+  /// branch somebody forgot to write.
+  void _sealed(ToolDef d) {}
 }
