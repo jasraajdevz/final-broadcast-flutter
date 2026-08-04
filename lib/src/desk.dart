@@ -325,7 +325,10 @@ class Rig {
 
   // --- the ledger, which only ever counts up ---
   double offAir = 0;
-  double ceiling = kCeiling0;
+  double _ceiling = kCeiling0;
+
+  /// The licence allowance, including anything the station equipment bought.
+  double get ceiling => _ceiling + ceilingBonus;
   double inSpec = 0;
   final Map<String, double> offAirBy = <String, double>{};
   final List<Debit> invoice = <Debit>[];
@@ -338,6 +341,32 @@ class Rig {
   bool voided = false;
   double _splatterFor = 0;
   double _t = 0;
+
+  // --- WHAT THE STATION EQUIPMENT ACTUALLY DOES ---
+  //
+  // Set by the runtime from the installed upgrades. They live here as plain
+  // multipliers rather than as lookups into GameState because the rig is pure
+  // Dart and a whole night has to simulate in forty milliseconds.
+  //
+  // These exist because the four descriptions were REWRITTEN to describe the
+  // new game and then left unimplemented, which made them lies — a worse state
+  // than the stale copy they replaced, because a stale description is merely
+  // out of date and a lie is a promise the player pays for.
+
+  /// TUBE PREHEAT — a preheated tube sheds heat better.
+  double plateCoolMul = 1.0;
+
+  /// SILVER HALIDE — the carrier follows the dial faster.
+  double trackMul = 1.0;
+
+  /// SIGNAL COMPRESSOR — programme audio wanders less.
+  double driftMul = 1.0;
+
+  /// CARRIER HALO — a wider licence allowance.
+  double ceilingBonus = 0.0;
+
+  /// TAPE VAULT — the hour comes due less often.
+  double logPeriod = kLogPeriod;
 
   /// Scales how fast dread bleeds off. The runtime raises it inside a
   /// protection window, because recovering from a scare is supposed to be
@@ -408,7 +437,7 @@ class Rig {
     final ramp = shiftRamp(_t / nightSeconds);
 
     // --- the carrier tracks the dial, and everything pulls it down ---
-    carrier += (drive - carrier) * kTrack * dt;
+    carrier += (drive - carrier) * kTrack * trackMul * dt;
     carrier -= (carrierDecay(night) * ramp + lineWander(_t)) * dt;
     carrier -= ((bite[Rail.carrier] ?? 0) + attachedOn(Rail.carrier)) * dt;
     if (lockout > 0) {
@@ -421,7 +450,7 @@ class Rig {
     // --- the plate, on a square law, cooling by Newton ---
     final double d = (lockout > 0 ? 0 : drive) / 100;
     plate += d * d * kPlateGain * dt;
-    plate -= (kPlateCoolBase + plate * kPlateCoolPerDeg) * dt;
+    plate -= (kPlateCoolBase + plate * kPlateCoolPerDeg) * plateCoolMul * dt;
     plate += ((bite[Rail.plate] ?? 0) + attachedOn(Rail.plate)) * dt;
     plate = plate.clamp(0.0, 140.0);
     if (plate >= kPlateTrip && lockout <= 0) {
@@ -432,7 +461,7 @@ class Rig {
     }
 
     // --- modulation ---
-    modulation += modDrift(_t) * dt;
+    modulation += modDrift(_t) * driftMul * dt;
     modulation -=
         ((bite[Rail.modulation] ?? 0) + attachedOn(Rail.modulation)) * dt;
     modulation = modulation.clamp(0.0, 100.0);
@@ -451,7 +480,7 @@ class Rig {
     logDue -= dt;
     logDue -= ((bite[Rail.log] ?? 0) + attachedOn(Rail.log)) * dt;
     if (logDue < -kLogGrace) {
-      logDue = kLogPeriod;
+      logDue = logPeriod;
       _charge('LOG NOT SIGNED', kChargeUnsigned);
     }
 
@@ -489,7 +518,7 @@ class Rig {
       if (inSpec > kInSpecArm) {
         final earned = ((inSpec - kInSpecArm) / kInSpecPeriod).floor();
         final want = math.min(kCeilingMax, kCeiling0 + earned.toDouble());
-        if (want > ceiling) ceiling = want;
+        if (want > _ceiling) _ceiling = want;
       }
     } else {
       inSpec = 0;
@@ -530,7 +559,7 @@ class Rig {
         modulation = (modulation - kNudgeMod).clamp(0.0, 100.0);
       case 'sign':
         // The Rerun cannot sign for you. It only does the things that cost.
-        if (!ghost) logDue = kLogPeriod;
+        if (!ghost) logDue = logPeriod;
     }
     if (!ghost) tape.write(_t, act);
   }

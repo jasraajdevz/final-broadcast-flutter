@@ -2264,14 +2264,20 @@ class AnomalyRuntime extends ChangeNotifier {
       s.toast('CARRIER RECOVERED', ToastKind.plain);
     });
 
-    // --- what it takes. Unchanged per-entity maths; only the timing moved. ---
+    // --- what it takes ---
+    //
+    // LEAD LINING promises "jumpscares steal half as much". It used to halve a
+    // signal loss, and signal buys nothing now, so the promise was empty. A
+    // scare knocks the operator off the desk instead — the carrier sags while
+    // nobody is holding it — and the lining halves THAT, which is a thing the
+    // player can watch happen on the instrument in front of them.
     final half = (s.ups['lead'] ?? false) ? 0.5 : 1.0;
-    final halo = s.ups['halo'] ?? false;
+    rig.carrier = math.max(0, rig.carrier - 18.0 * half);
     var lostSig = 0.0, lostSeg = 0.0;
     if (def.id == 'niel') {
       // He restates the segment's output — the quota bar visibly walks backward,
       // which is his whole point. HALO protects the filing.
-      lostSeg = halo ? 0 : s.segSig * 0.30 * half;
+      lostSeg = s.segSig * 0.30 * half;
       s.segSig -= lostSeg;
       lostSig = s.sig * 0.10 * half;
       s.sig -= lostSig;
@@ -2969,6 +2975,16 @@ class AnomalyRuntime extends ChangeNotifier {
     // a failsafe bleeds dread faster, aftermath faster still, and an unwritten
     // hour bleeds slower. They used to be applied by a second write to s.dread
     // three hundred lines below, which the rig silently made dead.
+    // THE STATION EQUIPMENT, applied where it is read rather than described.
+    // Every one of these four had its description rewritten for the new game
+    // and was then left doing nothing, which is a lie the player pays for.
+    final ups = s.ups;
+    rig.plateCoolMul = (ups['preheat'] ?? false) ? 1.12 : 1.0;
+    rig.trackMul = (ups['halide'] ?? false) ? 1.35 : 1.0;
+    rig.driftMul = (ups['comp'] ?? false) ? 0.75 : 1.0;
+    rig.ceilingBonus = (ups['halo'] ?? false) ? 20.0 : 0.0;
+    rig.logPeriod = vaultLogPeriod(s);
+
     rig.recoveryScale = ((s.ups['failsafe'] ?? false) ? 1.6 : 0.8) *
         recordDecayMul(s) *
         (aftermath > 0 ? 2.6 : (calm > 0 ? 1.5 : 1.0));

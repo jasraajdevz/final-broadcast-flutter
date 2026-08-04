@@ -512,7 +512,7 @@ final List<Upgrade> kUpgrades = [
       id: 'vault',
       nm: 'TAPE VAULT',
       cost: 1.4e11,
-      ds: 'Offline signal accrual while tab is away.',
+      ds: 'The vault files for you. The hour comes due 45% less often.',
       req: (s) => s.rp >= 5),
   Upgrade(
       id: 'halo',

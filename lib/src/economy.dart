@@ -20,6 +20,7 @@ import 'dart:math' as math;
 import 'anomalies.dart';
 import 'checks.dart';
 import 'consts.dart';
+import 'desk.dart';
 import 'encounter.dart';
 import 'nights.dart';
 import 'record.dart';
@@ -131,13 +132,11 @@ double sponsorMult(GameState s) => s.sponsorEnd > 0 ? 3 : 1;
 
 /// JS sigMult().
 double sigMult(GameState s) {
+  // TUBE PREHEAT, SIGNAL COMPRESSOR and SILVER HALIDE used to multiply signal
+  // here. They do real work on the rig now — cooler plate, slower drift,
+  // faster tracking — and a second hidden effect on a currency nothing spends
+  // is not a bonus, it is a thing that makes the described effect untrue.
   var m = rpMult(s) * sponsorMult(s);
-  if (s.ups['preheat'] ?? false) m *= 1.3;
-  if (s.ups['comp'] ?? false) m *= 2.2;
-  // SILVER HALIDE's rack copy promises "+60% while a quota is unmet". Nothing
-  // read the flag, so the one upgrade that exists to dig you out of a held
-  // clock did nothing at all.
-  if ((s.ups['halide'] ?? false) && !quotaMet(s)) m *= 1.6;
   m *= metaOutputMult(s); // NIGHT SHIFT PAY, permanent
   m *= cardOf(s).output; // tonight's standing conditions
   return m;
@@ -207,21 +206,27 @@ double tuneYield(GameState s, AnomalyRuntime a) {
   // with. The automation ceiling (1.06 effective cps) is deliberately just
   // under the old 1.19 breakeven — the intent was always rack-parity.
   final double rackTerm = 26 * math.pow(sigRate(s, a) / 26, 0.62).toDouble();
-  return (s.tune.tierMult * base + rackTerm) *
-      ((s.ups['preheat'] ?? false) ? 1.3 : 1) *
-      sponsorMult(s);
+  return (s.tune.tierMult * base + rackTerm) * sponsorMult(s);
 }
 
-/// TAPE VAULT offline accrual. Returns 0 when it does not apply.
-/// JS: away<60s does nothing, capped at 4h, 35% efficiency, uses sigRateRaw().
-double offlineGrant(GameState s) {
-  if (!s.started || !(s.ups['vault'] ?? false)) return 0;
-  final away =
-      (DateTime.now().millisecondsSinceEpoch - s.lastSave) / 1000.0;
-  if (away < 60) return 0;
-  final cap = math.min(away, 4 * 3600);
-  return sigRateRaw(s) * cap * 0.35;
-}
+/// TAPE VAULT no longer grants anything for being away.
+///
+/// It used to accrue offline SIGNAL — "35% efficiency, capped at four hours" —
+/// which is a mechanic that only makes sense in an idle game, and which pays
+/// in a currency nothing spends. Its effect is now [vaultLogPeriod]: the vault
+/// files for you, so the hour comes due less often.
+///
+/// Kept as a named zero rather than deleted at the call site, so the sign-on
+/// path reads as a deliberate nothing rather than a missing branch.
+double offlineGrant(GameState s) => 0;
+
+/// How long the operator gets between hours that must be signed.
+///
+/// TAPE VAULT is the one upgrade in the list whose old effect had no honest
+/// translation — there is nothing to accrue any more — so it was given a new
+/// one rather than a new sentence.
+double vaultLogPeriod(GameState s) =>
+    (s.ups['vault'] ?? false) ? kLogPeriod * 1.45 : kLogPeriod;
 
 // ---------------------------------------------------------------------------
 // Difficulty
