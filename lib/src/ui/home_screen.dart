@@ -358,11 +358,11 @@ class _Big extends StatelessWidget {
         width: 420,
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
-          color: hover ? const Color(0xFF0E2A18) : const Color(0xFF0A1A10),
+          color: hover ? const Color(0xFF19232E) : const Color(0xFF0F151C),
           border: Border.all(color: hover ? K.green : K.greenDim, width: 2),
           boxShadow: hover
               ? <BoxShadow>[
-                  const BoxShadow(color: Color(0x476DFF9A), blurRadius: 26)
+                  const BoxShadow(color: Color(0x4799D6FF), blurRadius: 26)
                 ]
               : null,
         ),

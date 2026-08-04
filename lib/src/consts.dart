@@ -194,7 +194,7 @@ class K {
   static const Color tabBg = Color(0xFF070C11);
   static const Color tabInk = Color(0xFF4C5C6A);
   static const Color tabOnBg = Color(0xFF111921);
-  static const Color tabHover = Color(0xFF9FB3B2);
+  static const Color tabHover = Color(0xFF6B96C4);
   static const Color itemBorder = Color(0xFF1C2530);
   static const Color itemTop = Color(0xFF0D141B);
   static const Color itemBot = Color(0xFF080D13);
@@ -209,14 +209,14 @@ class K {
   static const Color noteInk = Color(0xFF8496A0);
   static const Color keyTop = Color(0xFF232B2D);
   static const Color keyBot = Color(0xFF141A1B);
-  static const Color keyInk = Color(0xFF93A6A6);
+  static const Color keyInk = Color(0xFF638BB6);
   static const Color keySub = Color(0xFF6B8183);
-  static const Color keySubKnown = Color(0xFF7FA6A2);
+  static const Color keySubKnown = Color(0xFF638BB6);
   static const Color keyHotBorder = Color(0xFF7A2A24);
   static const Color keyHotInk = Color(0xFFFFB0A8);
-  static const Color keyGoodTop = Color(0xFF0D3A1F);
-  static const Color keyGoodBot = Color(0xFF06210F);
-  static const Color keyGoodInk = Color(0xFF7DFFA8);
+  static const Color keyGoodTop = Color(0xFF22303F);
+  static const Color keyGoodBot = Color(0xFF131B24);
+  static const Color keyGoodInk = Color(0xFF99D6FF);
   static const Color keyBadTop = Color(0xFF3A0D0D);
   static const Color keyBadBot = Color(0xFF210606);
   static const Color keyBadInk = Color(0xFFFF9A92);
@@ -227,24 +227,24 @@ class K {
   static const Color sheetBot = Color(0xFF080B0C);
   static const Color sheetBorder = Color(0xFF2A3436);
   static const Color manInk = Color(0xFF61767A);
-  static const Color manInkOn = Color(0xFFB7C9C7);
+  static const Color manInkOn = Color(0xFF78A8DD);
   static const Color manUnk = Color(0xFF3B4749);
   static const Color manTag = Color(0xFF546A6C);
-  static const Color manH3 = Color(0xFFE6F2EF);
+  static const Color manH3 = Color(0xFF91CBFF);
   static const Color manCls = Color(0xFF6B4A4A);
   static const Color fldKey = Color(0xFF6F8688);
-  static const Color fldVal = Color(0xFFB9CBC8);
+  static const Color fldVal = Color(0xFF79AADF);
   static const Color fldWarn = Color(0xFFFF9A92);
-  static const Color toastInk = Color(0xFFB9CBC8);
+  static const Color toastInk = Color(0xFF79AADF);
   static const Color toastBad = Color(0xFFFF8B82);
   static const Color toastBg = Color(0xE60A0A0B); // rgba(6,10,11,.92)
   static const Color lostBorder = Color(0xFF5A1414);
   static const Color lostInk = Color(0xFFC0A3A3);
   static const Color lostBold = Color(0xFFFF8B82);
   static const Color lostDim = Color(0xFF8A7070);
-  static const Color winBorder = Color(0xFF2F7A4C);
-  static const Color winInk = Color(0xFFA8C4B4);
-  static const Color bootTitle = Color(0xFFE8F2EF);
+  static const Color winBorder = Color(0xFF496686);
+  static const Color winInk = Color(0xFF75A4D7);
+  static const Color bootTitle = Color(0xFF91CBFF);
   static const Color bootSig = Color(0xFF4D6164);
   static const Color bootBody = Color(0xFF7D9091);
   static const Color bootFine = Color(0xFF3F4E50);
@@ -932,7 +932,7 @@ const List<Ad> kAds = [
       t: 'MERIDIAN CATHODE',
       s: 'PICTURE TUBES',
       l: 'A WARMER BLACK. A DEEPER DARK.',
-      c: Color(0xFF6DFF9A)),
+      c: Color(0xFF99D6FF)),
   Ad(
       t: "THE 11 O'CLOCK",
       s: 'NEWS AT ELEVEN',

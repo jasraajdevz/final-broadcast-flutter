@@ -694,7 +694,7 @@ class WindowScene {
     g.drawRect(ui.Rect.fromLTWH(wx + ww * 0.5 - 3, wy, 1.4, wh), mullLit);
     // (the original sets fillStyle="#10151700" here and never uses it)
     fillText(g, 'EXT — FIELD', ui.Offset(wx, wy + wh + 16),
-        mono(10, rgba(150, 190, 185, 0.6)));
+        mono(10, rgba(114, 159, 209, 0.6)));
 
     // cold spilling into the room
     withBlend(g, kWall, ui.BlendMode.plus, (c) {

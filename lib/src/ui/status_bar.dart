@@ -369,7 +369,7 @@ class _OnAir extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: safe
-              ? const Color(0xFF08210F)
+              ? const Color(0xFF131B24)
               : (live ? K.onAirLiveBg : K.onAirOffBg),
           border: Border.all(
               color: safe

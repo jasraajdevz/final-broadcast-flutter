@@ -1020,7 +1020,7 @@ void _drawSleep(ui.Canvas g, double t, double p) {
       6,
       const ui.Offset(_fw * 0.32, _fh * 0.30),
       250,
-      <ui.Color>[rgba(255, 255, 252, 0.95), rgba(198, 190, 172, 0)],
+      <ui.Color>[rgba(153, 214, 255, 0.95), rgba(198, 190, 172, 0)],
       <double>[0, 1],
     ),
   );
@@ -1147,7 +1147,7 @@ void _drawVert(ui.Canvas g, double t, double p) {
   final roll = (t * speed) % _fh;
   final skew = math.sin(t * 17) * p * 3.5;
 
-  fillRect(g, 0, 0, _fw, _fh, const ui.Color(0xFF040706));
+  fillRect(g, 0, 0, _fw, _fh, const ui.Color(0xFF040507));
 
   // the rolled programme: a lit studio floor, so the roll cannot be missed
   for (final oy in const <double>[-_fh, 0]) {
@@ -1163,9 +1163,9 @@ void _drawVert(ui.Canvas g, double t, double p) {
         ui.Offset.zero,
         const ui.Offset(0, _fh),
         const <ui.Color>[
-          ui.Color(0xFF16281F),
-          ui.Color(0xFF0D1C15),
-          ui.Color(0xFF050D09),
+          ui.Color(0xFF18212C),
+          ui.Color(0xFF10171E),
+          ui.Color(0xFF070A0E),
         ],
         <double>[0, 0.55, 1],
       ),
@@ -1222,9 +1222,9 @@ void _vertBand(ui.Canvas g, double t, double p, double y, double h, double hx,
   g.save();
   g.clipRect(rect);
   fillRect(g, 0, y, _fw, h,
-      primary ? const ui.Color(0xFFDCE6E0) : const ui.Color(0xFF9DB2A8));
+      primary ? const ui.Color(0xFF8AC1FD) : const ui.Color(0xFF6A95C3));
   _grain(g, t, 30, 0.42, rect: rect);
-  _vertMan(g, hx, headTop, ground, sw, fill(const ui.Color(0xFF030605)));
+  _vertMan(g, hx, headTop, ground, sw, fill(const ui.Color(0xFF030506)));
 
   // the only eyes in this composition, and only while the seam is across them
   final hr = sw * 1.55;
@@ -1389,8 +1389,8 @@ void _drawDead(ui.Canvas g, double t, double p) {
 void _drawCard(ui.Canvas g, double t, double p) {
   const cols = <ui.Color>[
     ui.Color(0xFFC0C0C0),
-    ui.Color(0xFFC0C000),
-    ui.Color(0xFF00C0C0),
+    ui.Color(0xFF73A1D3),
+    ui.Color(0xFF73A1D3),
     ui.Color(0xFF99ACC0),
     ui.Color(0xFFC000C0),
     ui.Color(0xFFC00000),
@@ -1441,7 +1441,7 @@ void _drawCard(ui.Canvas g, double t, double p) {
   // --- her inset. Off-centre left, and she does not fill it for long.
   const box = ui.Rect.fromLTWH(26, 62, 92, 116);
   fillRect(g, box.left, box.top, box.width, box.height,
-      const ui.Color(0xFF1A1D1B));
+      const ui.Color(0xFF11181F));
   fillRectShader(
     g,
     box.left,
@@ -1449,7 +1449,7 @@ void _drawCard(ui.Canvas g, double t, double p) {
     box.width,
     box.height,
     radialR0(ui.Offset(box.center.dx, box.top + 40), 6, 96,
-        <ui.Color>[rgba(120, 128, 118, 0.55), rgba(8, 10, 9, 0)],
+        <ui.Color>[rgba(76, 107, 140, 0.55), rgba(8, 10, 9, 0)],
         <double>[0, 1]),
   );
   g.drawRect(box, stroke(const ui.Color(0xFF121212), 3));
@@ -1550,7 +1550,7 @@ void _drawCard(ui.Canvas g, double t, double p) {
     final br = r * (0.115 + (sg * math.cos(turn) > 0 ? 0.02 : 0));
     g.drawCircle(ui.Offset(bx, -r * 0.14), br, fill(const ui.Color(0xFF0C0C0C)));
     g.drawCircle(ui.Offset(bx - br * 0.30, -r * 0.14 - br * 0.30), br * 0.32,
-        fill(rgba(255, 255, 250, 0.85)));
+        fill(rgba(153, 214, 255, 0.85)));
   }
   // no nose. A stitched mouth, and it opens.
   final gap = p * r * 0.30;
@@ -1603,7 +1603,7 @@ void _drawCard(ui.Canvas g, double t, double p) {
   }
 }
 
-final TextStyle _cardIdent = mono(9, rgba(214, 214, 204, 0.78));
+final TextStyle _cardIdent = mono(9, rgba(128, 179, 235, 0.78));
 
 // --- 6. THE REPEAT ----------------------------------------------------------
 //
@@ -1628,7 +1628,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
   double walkS(double uu) => 0.24 + uu * uu * 0.30;
 
   // --- the room ---------------------------------------------------------
-  fillRect(g, 0, 0, _fw, _fh, const ui.Color(0xFF03100B));
+  fillRect(g, 0, 0, _fw, _fh, const ui.Color(0xFF090D11));
   fillRectShader(
     g,
     0,
@@ -1636,7 +1636,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
     _fw,
     horizon,
     linear(ui.Offset.zero, const ui.Offset(0, horizon),
-        <ui.Color>[rgba(27, 30, 34, 1), rgba(4, 18, 12, 1)], <double>[0, 1]),
+        <ui.Color>[rgba(27, 30, 34, 1), rgba(10, 15, 19, 1)], <double>[0, 1]),
   );
   fillRectShader(
     g,
@@ -1645,7 +1645,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
     _fw,
     _fh - horizon,
     linear(const ui.Offset(0, horizon), const ui.Offset(0, _fh),
-        <ui.Color>[rgba(41, 46, 52, 1), rgba(3, 14, 9, 1)], <double>[0, 1]),
+        <ui.Color>[rgba(41, 46, 52, 1), rgba(8, 11, 15, 1)], <double>[0, 1]),
   );
   const vp = ui.Offset(_fw * 0.54, horizon);
   final fl = stroke(rgba(160, 180, 200, 0.14), 1);
@@ -1689,7 +1689,7 @@ void _drawRerun(ui.Canvas g, double t, double p) {
   if (still > 0) {
     const sy = horizon + (_fh - horizon) * 0.46;
     _walker(g, _fw * 0.74, sy, 0.40,
-        rgba(3, 13, 9, clampD(0.40 + still * 0.55, 0, 1)), 0);
+        rgba(7, 10, 14, clampD(0.40 + still * 0.55, 0, 1)), 0);
     if (still > 0.72) {
       // a sliver of cheek. Not a face — it has not turned that far yet.
       drawEllipse(g, _fw * 0.74 + 2.6, sy - 62 * 0.40, 1.6, 3.0, 0,
@@ -1703,10 +1703,10 @@ void _drawRerun(ui.Canvas g, double t, double p) {
     if (prev != null) {
       drawImageStretch(tc, prev, _feedRect, nearestPaint());
     }
-    fillRect(tc, 0, 0, _fw, _fh, rgba(2, 7, 5, 0.055 + p * 0.020));
+    fillRect(tc, 0, 0, _fw, _fh, rgba(4, 5, 7, 0.055 + p * 0.020));
     _walker(tc, walkX(u), walkY(u), walkS(u), rgba(204, 229, 255, 0.42), u * 5);
     if (u < 0.05) {
-      fillRect(tc, 0, 0, _fw, _fh, rgba(2, 7, 5, 1)); // hard cut on the splice
+      fillRect(tc, 0, 0, _fw, _fh, rgba(4, 5, 7, 1)); // hard cut on the splice
     }
   });
   prev?.dispose();
@@ -2218,7 +2218,7 @@ ui.Offset _dialMan(
         ui.Offset(x, headY),
         math.max(0.6, headR * 0.09),
         fill(
-            rgba(220, 255, 255,
+            rgba(153, 214, 255,
                 clampD(align * (0.55 + 0.45 * math.sin(t * 6)), 0, 1)),
             mode: ui.BlendMode.plus));
   }

@@ -94,7 +94,7 @@ class _PlaceholderPainter extends CustomPainter {
     for (final p in kSide) {
       final r = ui.Rect.fromLTWH(p.dx, p.dy, kSideW, kSideH);
       canvas.drawRect(r, fill(const ui.Color(0xFF0C1011)));
-      canvas.drawRect(r.deflate(4), fill(const ui.Color(0xFF07100B)));
+      canvas.drawRect(r.deflate(4), fill(const ui.Color(0xFF090D11)));
       canvas.drawRect(r, stroke(const ui.Color(0xFF1B2426), 2));
     }
 
@@ -105,7 +105,7 @@ class _PlaceholderPainter extends CustomPainter {
         stroke(const ui.Color(0xFF262E30), 2));
     final flicker = 0.06 + 0.02 * math.sin(t * 7.3);
     canvas.drawRRect(
-        ui.RRect.fromRectXY(kScr, 10, 10), fill(const ui.Color(0xFF04120A)));
+        ui.RRect.fromRectXY(kScr, 10, 10), fill(const ui.Color(0xFF0A0F13)));
     canvas.drawRRect(
       ui.RRect.fromRectXY(kScr, 10, 10),
       ui.Paint()

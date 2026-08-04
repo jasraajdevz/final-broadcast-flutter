@@ -24,7 +24,7 @@ class UX {
 
   // status strip
   static const Color rdoRule = Color(0xFF1E2628); // .rdo border-right
-  static const Color qBarBg = Color(0xFF0E1A16);
+  static const Color qBarBg = Color(0xFF0F151C);
   static const Color qBarBorder = Color(0xFF2E343A);
 
   // rack
@@ -45,7 +45,7 @@ class UX {
   static const Color keyShadow = Color(0xFF050708);
   static const Color keyHoverTop = Color(0xFF2B3436);
   static const Color keyHoverBot = Color(0xFF1A2122);
-  static const Color keyHoverInk = Color(0xFFCFE0DE);
+  static const Color keyHoverInk = Color(0xFF86BCF6);
   static const Color keyGoodEdge = Color(0xFF6E7C8A);
   static const Color keyBadEdge = Color(0xFF8A2F2F);
   static const Color skeyTopEdge = Color(0xFF5A4416);
@@ -55,7 +55,7 @@ class UX {
   // modals
   static const Color scrim = Color(0xDB000000); // rgba(0,0,0,.86)
   static const Color sheetHeadBg = Color(0xFF0A0E0F);
-  static const Color sheetHeadRule = Color(0xFF26302F);
+  static const Color sheetHeadRule = Color(0xFF1C2834);
   static const Color closeInk = Color(0xFF5C6E70);
   static const Color manListRule = Color(0xFF202A2B);
   static const Color mrowRule = Color(0xFF131A1B);
@@ -87,14 +87,14 @@ class UX {
   static const Color acceptBg = Color(0xFF140606);
   static const Color acceptInk = Color(0xFFC46B63);
   static const Color acceptHover = Color(0xFF200909);
-  static const Color winTopA = Color(0xFF06140B);
-  static const Color winTopB = Color(0xFF030803);
-  static const Color winHeadBg = Color(0xFF040C07);
+  static const Color winTopA = Color(0xFF0C1016);
+  static const Color winTopB = Color(0xFF040608);
+  static const Color winHeadBg = Color(0xFF070A0D);
   static const Color winHeadRule = Color(0xFF2E343A);
   static const Color winAcceptBg = Color(0xFF1A1D21);
 
   // boot
-  static const Color bootBtnBg = Color(0xFF0A1A10);
+  static const Color bootBtnBg = Color(0xFF0F151C);
   static const Color bootBtnBorder = Color(0xFF616D7A);
   static const Color bootBtnHover = Color(0xFF21252A);
   static const Color bootBody2 = Color(0xFF6B7D80);

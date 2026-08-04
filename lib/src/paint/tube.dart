@@ -557,7 +557,7 @@ void drawMainCRT(ui.Canvas g, GameState s, AnomalyRuntime a, ui.Image feed,
         mono(9, rgba(204, 229, 255, .9), weight: ui.FontWeight.bold));
   } else {
     fillText(g, 'MERIDIAN CATHODE  ·  MODEL 7',
-        ui.Offset(cx + 24, cy + chh - 16), mono(11, rgba(180, 220, 215, .35)));
+        ui.Offset(cx + 24, cy + chh - 16), mono(11, rgba(132, 184, 242, .35)));
   }
 
   // power lamp

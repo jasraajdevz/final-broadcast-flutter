@@ -177,7 +177,7 @@ void paintWallTex(ui.Canvas g) {
   }
   // patched holes
   final holeDark = fill(rgba(0, 0, 0, .42));
-  final holeLit = fill(rgba(190, 200, 195, .05));
+  final holeLit = fill(rgba(120, 168, 220, .05));
   for (var i = 0; i < 14; i++) {
     final x = rand() * w, y = rand() * h, r = 2 + rand() * 4;
     _fillCircle(g, x, y, r, holeDark);
@@ -357,7 +357,7 @@ class RoomScene {
   static final ui.Paint _ceilPaint = fill(_hex(0x080a0b));
   static final ui.Paint _leftWallPaint = fill(_hex(0x0c1011));
   static final ui.Paint _rightWallPaint = fill(_hex(0x070a0b));
-  static final ui.Paint _gridPaint = stroke(rgba(120, 180, 170, .05), 1);
+  static final ui.Paint _gridPaint = stroke(rgba(108, 151, 198, .05), 1);
   static final ui.Paint _cornerPaint = stroke(rgba(255, 255, 255, .05), 1);
 
   /// JS `drawRoom(t)`.
@@ -445,10 +445,10 @@ class RoomScene {
   // -------------------------------------------------------------------------
 
   static final ui.Paint _doorFill = fill(_hex(0x05080a));
-  static final ui.Paint _doorEdge = stroke(rgba(160, 190, 190, .10), 2);
+  static final ui.Paint _doorEdge = stroke(rgba(114, 159, 209, .10), 2);
   static final ui.Paint _gapDark = fill(rgba(30, 6, 6, .95));
   static final ui.Paint _gapBlack = fill(rgba(0, 0, 0, .95));
-  static final ui.Paint _handle = fill(rgba(200, 220, 215, .14));
+  static final ui.Paint _handle = fill(rgba(132, 184, 242, .14));
   // lineCap = "round" is set here in the original and never unset.
   static final ui.Paint _cablePaint =
       stroke(rgba(0, 0, 0, .55), 3, cap: ui.StrokeCap.round);
@@ -460,16 +460,16 @@ class RoomScene {
   static final ui.Paint _clockFace = fill(_hex(0x0b0f10));
   static final ui.Paint _clockEdge =
       stroke(_hex(0x2a3436), 2, cap: ui.StrokeCap.round);
-  static final ui.Paint _clockTick = fill(rgba(180, 210, 205, .35));
+  static final ui.Paint _clockTick = fill(rgba(126, 176, 231, .35));
   static final ui.Paint _minuteHand =
-      stroke(rgba(200, 225, 220, .55), 2, cap: ui.StrokeCap.round);
+      stroke(rgba(135, 189, 247, .55), 2, cap: ui.StrokeCap.round);
   static final ui.Paint _secondHand =
       stroke(rgba(255, 90, 70, .8), 1, cap: ui.StrokeCap.round);
   static final ui.Paint _shelfFill = fill(_hex(0x0c1011));
   // PORT NOTE: lineWidth is still 2 here, left over from the ON AIR box stroke.
   static final ui.Paint _shelfEdge =
       stroke(_hex(0x222b2d), 2, cap: ui.StrokeCap.round);
-  static final ui.Paint _spineLit = fill(rgba(200, 220, 215, .10));
+  static final ui.Paint _spineLit = fill(rgba(132, 184, 242, .10));
 
   static final TextStyle _onAirHotStyle =
       mono(17, _hex(0xff5a46), weight: FontWeight.bold);
@@ -651,7 +651,7 @@ class RoomScene {
   static final ui.Paint _monScan = fill(rgba(0, 0, 0, .3));
   static final ui.Paint _monSil = fill(rgba(0, 0, 0, .94));
   static final TextStyle _monLabelHot = mono(10, rgba(255, 140, 130, .95));
-  static final TextStyle _monLabelCold = mono(10, rgba(150, 190, 185, .75));
+  static final TextStyle _monLabelCold = mono(10, rgba(114, 159, 209, .75));
 
   /// JS `drawSmallMonitors(t)` — the security cams to the left of the tube.
   ///
@@ -848,9 +848,9 @@ class RoomScene {
   static final ui.Paint _needleCold =
       stroke(_hex(0xffcc88), 1.6, cap: ui.StrokeCap.round);
   static final ui.Paint _reelRim =
-      stroke(rgba(180, 210, 205, .35), 1.4, cap: ui.StrokeCap.round);
+      stroke(rgba(126, 176, 231, .35), 1.4, cap: ui.StrokeCap.round);
   static final ui.Paint _reelHub = fill(_hex(0x1a2122));
-  static final TextStyle _vuLabel = mono(7, rgba(150, 180, 175, .4));
+  static final TextStyle _vuLabel = mono(7, rgba(108, 151, 198, .4));
 
   /// JS `drawDesk(t)` — the foreground desk, the two VU meters that track
   /// [sigRate], and the reel-to-reel that spins faster during an intrusion.
@@ -962,7 +962,7 @@ class RoomScene {
             0.30 *
             (0.4 + 0.6 * math.sin(t * 1.7 + d.ph) * 0.5 + 0.3);
         if (a <= 0.004) continue;
-        _dustPaint.color = rgba(190, 215, 205, a);
+        _dustPaint.color = rgba(129, 180, 236, a);
         c.drawRect(ui.Rect.fromLTWH(px, py, d.s, d.s), _dustPaint);
       }
     });

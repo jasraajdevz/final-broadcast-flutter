@@ -97,7 +97,7 @@ double _climb(GameState s) =>
     ((s.stats.banished + s.stats.scared) / 26.0).clamp(0.0, 0.92);
 
 void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
-  fillRect(f, 0, 0, _fw, _fh, const ui.Color(0xFF04120A));
+  fillRect(f, 0, 0, _fw, _fh, const ui.Color(0xFF0A0F13));
 
   // A low, dirty glow on the horizon — sodium lamps in a town that is going
   // out, not a sunrise. Sits under the treeline so it silhouettes rather than
@@ -109,7 +109,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     _fw,
     _fh,
     radialR0(const ui.Offset(_fw / 2, _fh * 0.72), 8, 150,
-        <ui.Color>[rgba(56, 63, 70, 0.42), rgba(2, 10, 6, 0)], <double>[0, 1]),
+        <ui.Color>[rgba(56, 63, 70, 0.42), rgba(6, 8, 11, 0)], <double>[0, 1]),
   );
 
   // --- the sky ---
@@ -123,7 +123,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     _fw,
     120,
     linear(const ui.Offset(0, 60), const ui.Offset(0, 180),
-        <ui.Color>[rgba(8, 26, 18, 0), rgba(35, 39, 44, 0.55)],
+        <ui.Color>[rgba(15, 21, 28, 0), rgba(35, 39, 44, 0.55)],
         <double>[0, 1]),
   );
 
