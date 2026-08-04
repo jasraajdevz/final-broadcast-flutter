@@ -344,7 +344,7 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         stroke(rgba(140, 255, 200, clampD(0.35 + pulse * 0.4, 0, 1)), 1));
     fillText(
       f,
-      'STRIKE THE SET TO HOLD THE CARRIER',
+      'HOLD THE CARRIER — UP AND DOWN',
       ui.Offset(_fw / 2, _fh * 0.38 + 20),
       mono(13, rgba(200, 255, 225, clampD(0.6 + pulse * 0.4, 0, 1)),
           weight: FontWeight.bold),
@@ -354,8 +354,8 @@ void drawFeedNormal(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
     fillText(
       f,
       s.tune.strikes < 1
-          ? '>> CLICK ANYWHERE ON THIS SCREEN <<'
-          : 'BUY A TRANSMITTER AND IT HOLDS ITSELF',
+          ? '>> UP RAISES THE DRIVE. IT HEATS THE PLATE. <<'
+          : 'LEFT AND RIGHT TRIM THE MODULATION',
       ui.Offset(_fw / 2, _fh * 0.38 + 35),
       _hintStyle,
       anchor: TextAnchor.center,

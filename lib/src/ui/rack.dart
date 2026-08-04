@@ -57,34 +57,7 @@ class _RackState extends State<Rack> {
     s.bump();
   }
 
-  void _cycleBuyMode() {
-    s.buyMode = s.buyMode == 1
-        ? 10
-        : (s.buyMode == 10 ? GameState.buyModeMax : 1);
-    audio.click();
-    s.bump();
-  }
 
-  void _buy(Producer p, int n) {
-    audio.init();
-    final before = s.prod[p.id] ?? 0;
-    if (!buyProducer(s, p, n)) {
-      audio.env('square', 180, 0.08, 0.07, 140);
-      s.bump();
-      return;
-    }
-    audio.buy();
-    // Buying the 1st and the 500th used to be the same event. Crossing a mark
-    // is now its own moment, with a permanent multiplier behind it.
-    final after = s.prod[p.id] ?? 0;
-    for (final mark in marksCrossed(before, after)) {
-      audio.milestone('producer', mark);
-      s.toast('${p.nm} x$mark — OUTPUT x${producerMarkMult(after).toStringAsFixed(2)}',
-          ToastKind.gold);
-    }
-    s.save();
-    s.bump();
-  }
 
   void _buyUp(Upgrade u) {
     audio.init();
@@ -143,7 +116,14 @@ class _RackState extends State<Rack> {
     // board and an archive inside ninety seconds, none of it legible. The tabs
     // now arrive one per rung of the roster, each with a name attached.
     final labels = <List<String>>[
-      <String>['tx', 'TRANSMIT'],
+      // THE TRANSMIT TAB IS GONE.
+      //
+      // It was the Cookie Clicker shop, undisguised: RABBIT EARS 15, DIPOLE
+      // ARRAY 140, VHF MAST 1.30K, MICROWAVE RELAY 12.0K, CABLE HEADEND 110K,
+      // SATELLITE 1.00M. Buy a number that makes another number go up faster.
+      // Asked about twice, and the rig replaced the loop it fed — nothing in
+      // the game reads sig/s any more, so the whole tab was a shop selling
+      // tickets to a show that had closed.
       <String>['hw', 'HARDWARE'],
       if (unlocked(s, 'bots')) <String>['bot', 'AUTO'],
       if (unlocked(s, 'board')) <String>['st', 'STATION'],
@@ -214,72 +194,8 @@ class _RackState extends State<Rack> {
       case 'st':
         return _station();
       default:
-        return _transmit();
+        return _hardware();
     }
-  }
-
-  // --- TRANSMIT ------------------------------------------------------------
-
-  List<Widget> _transmit() {
-    final mode = s.buyMode == 1
-        ? '1'
-        : (s.buyMode == 10 ? '10' : 'MAX');
-    final out = <Widget>[
-      RackHead('TRANSMISSION HARDWARE   ·   BUY x$mode',
-          ui: s.ui, onTap: _cycleBuyMode),
-    ];
-    for (var i = 0; i < kProducers.length; i++) {
-      final p = kProducers[i];
-      final owned = s.prod[p.id] ?? 0;
-      if (!producerUnlocked(s, i)) {
-        // show the WHOLE ladder, always
-        final pct = (s.sig / p.cost * 100).floor().clamp(0, 99);
-        out.add(Opacity(
-          opacity: 0.42,
-          child: _Item(
-            ui: s.ui,
-            name: p.nm,
-            cost: fmt(p.cost),
-            afford: false,
-            desc: p.ds,
-            statLeft: '+${fmt(p.sig)} sig/s each',
-            statRight: '$pct%',
-          ),
-        ));
-        continue;
-      }
-      final n = resolveBuyCount(s, p);
-      final c = bulkCost(s, p, n);
-      final live = prodLive(runtime, p.id);
-      Widget item = _Item(
-        ui: s.ui,
-        name: p.nm,
-        offAir: !live,
-        cost: fmt(c),
-        afford: s.sig >= c,
-        desc: p.ds,
-        statLeft: '+${fmt(p.sig * n * sigMult(s))} sig/s',
-        statRight: 'x$n',
-        qty: '$owned',
-        onTap: () => _buy(p, n),
-      );
-      if (!live) {
-        item = Opacity(
-          opacity: 0.38,
-          child: ColorFiltered(
-            colorFilter: const ColorFilter.matrix(<double>[
-              0.2126, 0.7152, 0.0722, 0, 0, //
-              0.2126, 0.7152, 0.0722, 0, 0, //
-              0.2126, 0.7152, 0.0722, 0, 0, //
-              0, 0, 0, 1, 0,
-            ]),
-            child: item,
-          ),
-        );
-      }
-      out.add(item);
-    }
-    return out;
   }
 
   // --- HARDWARE ------------------------------------------------------------
@@ -610,7 +526,6 @@ class _Item extends StatelessWidget {
     this.qty,
     this.onTap,
     this.owned = false,
-    this.offAir = false,
   });
 
   final double ui;
@@ -623,7 +538,6 @@ class _Item extends StatelessWidget {
   final String? qty;
   final VoidCallback? onTap;
   final bool owned;
-  final bool offAir;
 
   @override
   Widget build(BuildContext context) {
@@ -660,12 +574,9 @@ class _Item extends StatelessWidget {
                             text: TextSpan(
                               style: t.at(16, K.itemName, ls: 0.5),
                               children: <InlineSpan>[
+                                // the "## OFF AIR" tag went with the
+                                // transmitter shop it belonged to
                                 TextSpan(text: name),
-                                if (offAir)
-                                  TextSpan(
-                                    text: ' ## OFF AIR',
-                                    style: t.at(16, UX.offAir, ls: 0.5),
-                                  ),
                               ],
                             ),
                           ),

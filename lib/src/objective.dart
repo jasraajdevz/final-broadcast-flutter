@@ -99,7 +99,7 @@ Directive primeDirective(GameState s, AnomalyRuntime r) {
           // The one moment the player has no idea what to press. Telling them
           // to go and read a manual under a live window was advice they could
           // not take; hitting the glass is something they can do RIGHT NOW.
-          : 'STRIKE THE TUBE TO HOLD IT BACK — THEN READ THE BEZEL',
+          : 'HOLD THE CARRIER — THEN READ THE BEZEL',
       Urgency.urgent,
     );
   }
@@ -148,7 +148,7 @@ Directive primeDirective(GameState s, AnomalyRuntime r) {
     return Directive(
         s.sig >= first
             ? 'BUY ${kProducers.first.nm} — THE RACK IS ON YOUR RIGHT'
-            : 'STRIKE THE TUBE — THAT IS HOW SIGNAL STARTS',
+            : 'THE CARRIER IS FALLING — UP RAISES THE DRIVE',
         Urgency.calm);
   }
 
@@ -162,7 +162,7 @@ Directive primeDirective(GameState s, AnomalyRuntime r) {
     return const Directive('ALL CLEAR — SPEND IT BEFORE IT COSTS YOU',
         Urgency.calm);
   }
-  return const Directive('ALL CLEAR — STRIKE THE TUBE', Urgency.calm);
+  return const Directive('ALL CLEAR — MIND THE NEEDLES', Urgency.calm);
 }
 
 /// Will the station clear this segment's quota before the clock reaches :59

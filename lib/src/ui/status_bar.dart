@@ -11,6 +11,7 @@ import 'package:flutter/widgets.dart';
 import '../anomalies.dart';
 import '../bake.dart' show measureText;
 import '../consts.dart';
+import '../desk.dart';
 import '../economy.dart';
 import '../state.dart';
 import 'ui_kit.dart';
@@ -23,31 +24,12 @@ class StatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rig = runtime.rig;
     final t = Sty(s.ui);
-    final a = runtime.active;
 
-    // --- SIGNAL rate: theft first, then off-air transmitters, then normal ---
-    String rateText;
-    Color rateColor;
-    if (runtime.sabOn('card') && a != null && a.held > 0) {
-      rateText = '>> SHE HAS ${fmt(a.held)}';
-      rateColor = K.heldPink;
-    } else if (a != null && a.mute.isNotEmpty) {
-      rateText = 'v ${fmt(sigRate(s, runtime))}/s  ${a.mute.length} OFF AIR';
-      rateColor = K.toastBad;
-    } else {
-      rateText = '+${fmt(sigRate(s, runtime))}/s  '
-          '×${sigMult(s).toStringAsFixed(2)}${s.sponsorEnd > 0 ? " +" : ""}';
-      rateColor = K.subGreen;
-    }
-
+    // The SIGNAL rate line, the segment quota and its bar all went with the
+    // readouts they belonged to. Nothing on this strip is a bank any more.
     final sg = segOf(s);
-    // TONIGHT's quota, not the printed table. quotaScale() has escalated these
-    // night over night since it was added; the HUD was still reading the
-    // night-one figure, so from night 2 on the bar filled and the clock stayed
-    // held anyway with nothing on screen explaining why.
-    final quota = segQuota(s);
-    final quotaP = quota <= 0 ? 1.0 : math.min(1.0, s.segSig / quota);
 
     return Container(
       decoration: vgrad(
@@ -64,28 +46,99 @@ class StatusBar extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
+          // --- THE RIG ---
+          // What replaced SIGNAL / BROADCAST / QUOTA. Those three were the
+          // Cookie Clicker readout: a bank, a running total and a target, and
+          // not one of them was ever a thing the operator had to DO something
+          // about from one second to the next.
+          //
+          // These are. CARRIER shows where the needle is and where the dial is
+          // set; the gap between them is the night getting harder. PLATE is
+          // the price of closing that gap.
           _Rdo(
             ui: s.ui,
-            maxWidth: 185,
-            label: 'SIGNAL',
-            value: fmt(s.sig),
-            valueColor: K.green,
-            sub: rateText,
-            subColor: rateColor,
+            minWidth: 104,
+            maxWidth: 150,
+            label: 'CARRIER',
+            value: rig.carrier.toStringAsFixed(0),
+            valueColor: rig.lowPower ? K.red : K.green,
+            valueSize: 17,
+            sub: 'DRIVE ${rig.drive.toStringAsFixed(0)}  UP/DN',
+            subColor: K.lbl,
+            below: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: _Meter(
+                fraction: (rig.carrier / 100).clamp(0.0, 1.0),
+                height: 5,
+                background: UX.qBarBg,
+                border: UX.qBarBorder,
+                fillA: rig.lowPower ? K.red : K.greenDim,
+                fillB: rig.lowPower ? K.red : K.green,
+              ),
+            ),
           ),
           _Rdo(
             ui: s.ui,
-            maxWidth: 160,
-            label: 'BROADCAST',
-            value: fmt(s.segSig),
-            valueColor: K.cyan,
-            valueGlowAlpha: 0.4,
-            sub: 'THIS SEGMENT',
+            minWidth: 76,
+            maxWidth: 108,
+            label: 'PLATE',
+            value: rig.plate.toStringAsFixed(0),
+            valueColor:
+                rig.plate > 84 ? K.red : (rig.plate > 66 ? K.amber : K.green),
+            valueSize: 17,
+            sub: rig.lockout > 0
+                ? 'CONTACTOR OUT'
+                : (rig.trips > 0 ? 'RECYCLES ${rig.trips}' : 'NOMINAL'),
+            subColor: rig.lockout > 0 ? K.red : K.lbl,
+            below: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: _Meter(
+                fraction: (rig.plate / 100).clamp(0.0, 1.0),
+                height: 5,
+                background: UX.qBarBg,
+                border: UX.qBarBorder,
+                fillA: rig.plate > 84 ? K.red : K.greenDim,
+                fillB: rig.plate > 84 ? K.red : K.amber,
+              ),
+            ),
+          ),
+          // MOD is two-sided, so its meter is marked at the CENTRE rather than
+          // filled from the left. A bar that fills one way teaches the player
+          // to maximise it, and this is the one gauge in the game where
+          // maximising is a failure.
+          _Rdo(
+            ui: s.ui,
+            minWidth: 84,
+            maxWidth: 118,
+            label: 'MODULATION',
+            value: (rig.modulation - 50).toStringAsFixed(0),
+            valueColor:
+                (rig.modulation - 50).abs() > kModGreen ? K.red : K.green,
+            valueSize: 17,
+            sub: '< >',
+            subColor: K.lbl,
+            below: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: _CentreMeter(value: (rig.modulation - 50) / 50),
+            ),
+          ),
+          // THE DRUMS. The score, and it only ever counts up.
+          _Rdo(
+            ui: s.ui,
+            minWidth: 96,
+            maxWidth: 126,
+            label: 'LICENCE',
+            value: '${rig.offAir.toStringAsFixed(1)}/'
+                '${rig.ceiling.toStringAsFixed(0)}',
+            valueColor: rig.offAir > rig.ceiling * 0.8 ? K.red : K.amber,
+            valueSize: 15,
+            sub: rig.allGreen ? 'IN SPEC' : 'SEC OFF AIR',
+            subColor: rig.allGreen ? K.green : K.lbl,
           ),
           _Rdo(
             ui: s.ui,
-            minWidth: 136,
-            maxWidth: 195,
+            minWidth: 112,
+            maxWidth: 168,
             // The label is a promise, and during the long night the game is
             // no longer making it.
             label: runtime.longNight ? 'THE SHIFT HAS NOT ENDED' : 'SHIFT ENDS 06:00',
@@ -96,26 +149,6 @@ class StatusBar extends StatelessWidget {
             sub: runtime.longNight
                 ? 'NO SEGMENT'
                 : '${s.stalled ? "HELD - " : ""}${sg.nm}',
-          ),
-          _Rdo(
-            ui: s.ui,
-            minWidth: 118,
-            maxWidth: 175,
-            label: 'QUOTA',
-            value: '${fmt(math.min(s.segSig, quota))} / ${fmt(quota)}',
-            valueColor: K.green,
-            valueSize: 17,
-            below: Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: _Meter(
-                fraction: quotaP,
-                height: 5,
-                background: UX.qBarBg,
-                border: UX.qBarBorder,
-                fillA: K.greenDim,
-                fillB: K.green,
-              ),
-            ),
           ),
           // --- DREAD ---
           Expanded(
@@ -166,7 +199,6 @@ class _Rdo extends StatelessWidget {
     this.minWidth = 112,
     this.maxWidth = 185,
     this.valueSize = 24,
-    this.valueGlowAlpha = 0.45,
   });
 
   final double ui;
@@ -185,7 +217,6 @@ class _Rdo extends StatelessWidget {
   /// more than the strip is wide.
   final double maxWidth;
   final double valueSize;
-  final double valueGlowAlpha;
 
   @override
   Widget build(BuildContext context) {
@@ -226,7 +257,7 @@ class _Rdo extends StatelessWidget {
             maxLines: 1,
             softWrap: false,
             style: t.at(valueSize, valueColor,
-                ls: 1, h: 1.15, sh: glow(valueColor, 8, valueGlowAlpha)),
+                ls: 1, h: 1.15, sh: glow(valueColor, 8, 0.45)),
           ),
           if (sub != null)
             Text(sub!,
@@ -358,6 +389,59 @@ class _OnAir extends StatelessWidget {
                   ? glow(K.green, 10, 0.8)
                   : (live ? glow(K.red, 10, 0.8) : null)),
         ),
+      ),
+    );
+  }
+}
+
+
+/// A meter marked at its CENTRE rather than filled from the left.
+///
+/// Modulation is the one gauge in this game where more is not better — too low
+/// is dead air, too high is splatter across the band — and a bar that fills
+/// from one end teaches exactly the wrong reflex. This one grows out of the
+/// middle in whichever direction the needle has gone.
+class _CentreMeter extends StatelessWidget {
+  const _CentreMeter({required this.value});
+
+  /// -1..1, zero being on the mark.
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = value.clamp(-1.0, 1.0);
+    final bad = v.abs() > kModGreen / 50;
+    return SizedBox(
+      height: 5,
+      child: LayoutBuilder(
+        builder: (_, c) {
+          final half = c.maxWidth / 2;
+          final w = (half * v.abs()).clamp(0.0, half);
+          return Stack(
+            children: <Widget>[
+              Container(
+                decoration: BoxDecoration(
+                  color: UX.qBarBg,
+                  border: Border.all(color: UX.qBarBorder, width: 0.5),
+                ),
+              ),
+              Positioned(
+                left: v < 0 ? half - w : half,
+                width: w,
+                top: 0,
+                bottom: 0,
+                child: ColoredBox(color: bad ? K.red : K.green),
+              ),
+              Positioned(
+                left: half - 0.5,
+                width: 1,
+                top: 0,
+                bottom: 0,
+                child: const ColoredBox(color: Color(0x99FFFFFF)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

@@ -113,7 +113,13 @@ void main() {
 
       testWidgets('status strip', (WidgetTester tester) async {
         await stage(tester, StatusBar(s: s, runtime: runtime));
-        expect(find.text('SIGNAL'), findsOneWidget);
+        // SIGNAL / BROADCAST / QUOTA were the Cookie Clicker readout — a
+        // bank, a running total and a target. The strip now shows the things
+        // the operator has to hold inside limits.
+        expect(find.text('CARRIER'), findsOneWidget);
+        expect(find.text('PLATE'), findsOneWidget);
+        expect(find.text('MODULATION'), findsOneWidget);
+        expect(find.text('LICENCE'), findsOneWidget);
         expect(find.text('DREAD'), findsOneWidget);
         expect(find.text('23:00'), findsOneWidget);
       });

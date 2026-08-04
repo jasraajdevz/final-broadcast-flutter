@@ -1674,7 +1674,7 @@ class AnomalyRuntime extends ChangeNotifier {
     audio.env('sine', 1000, 0.5, 0.12, 1000);
     s.toast('KBLK-7 IS ON AIR — GOOD LUCK, OPERATOR', ToastKind.gold);
     s.toasts
-        .pushDelayed(1600, 'BUY A TRANSMITTER FROM THE RACK ->', ToastKind.gold);
+        .pushDelayed(1600, 'THE CARRIER FALLS ON ITS OWN — UP / DOWN', ToastKind.gold);
     notifyListeners();
   }
 
@@ -3048,9 +3048,9 @@ class AnomalyRuntime extends ChangeNotifier {
         s.toast('CLOCK HELD — ${fmt(short)} MORE OUTPUT NEEDED THIS SEGMENT',
             ToastKind.bad);
         const advice = <String>[
-          'STRIKE THE TUBE — EVERY HIT COUNTS TOWARD THE QUOTA',
+          'THE CARRIER IS SAGGING — WIND THE DRIVE UP',
           'BANISH SOMETHING — A CLEAN KILL PAYS STRAIGHT INTO OUTPUT',
-          'BUY A TRANSMITTER — THE RACK IS ON YOUR RIGHT',
+          'THE PLATE IS HOT — WIND IT BACK DOWN',
         ];
         s.toasts.pushDelayed(
             1200, advice[_stallAdvice % advice.length], ToastKind.gold);

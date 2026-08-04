@@ -189,7 +189,7 @@ final List<BotDef> kBots = <BotDef>[
     mul: 3.4,
     maxLvl: 5,
     req: (s) => s.tune.strikes >= 15,
-    reqNote: 'STRIKE THE TUBE 15 TIMES BY HAND',
+    reqNote: 'WORK THE DRIVE 15 TIMES BY HAND',
   ),
   BotDef(
     id: 'eye',

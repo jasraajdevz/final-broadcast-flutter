@@ -37,7 +37,7 @@ void main() {
     expect(d.text, isNot(contains('BEHIND')));
     expect(d.urgency, Urgency.calm,
         reason: 'second zero must read as an instruction, not an alarm');
-    expect(d.text, contains('STRIKE THE TUBE'),
+    expect(d.text, contains('THE CARRIER IS FALLING'),
         reason: 'the true first action, since 15 SIGNAL is unaffordable at 0');
   });
 

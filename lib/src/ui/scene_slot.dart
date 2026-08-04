@@ -135,7 +135,7 @@ class _PlaceholderPainter extends CustomPainter {
     );
     fillText(
       canvas,
-      runtime.signedOn ? 'STRIKE THE TUBE FOR SIGNAL' : 'KBLK-7',
+      runtime.signedOn ? 'HOLD IT INSIDE THE LIMITS' : 'KBLK-7',
       ui.Offset(kScr.center.dx, kScr.center.dy + 16),
       mono(12, K.greenDim, letterSpacing: 3),
       anchor: TextAnchor.center,

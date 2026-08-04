@@ -214,7 +214,7 @@ class _Brief extends StatelessWidget {
                   style: t.at(13, K.bootBody, h: 1.75)),
             ),
           const SizedBox(height: 14),
-          _RuleRow(ui: ui, k: 'STRIKE THE TUBE', v: 'to put signal out by hand'),
+          _RuleRow(ui: ui, k: 'ARROW KEYS', v: 'hold the carrier, mind the plate'),
           _RuleRow(ui: ui, k: 'KEYS 1-8', v: 'each banishes exactly one thing'),
           _RuleRow(ui: ui, k: 'DREAD 100', v: 'and it comes out here instead'),
         ],
