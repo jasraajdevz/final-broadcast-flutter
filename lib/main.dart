@@ -438,6 +438,12 @@ class _GameRootState extends State<GameRoot>
     setState(() {});
   }
 
+  /// THE LONG SHIFT. Same desk, same eight things, no 06:00.
+  void _signOnEndless() {
+    s.endless = true;
+    _signOn();
+  }
+
   void _closeLog() {
     runtime.paused = false;
     setState(() => _pendingLog = null);
@@ -732,6 +738,7 @@ class _GameRootState extends State<GameRoot>
                       s: s,
                       onSignOn: _signOn,
                       onManual: _openManual,
+                      onEndless: _signOnEndless,
                       onSetup: () => setState(() => _showSetup = true),
                     )),
               // THE LINE-UP CARD sits on top of the home screen, because a

@@ -425,6 +425,14 @@ class GameState extends ChangeNotifier {
 
   bool started = false;
 
+  /// THE SHIFT THAT DOES NOT END. Set before signing on; never saved as part
+  /// of a run, because a mode is a choice made at the door.
+  bool endless = false;
+
+  /// Longest endless run, in real seconds. The only score in the game that
+  /// goes UP, and it is a duration rather than a currency.
+  double bestEndless = 0;
+
   /// "tx" | "hw" | "st"
   String tab = 'tx';
 
@@ -497,6 +505,7 @@ class GameState extends ChangeNotifier {
       'airtime': airtime,
       'dread': dread,
       'shiftMin': shiftMin,
+        'bestEndless': bestEndless,
       'stalled': stalled,
       'survived': survived,
       'stats': stats.toJson(),
@@ -551,6 +560,7 @@ class GameState extends ChangeNotifier {
     airtime = _dbl(o['airtime'], airtime);
     dread = _dbl(o['dread'], dread);
     shiftMin = _dbl(o['shiftMin'], shiftMin);
+    bestEndless = _dbl(o['bestEndless'], bestEndless);
     stalled = _bool(o['stalled'], stalled);
     survived = _int(o['survived'], survived);
     dawnBonus = _int(o['dawnBonus'], dawnBonus);

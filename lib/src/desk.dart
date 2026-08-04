@@ -260,8 +260,22 @@ const double kDreadRecover = 3.0;
 /// wall: a competent operator survived night 12 comfortably and then died 64
 /// seconds into night 16, because once the demanded rate crosses what two
 /// hands can serve the failure is a cascade and arrives all at once.
-double carrierDecay(int night) =>
-    2.9 + math.pow(night.toDouble(), 0.85).toDouble() * 0.42;
+/// AND IT HAS A CEILING, because the dial does.
+///
+/// The carrier rests at `drive - 2*decay*shiftRamp`. At full drive and the
+/// late-shift ramp of 1.34 that is `100 - 2.68*decay`, so once decay passes
+/// 17.9 the needle cannot be held above the 52 low-power line BY ANY DIAL
+/// POSITION — the operator is charged for every second of the back half of
+/// the shift no matter what they do. Uncapped this arrived at night 67, and
+/// measured there: void at 128 seconds of 480, twelve plate recycles, and a
+/// beating rather than a night.
+///
+/// Capped at 12.4 the worst resting carrier is 66.8, which leaves fifteen
+/// points of headroom for the wander and the bites to eat into. A late-career
+/// night is then hard because everything is happening at once, not because
+/// the machine has been put beyond reach of its own controls.
+double carrierDecay(num night) => math.min(
+    12.4, 2.9 + math.pow(night.toDouble(), 0.85).toDouble() * 0.42);
 
 /// And how much harder it falls as the shift wears on, 0..1 through the night.
 ///
@@ -321,10 +335,36 @@ double modDrift(double t) =>
 /// night simulate in about forty milliseconds, which is the only reason any of
 /// this could be tuned honestly.
 class Rig {
-  Rig(this.night, {this.nightSeconds = 8 * 60});
+  Rig(this.night, {this.nightSeconds = 8 * 60, this.endless = false});
 
   final int night;
   final double nightSeconds;
+
+  /// THE SHIFT THAT DOES NOT END.
+  ///
+  /// A career tops out: the carrier decay is capped so that the needle stays
+  /// reachable by the dial, which means past about night 30 every night is the
+  /// same night. That is the right shape for a career — it has an ending — and
+  /// the wrong shape for the question "how long could I hold it", which is the
+  /// one this game's score was always really asking.
+  ///
+  /// In endless there is no 06:00. Difficulty is a function of how long you
+  /// have been sitting there rather than of which night it is, it keeps
+  /// climbing past where the career stops, and the only number that matters is
+  /// the one on the clock when the licence goes.
+  final bool endless;
+
+  /// Seconds of endless play worth one night of career difficulty.
+  ///
+  /// At 42 the operator passes night-30 conditions at about twenty-one
+  /// minutes, which is far enough in that getting there is the achievement and
+  /// near enough that a good run is not an evening.
+  static const double kEndlessNightSeconds = 42.0;
+
+  /// What the machine thinks tonight is. Whole nights in a career; a rising
+  /// real number in endless.
+  double get effectiveNight =>
+      endless ? 1 + _t / kEndlessNightSeconds : night.toDouble();
 
   // --- the operator's one continuous control ---
 
@@ -400,7 +440,8 @@ class Rig {
   /// early game was one, which is the worst place to have that problem: it is
   /// where the player decides whether this is a game about a transmitter or a
   /// game about one wobbling needle.
-  double get nightDriftScale => (0.58 + night * 0.030).clamp(0.0, 1.0);
+  double get nightDriftScale =>
+      (0.58 + effectiveNight * 0.030).clamp(0.0, 1.0);
 
   /// Scales how fast dread bleeds off. The runtime raises it inside a
   /// protection window, because recovering from a scare is supposed to be
@@ -476,11 +517,17 @@ class Rig {
   void tick(double dt, {bool handsCommitted = false}) {
     if (voided) return;
 
-    final ramp = shiftRamp(_t / nightSeconds);
+    // In endless the shift never wears on toward a dawn, so the within-night
+    // ramp is replaced by a slow breathing cycle — the weather comes and goes
+    // instead of the sun coming up.
+    final ramp = endless
+        ? 1.0 + math.sin(_t * 0.021) * 0.22
+        : shiftRamp(_t / nightSeconds);
 
     // --- the carrier tracks the dial, and everything pulls it down ---
     carrier += (drive - carrier) * kTrack * trackMul * dt;
-    carrier -= (carrierDecay(night) * ramp * decayMul + lineWander(_t)) * dt;
+    carrier -=
+        (carrierDecay(effectiveNight) * ramp * decayMul + lineWander(_t)) * dt;
     carrier -= ((bite[Rail.carrier] ?? 0) + attachedOn(Rail.carrier)) * dt;
     if (lockout > 0) {
       // contactor out: the dial is not connected to anything

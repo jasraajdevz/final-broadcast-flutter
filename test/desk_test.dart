@@ -12,6 +12,8 @@
 // detail of this design, it IS the design, and a harness without it would have
 // signed off on a game nobody can play.
 
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:final_broadcast/src/desk.dart';
@@ -71,6 +73,33 @@ class Night {
       '${rig.voided ? "VOID @${rig.t.toStringAsFixed(0)}s" : "held"}';
 }
 
+/// Keeps a rig alive for [seconds], servicing the most urgent rail. Crude on
+/// purpose — these tests are about the SHAPE of the long shift, not its
+/// balance, and desk_test's real operator is the one that judges fairness.
+void _hold(Rig r, double seconds) {
+  const dt = 1 / 30.0;
+  var next = 0.0;
+  while (r.t < seconds && !r.voided) {
+    if (r.t >= next) {
+      next = r.t + 0.28;
+      if (r.logDue <= 0) {
+        r.sign();
+      } else if (r.plate > 88) {
+        r.trim(-1);
+      } else if (r.carrier < kLowPower + 6) {
+        r.trim(1);
+      } else if (r.modulation < 50 - kModGreen + 2) {
+        r.nudge(1);
+      } else if (r.modulation > 50 + kModGreen - 2) {
+        r.nudge(-1);
+      } else if (r.carrier > kLowPower + 22 && r.plate > 62) {
+        r.trim(-1);
+      }
+    }
+    r.tick(dt);
+  }
+}
+
 /// A competent operator with human hands and one pair of eyes.
 Night playNight(int night,
     {double seconds = 8 * 60, int seed = 7717, double missRate = 0}) {
@@ -99,7 +128,7 @@ Night playNight(int night,
       if (nextArrival <= 0) {
         live = kBites.keys.elementAt((rng.next() * 4).floor() % 4);
         liveFor = 0;
-        nextArrival = 11 + rng.next() * 9 - night * 0.35;
+        nextArrival = math.max(5.5, 11 + rng.next() * 9 - night * 0.35);
       }
     }
     rig.tick(dt, handsCommitted: cooldown > 0);
@@ -187,7 +216,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('READOUT', () {
-    for (final n in <int>[1, 3, 5, 8, 12, 16, 20, 24, 28]) {
+    for (final n in <int>[1, 8, 20, 32, 45, 55, 67, 80]) {
       // ignore: avoid_print
       print('night ${n.toString().padLeft(2)}: ${playNight(n)}');
     }
@@ -444,5 +473,36 @@ void main() {
     // and it must be readable: coalesced, not four thousand rows of 0.03
     expect(r.rig.invoice.length, lessThan(40),
         reason: '${r.rig.invoice.length} lines is a log, not an invoice');
+  });
+
+  test('THE LONG SHIFT keeps climbing past where the career stops', () {
+    // The career tops out on purpose: carrierDecay is capped so the needle
+    // stays reachable by the dial, which means past about night 30 every night
+    // is the same night. Measured before the cap, night 67 was void at 128
+    // seconds of 480 with twelve plate recycles — a beating, not a night.
+    //
+    // Endless is where the question "how long could I hold it" lives, so its
+    // difficulty has to be a function of how long you have been sitting there.
+    final easy = Rig(1, endless: true);
+    final worn = Rig(1, endless: true);
+    // minded, or it dies in under two minutes and measures nothing
+    _hold(worn, 900);
+    expect(worn.effectiveNight, greaterThan(easy.effectiveNight + 8),
+        reason: 'fifteen minutes in, the long shift is still night '
+            '${worn.effectiveNight.toStringAsFixed(1)}');
+    expect(carrierDecay(worn.effectiveNight),
+        greaterThan(carrierDecay(easy.effectiveNight)),
+        reason: 'the machine does not get harder to hold');
+  });
+
+  test('and it never reaches a dawn', () {
+    // A career night is 420 shift-minutes and then 06:00. The long shift has
+    // no 06:00 — that is the entire premise, and the clock keeps counting
+    // past sunrise rather than stopping at it.
+    final r = Rig(1, endless: true, nightSeconds: 8 * 60);
+    _hold(r, 700);
+    expect(r.t, greaterThan(8 * 60),
+        reason: 'the long shift stopped at ${r.t.toStringAsFixed(0)}s, which '
+            'is where a career night would have ended');
   });
 }

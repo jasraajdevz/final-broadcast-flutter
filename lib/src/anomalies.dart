@@ -576,7 +576,7 @@ class AnomalyRuntime extends ChangeNotifier {
   /// count what the county heard instead of you. This replaced the economy
   /// that used to sit at the middle of this loop — see desk.dart, and
   /// test/demand_test.dart for the measurement that forced it.
-  late final Rig rig = Rig(s.night);
+  late final Rig rig = Rig(s.night, endless: s.endless);
 
   /// Wall time until which the operator's hands are committed. Feeds the BUSY
   /// term of the rig's strain, which is its largest — difficulty arrives as
@@ -2360,6 +2360,7 @@ class AnomalyRuntime extends ChangeNotifier {
   /// on this invoice is something they watched happen.
   void licenceVoid() {
     if (lost) return;
+    if (s.endless && rig.t > s.bestEndless) s.bestEndless = rig.t;
     audio.deadAir(true);
     audio.env('sawtooth', 71, 1.6, 0.32, 33);
     signalLost();
@@ -3129,7 +3130,9 @@ class AnomalyRuntime extends ChangeNotifier {
         audio.relay();
         _later(300, () => audio.env('square', 1000, 0.07, 0.07, 1000));
       }
-      if (s.shiftMin >= kShiftMinutes) {
+      // THERE IS NO 06:00 IN ENDLESS. The clock keeps counting past sunrise
+      // because the point of the mode is that it never comes.
+      if (s.shiftMin >= kShiftMinutes && !s.endless) {
         if (longNight) {
           // the clock keeps counting into an hour with no segment
           overMin += dt / kMinReal;

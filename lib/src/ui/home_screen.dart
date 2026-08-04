@@ -26,12 +26,14 @@ class HomeScreen extends StatelessWidget {
     required this.s,
     required this.onSignOn,
     required this.onManual,
+    required this.onEndless,
     required this.onSetup,
   });
 
   final GameState s;
   final VoidCallback onSignOn;
   final VoidCallback onManual;
+  final VoidCallback onEndless;
   final VoidCallback onSetup;
 
   bool get _returning => s.started && (s.night > 1 || s.survived > 0);
@@ -114,6 +116,26 @@ class HomeScreen extends StatelessWidget {
                   onTap: onSignOn,
                 ),
                 const SizedBox(height: 10),
+                // THE SHIFT THAT DOES NOT END.
+                //
+                // The career tops out — the carrier decay is capped so the
+                // needle stays reachable by the dial, which means past about
+                // night 30 every night is the same night. That is the right
+                // shape for a career and the wrong shape for "how long could I
+                // hold it", which is the question this game's score was always
+                // really asking. Offered only once the operator has actually
+                // held a shift, because it is not a place to learn the desk.
+                if (s.survived > 0) ...<Widget>[
+                  _Secondary(
+                    ui: s.ui,
+                    label: 'THE LONG SHIFT',
+                    sub: s.bestEndless > 0
+                        ? 'NO 06:00  ·  BEST ${_mmss(s.bestEndless)}'
+                        : 'NO 06:00. IT JUST KEEPS GOING.',
+                    onTap: onEndless,
+                  ),
+                  const SizedBox(height: 10),
+                ],
                 _Secondary(
                   ui: s.ui,
                   label: "OPERATOR'S MANUAL",
@@ -553,4 +575,12 @@ class _RungBar extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RungBar o) => o.v != v;
+}
+
+
+/// A duration as the station clock would keep it.
+String _mmss(double seconds) {
+  final m = (seconds ~/ 60).toString().padLeft(2, '0');
+  final s = (seconds % 60).floor().toString().padLeft(2, '0');
+  return '$m:$s';
 }
