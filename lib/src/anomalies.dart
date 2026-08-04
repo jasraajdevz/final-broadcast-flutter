@@ -2845,7 +2845,20 @@ class AnomalyRuntime extends ChangeNotifier {
         presenceIn -= dt;
         if (presenceIn <= 0) {
           final double d = s.dread / 100;
-          presenceIn = rr(80, 190) - d * 40;
+          // IT WAITS FOR THE ROOM TO GO QUIET RATHER THAN LOSING ITS TURN.
+          //
+          // The reset used to sit ABOVE this check, so a visit that came due
+          // while something was on the tube was silently thrown away and the
+          // clock started again from eighty seconds. That was survivable while
+          // nights were mostly empty. The moment the rewrite made them busy it
+          // started eating half the visits — measured, one a night where there
+          // had been two — and the thing in the room is not a mechanic that
+          // can afford to be rare.
+          if (!(active == null && scare <= 0 && !paused)) {
+            presenceIn = 4;
+          } else {
+            presenceIn = rr(80, 190) - d * 40;
+          }
           if (active == null && scare <= 0 && !paused) {
             presenceSpan = rr(8, 20);
             presence = 1;

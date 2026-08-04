@@ -67,7 +67,7 @@ class Night {
       'trips ${rig.trips}  '
       'dread ${peakDread.toStringAsFixed(0)}/${meanDread.toStringAsFixed(0)}  '
       'strain ${meanStrain.toStringAsFixed(3)}/${peakStrain.toStringAsFixed(3)}  '
-      '${mix.entries.map((e) => "${e.key} ${e.value}").join(" ")}  '
+      'mix ${(<String>["up", "down", "mod", "entity", "log"]).map((k) => "$k ${(share(k) * 100).round()}%").join(" ")}  '
       '${rig.voided ? "VOID @${rig.t.toStringAsFixed(0)}s" : "held"}';
 }
 
@@ -224,6 +224,35 @@ void main() {
             'them');
     expect(holes(late), lessThan(12),
         reason: 'night 16 still has ${holes(late)} holes over six seconds');
+  });
+
+  test('no single system wears the whole shift', () {
+    // "you're supposed to be in multiple things" is a claim about the MIX, not
+    // just about there being something to do, and the two are easy to confuse:
+    // a night can have no dead air at all and still be one gauge wobbling.
+    //
+    // Drift used to be identical at every difficulty while drive work scaled
+    // with the night's decay, so night 1 measured modulation at 60% of every
+    // action against drive at 17%. The late game was four systems and the
+    // early game was one — and the early game is exactly where a player
+    // decides whether this is about a transmitter or about one needle.
+    for (final n in <int>[1, 3, 5, 8, 12, 16]) {
+      final r = playNight(n);
+      final drive = r.share('up') + r.share('down');
+      for (final e in <String, double>{
+        'the drive': drive,
+        'modulation': r.share('mod'),
+        'the entities': r.share('entity'),
+      }.entries) {
+        expect(e.value, lessThan(0.62),
+            reason: 'night $n spends ${(e.value * 100).round()}% of every '
+                'action on ${e.key} alone');
+      }
+      expect(r.share('mod'), greaterThan(0.12),
+          reason: 'night $n barely touches the modulation at all');
+      expect(drive, greaterThan(0.15),
+          reason: 'night $n barely touches the drive at all');
+    }
   });
 
   test('a harder night is BUSIER, not merely louder', () {

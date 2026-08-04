@@ -296,7 +296,7 @@ double shiftRamp(double progress) => 0.72 + 0.62 * progress.clamp(0.0, 1.0);
 /// two hands to do. The median hid it completely at 2.57s. A distribution has
 /// to be looked at, not summarised.
 double lineWander(double t) =>
-    (math.sin(t * 0.31) + math.sin(t * 0.097) * 0.8) * 2.3;
+    (math.sin(t * 0.31) + math.sin(t * 0.097) * 0.8) * 3.6;
 
 /// Modulation's wander. THREE incommensurable periods, so the sign flips on a
 /// schedule the operator cannot learn and pre-empt with a held correction.
@@ -381,6 +381,18 @@ class Rig {
 
   /// TAPE VAULT — the hour comes due less often.
   double logPeriod = kLogPeriod;
+
+  /// HOW MUCH THE PROGRAMME AUDIO WANDERS ON AN EARLY NIGHT.
+  ///
+  /// Drift used to be identical at every difficulty while drive work scaled
+  /// with the night's decay, so on night 1 — where the carrier barely sags —
+  /// modulation was the only system asking for anything. Measured shares of a
+  /// night 1 operator's actions: mod 60%, drive 17%. By night 28 the same
+  /// numbers are mod 22%, drive 59%. The late game was four systems and the
+  /// early game was one, which is the worst place to have that problem: it is
+  /// where the player decides whether this is a game about a transmitter or a
+  /// game about one wobbling needle.
+  double get nightDriftScale => (0.58 + night * 0.030).clamp(0.0, 1.0);
 
   /// Scales how fast dread bleeds off. The runtime raises it inside a
   /// protection window, because recovering from a scare is supposed to be
@@ -475,7 +487,7 @@ class Rig {
     }
 
     // --- modulation ---
-    modulation += modDrift(_t) * driftMul * dt;
+    modulation += modDrift(_t) * driftMul * nightDriftScale * dt;
     modulation -=
         ((bite[Rail.modulation] ?? 0) + attachedOn(Rail.modulation)) * dt;
     modulation = modulation.clamp(0.0, 100.0);
