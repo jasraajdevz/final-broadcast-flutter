@@ -13,6 +13,8 @@ import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/nights.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _forNight(int night) {
   final s = GameState();
   for (final p in kProducers) {
@@ -46,7 +48,8 @@ GameState _forNight(int night) {
   var wasActive = false;
   const dt = 1 / 60.0;
   while (t < 21 * 60 && !r.lost) {
-    r.tick(dt);
+    mindTheDesk(r);
+        r.tick(dt);
     t += dt;
     if (s.dread > peak) peak = s.dread;
     final a = r.active;

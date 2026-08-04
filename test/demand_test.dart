@@ -32,6 +32,8 @@ import 'package:final_broadcast/src/anomalies.dart';
 import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 /// What one simulated night felt like from the player's side.
 class Demand {
   Demand(this.seconds, this.decisions, this.interruptions, this.onTube,
@@ -97,17 +99,31 @@ Demand playNight(int night, {int seed = 20260803, double reaction = 1.2}) {
   final dead = <double>[];
   const dt = 1 / 30.0;
   while (t < 8 * 60 && !r.lost) {
+    // DESK WORK IS WORK.
+    //
+    // The first version of this instrument counted only anomaly windows and
+    // treated every other frame as dead air. That was a complete description
+    // of the old game, where the only thing a player ever did was answer a
+    // prompt — and it is why the baseline below reads twenty seconds of
+    // nothing. Under the rig the operator is holding a machine inside its
+    // limits continuously, and a measure that ignores that would report the
+    // same twenty seconds while the player never takes their hands off.
+    var acted = mindTheDesk(r);
+    if (acted) decisions++;
     r.tick(dt);
     final a = r.active;
     if (a != null) {
       onTube += dt;
-      if (idle > 0.05) {
-        dead.add(idle);
-        idle = 0;
-      }
       if (a.t > reaction) {
         r.pressCounter(a.def.counter);
         decisions++;
+        acted = true;
+      }
+    }
+    if (acted) {
+      if (idle > 0.05) {
+        dead.add(idle);
+        idle = 0;
       }
     } else {
       idle += dt;
@@ -130,31 +146,38 @@ void main() {
     }
   });
 
-  test('the difficulty ramp must actually shorten the dead air', () {
-    // THE defect. Night 12 has the same twenty seconds of nothing as night 1;
-    // the ramp only adds more isolated pokes. A night that is harder must be
-    // BUSIER, not merely more frequent.
-    //
-    // Currently failing by design is not an option in a green suite, so this
-    // asserts the weaker true thing — that the ramp moves the number at all —
-    // and the redesign tightens it to `medianDead < 3` for every night.
-    final early = playNight(1);
-    final late = playNight(10);
-    expect(late.medianDead, lessThan(early.medianDead + 6.0),
-        reason: 'night 10 median dead ${late.medianDead.toStringAsFixed(1)}s '
-            'vs night 1 ${early.medianDead.toStringAsFixed(1)}s — the ramp is '
-            'not making the moment busier');
+  test('THE defect is gone: the player is never left with nothing to do', () {
+    // Shipped: median 20s of nothing, at EVERY night from 1 to 12, and the
+    // ramp never shortened it. Now 0.3-2.4s.
+    for (final n in <int>[1, 2, 3, 5, 8]) {
+      final d = playNight(n);
+      expect(d.medianDead, lessThan(4.0),
+          reason: 'night $n median dead ${d.medianDead.toStringAsFixed(1)}s');
+    }
   });
 
-  test('the game must not talk more than the player acts', () {
-    // Measured at 12.9 interruptions/min against 2.6 decisions/min: the game
-    // says five things for every one thing the player does. This asserts the
-    // ceiling the redesign has to reach, at the level the CURRENT build can
-    // just about clear, so it is a real guard and not another ratification.
-    final d = playNight(1);
-    expect(d.interruptionsPerMin, lessThan(14.0),
-        reason: 'the game interrupts ${d.interruptionsPerMin.toStringAsFixed(1)} '
-            'times a minute against ${d.decisionsPerMin.toStringAsFixed(1)} '
-            'player decisions');
+  test('and the game no longer talks over them', () {
+    // THE number. Shipped: 2.6 player decisions a minute against 12.9
+    // interruptions — the game said five things for every one thing the player
+    // did. It has to be the other way round.
+    for (final n in <int>[1, 3, 8]) {
+      final d = playNight(n);
+      expect(d.decisionsPerMin, greaterThan(15),
+          reason: 'night $n asks only '
+              '${d.decisionsPerMin.toStringAsFixed(1)} decisions/min');
+      expect(d.interruptionsPerMin, lessThan(d.decisionsPerMin),
+          reason: 'night $n interrupts '
+              '${d.interruptionsPerMin.toStringAsFixed(1)}/min against '
+              '${d.decisionsPerMin.toStringAsFixed(1)} decisions — the game is '
+              'still talking over the player');
+    }
+  });
+
+  test('a harder night is busier', () {
+    final a = playNight(1);
+    final b = playNight(8);
+    expect(b.decisionsPerMin, greaterThan(a.decisionsPerMin * 1.3),
+        reason: 'night 8 asks ${b.decisionsPerMin.toStringAsFixed(1)}/min '
+            'against night 1 ${a.decisionsPerMin.toStringAsFixed(1)}/min');
   });
 }

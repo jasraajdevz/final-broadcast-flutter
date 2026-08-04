@@ -463,7 +463,7 @@ class Tools {
     a.dreadPaid = 1e9;
     a.bite = math.max(a.bite, kWandCalm);
     a.ringIv = math.max(a.ringIv, kWandCalm);
-    s.dread = math.max(0, s.dread - 4);
+    runtime.bumpDread(-4.0);
     runtime.shake = math.max(runtime.shake, 8);
     runtime.audio.env('sine', 60, 0.7, 0.22, 300);
     runtime.audio.burst(0.35, 0.20, 1400, 120);
@@ -585,7 +585,7 @@ class Tools {
     if (_stun > 0 && a != null) {
       _stun -= dt;
       a.t = math.max(0, a.t - dt);
-      s.dread = math.max(0, s.dread - dt * (1.2 + depth(s) * 0.02));
+      runtime.bumpDread(-(dt * (1.2 + depth(s)) * 0.02));
       a.bite = math.max(a.bite, 0.4);
       a.ringIv = math.max(a.ringIv, 0.4);
       if (runtime.sabOn('card')) {

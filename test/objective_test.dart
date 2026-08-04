@@ -15,6 +15,8 @@ import 'package:final_broadcast/src/objective.dart';
 import 'package:final_broadcast/src/state.dart';
 import 'package:final_broadcast/src/ui/wings.dart';
 
+import 'operator.dart';
+
 GameState _stocked() {
   final s = GameState();
   for (final p in kProducers) {
@@ -77,6 +79,7 @@ void main() {
       // drive until something is actually up
       var t = 0.0;
       while (t < 21 * 60 && r.active == null && !r.lost) {
+        mindTheDesk(r);
         r.tick(1 / 30.0);
         t += 1 / 30.0;
       }
@@ -93,6 +96,7 @@ void main() {
       r.startBroadcast();
       var t = 0.0;
       while (t < 21 * 60 && (r.active == null || r.active!.stage < 1) && !r.lost) {
+        mindTheDesk(r);
         r.tick(1 / 30.0);
         t += 1 / 30.0;
       }

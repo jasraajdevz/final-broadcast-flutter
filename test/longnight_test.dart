@@ -19,6 +19,8 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 ({GameState s, AnomalyRuntime r}) _atDawn({required int survived, int seed = 7}) {
   seedRandom(seed);
   final s = GameState()
@@ -43,6 +45,7 @@ import 'package:final_broadcast/src/state.dart';
 void _run(AnomalyRuntime r, double seconds) {
   var t = 0.0;
   while (t < seconds && !r.lost) {
+    mindTheDesk(r);
     r.tick(1 / 60.0);
     t += 1 / 60.0;
     final a = r.active;

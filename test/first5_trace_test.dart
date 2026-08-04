@@ -7,6 +7,8 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _fresh() {
   final s = GameState();
   for (final p in kProducers) {
@@ -43,7 +45,8 @@ void _trace(String label, {required bool clicks, required bool buys}) {
     drain();
 
     while (t < 300) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       // FakeAsync needs real elapse for Future.delayed callbacks
       fa.elapse(const Duration(milliseconds: 33));
       t += dt;

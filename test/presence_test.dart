@@ -15,6 +15,8 @@ import 'package:final_broadcast/src/anomalies.dart';
 import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 class _Rec implements GameAudio {
   final List<double> hearts = <double>[];
   @override
@@ -44,7 +46,8 @@ class _Rec implements GameAudio {
   var was = false;
   const dt = 1 / 60.0;
   while (t < 21 * 60 && !r.lost) {
-    r.tick(dt);
+    mindTheDesk(r);
+        r.tick(dt);
     t += dt;
     final now = r.presence > 0;
     if (now && !was) visits++;
@@ -81,6 +84,7 @@ void main() {
     var t = 0.0, overlaps = 0;
     var was = false;
     while (t < 21 * 60 && !r.lost) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       t += 1 / 60.0;
       final now = r.presence > 0;
@@ -104,6 +108,7 @@ void main() {
     // drive to a visit
     var t = 0.0;
     while (t < 21 * 60 && r.presence <= 0 && !r.lost) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       t += 1 / 60.0;
     }
@@ -112,6 +117,7 @@ void main() {
     final sig = s.sig, dread = s.dread, seg = s.segSig;
     // one frame of it standing there
     r.presence = 1;
+    mindTheDesk(r);
     r.tick(1 / 60.0);
     expect(s.sig, greaterThanOrEqualTo(sig), reason: 'it took SIGNAL');
     expect(s.segSig, greaterThanOrEqualTo(seg), reason: 'it took output');
@@ -146,6 +152,7 @@ void main() {
       r.presenceIn = 0;
       var t = 0.0;
       while (t < 5 && r.presence <= 0) {
+        mindTheDesk(r);
         r.tick(1 / 60.0);
         t += 1 / 60.0;
       }
@@ -153,6 +160,7 @@ void main() {
           reason: 'visit ${v + 1} could turn — too early to break the promise');
       var u = 0.0;
       while (u < 30 && r.presence > 0) {
+        mindTheDesk(r);
         r.tick(1 / 60.0);
         u += 1 / 60.0;
       }
@@ -198,6 +206,7 @@ void main() {
     var t = 0.0, sightings = 0, whileBusy = 0;
     var was = false;
     while (t < 21 * 60 && !r.lost) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       t += 1 / 60.0;
       final now = r.mirrorCam >= 0;
@@ -231,6 +240,7 @@ void main() {
 
     var t = 0.0;
     while (t < 21 * 60 && r.presence <= 0 && !r.lost) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       t += 1 / 60.0;
     }
@@ -239,6 +249,7 @@ void main() {
     // the longest a visit may last is 20s; give it 30 and it must be gone
     var u = 0.0;
     while (u < 30 && r.presence > 0) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       u += 1 / 60.0;
     }

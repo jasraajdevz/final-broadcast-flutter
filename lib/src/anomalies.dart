@@ -37,6 +37,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import 'consts.dart';
+import 'desk.dart';
 import 'career.dart';
 import 'checks.dart';
 import 'economy.dart';
@@ -570,6 +571,17 @@ class AnomalyRuntime extends ChangeNotifier {
 
   final GameState s;
   GameAudio audio;
+
+  /// THE RIG. Four systems that never stop moving, and a set of drums that
+  /// count what the county heard instead of you. This replaced the economy
+  /// that used to sit at the middle of this loop — see desk.dart, and
+  /// test/demand_test.dart for the measurement that forced it.
+  late final Rig rig = Rig(s.night);
+
+  /// Wall time until which the operator's hands are committed. Feeds the BUSY
+  /// term of the rig's strain, which is its largest — difficulty arrives as
+  /// workload, not as worse gauges.
+  double handsUntil = 0;
 
   /// Registered by the ad-break controller. If null, the spot is skipped and
   /// `done` fires immediately.
@@ -1278,6 +1290,7 @@ class AnomalyRuntime extends ChangeNotifier {
 
   /// JS pressCounter(cid). `cid` is a Counter.id, not a key digit.
   void pressCounter(String cid) {
+    handsUntil = tGlobal + 0.30;
     // You have one pair of hands. Reaching for a banish key takes them off the
     // book, and an abandoned signature is worth nothing — that trade IS the
     // mechanic. The station does not care that you were busy.
@@ -1378,7 +1391,7 @@ class AnomalyRuntime extends ChangeNotifier {
     // has always read.
     shake = math.max(shake, kShakeWrong);
     glitch = math.max(glitch, 1);
-    s.dread = math.min(100, s.dread + 3 * cardOf(s).dread);
+    bumpDread(3 * cardOf(s).dread);
     // The first fumble of every night names the manual. The measured blind run
     // went five minutes without ever being told what the deck was for.
     if (nightWrongs == 1) {
@@ -1435,7 +1448,7 @@ class AnomalyRuntime extends ChangeNotifier {
         act.bought += push;
       }
       // it is not free: this is panic, not work
-      s.dread = math.min(100, s.dread + 0.9 * cardOf(s).dread);
+      bumpDread(0.9 * cardOf(s).dread);
       s.tune.strike(x, y, 'HIT', tGlobal);
       audio.impact();
       shake = math.max(shake, 6.5);
@@ -1478,6 +1491,37 @@ class AnomalyRuntime extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Something frightening happened, or stopped happening.
+  ///
+  /// Goes through the rig, which owns dread, and then republishes the view on
+  /// GameState IMMEDIATELY rather than waiting for the next frame. Without the
+  /// republish, anything that reads s.dread in the same breath as changing it
+  /// sees the previous frame's value — which is a stale read rather than a
+  /// lost write, but is just as wrong and is exactly as quiet.
+  void bumpDread(double d) {
+    rig.bump(d);
+    s.dread = math.max(rig.dread, dreadFloor(s));
+  }
+
+  /// Wind the drive. A SETPOINT, not a pump — see the note at the top of
+  /// desk.dart about why that distinction is the entire rewrite.
+  void trimDrive(int dir) {
+    if (!signedOn || lost || paused) return;
+    handsUntil = tGlobal + 0.22;
+    rig.trim(dir);
+    audio.env('square', 128 + dir * 17, 0.045, 0.05, 96 + dir * 12);
+    notifyListeners();
+  }
+
+  /// Correct the modulation.
+  void nudgeMod(int dir) {
+    if (!signedOn || lost || paused) return;
+    handsUntil = tGlobal + 0.22;
+    rig.nudge(dir);
+    audio.env('triangle', 213 + dir * 23, 0.05, 0.045, 151);
+    notifyListeners();
+  }
+
   /// The hand goes on the ninth key.
   void beginCarrier() {
     if (!signedOn || lost || paused || !unlocked(s, 'ninth')) return;
@@ -1496,7 +1540,7 @@ class AnomalyRuntime extends ChangeNotifier {
     if (carrierHold > 0.1 && carrierHold < 1.0) {
       // Let go in time. Nothing happened, and knowing that it nearly did is
       // its own cost.
-      s.dread = math.min(100, s.dread + 4 * cardOf(s).dread);
+      bumpDread(4 * cardOf(s).dread);
       audio.env('sine', 220, 0.3, 0.07, 300);
       s.toast('THE NEEDLE COMES BACK UP', ToastKind.gold);
     }
@@ -1525,7 +1569,7 @@ class AnomalyRuntime extends ChangeNotifier {
     // And for a few seconds nothing is holding the rest of it down. Each drop
     // costs more than the last, so this can never become a rotation.
     final double bite = 26.0 + carrierDrops * 14.0;
-    s.dread = math.min(100, s.dread + bite * cardOf(s).dread);
+    bumpDread(bite * cardOf(s).dread);
     calm = 0;
     calmSpan = 0;
     calmGuard = 0;
@@ -1562,6 +1606,10 @@ class AnomalyRuntime extends ChangeNotifier {
     if (!signedOn || lost || paused) return;
     final ev = beginSign(checks, s);
     if (ev != null && ev.kind == CheckEventKind.falseEntry) {
+      // The price is applied HERE rather than inside checks.dart, which cannot
+      // reach the rig — and the rig owns dread, so a write from there would be
+      // thrown away a frame later without anything failing.
+      bumpDread(kFalseEntryDread);
       audio.env('square', 180, 0.22, 0.07, 120);
       shake = math.max(shake, 3);
       s.toast('## NOBODY ASKED YOU TO SIGN ANYTHING', ToastKind.bad);
@@ -1695,7 +1743,7 @@ class AnomalyRuntime extends ChangeNotifier {
       s.segSig += bonus;
       s.lifetimeSig += bonus;
       banishFx = 1;
-      s.dread = math.max(0, s.dread - 6);
+      bumpDread(-6.0);
       if (clutch) {
         s.stats.clutch++;
         // THE NEAR MISS IS THE HOOK. "Short misses and the feeling of a little
@@ -1878,7 +1926,7 @@ class AnomalyRuntime extends ChangeNotifier {
         final budget = 9 * sabK();
         final pay = math.min(budget - a.dreadPaid, budget / 7);
         if (pay > 0) {
-          s.dread = math.min(100, s.dread + pay * cardOf(s).dread);
+          bumpDread(pay * cardOf(s).dread);
           a.dreadPaid += pay;
         }
         audio.ring();
@@ -1983,7 +2031,7 @@ class AnomalyRuntime extends ChangeNotifier {
     scareBeat = ScareBeat.lunge;
     _scareHit(def, ScareBeat.lunge, _scareSerial, 0);
     // It costs nothing but dread — it did not rob you, it just came round.
-    s.dread = math.min(100, s.dread + 18 * cardOf(s).dread);
+    bumpDread(18 * cardOf(s).dread);
     s.toast('## IT WAS NOT BEHIND YOU ANY MORE', ToastKind.bad);
   }
 
@@ -2245,7 +2293,7 @@ class AnomalyRuntime extends ChangeNotifier {
     }
     s.sig = math.max(0, s.sig);
     s.segSig = math.max(0, s.segSig);
-    s.dread = math.min(100, s.dread + 26 * cardOf(s).dread);
+    bumpDread(26 * cardOf(s).dread);
     s.toast(
         'X ${def.nm} '
         '${beat == ScareBeat.falseClear ? "NEVER LEFT" : "GOT THROUGH"}'
@@ -2288,6 +2336,16 @@ class AnomalyRuntime extends ChangeNotifier {
   // -------------------------------------------------------------------------
   // SIGNAL LOST / REVIVE / DAWN / SIGN OFF
   // -------------------------------------------------------------------------
+
+  /// The drums reached the licence allowance. Named, because a death the
+  /// player cannot explain is a death they blame on the game, and every line
+  /// on this invoice is something they watched happen.
+  void licenceVoid() {
+    if (lost) return;
+    audio.deadAir(true);
+    audio.env('sawtooth', 71, 1.6, 0.32, 33);
+    signalLost();
+  }
 
   void signalLost() {
     if (lost) return;
@@ -2375,7 +2433,7 @@ class AnomalyRuntime extends ChangeNotifier {
       // one leaves you deeper in it than the last.
       final int free = metaFreeRevives(s);
       final int over = math.max(0, s.revives - 1 - free);
-      s.dread = math.min(88, 45 + over * 12.0);
+      bumpDread(math.min(88, 45 + over * 12.0) - rig.dread);
       lost = false;
       s.sponsorEnd = math.max(s.sponsorEnd, 45 / (1 + over * 0.45));
       _clearScareFx();
@@ -2455,7 +2513,7 @@ class AnomalyRuntime extends ChangeNotifier {
         ToastKind.bad);
 
     // and everything gets worse at once
-    s.dread = math.min(100, math.max(s.dread, 40));
+    if (rig.dread < 40) bumpDread(40 - rig.dread);
     calm = 0;
     calmSpan = 0;
     calmGuard = 0;
@@ -2682,7 +2740,7 @@ class AnomalyRuntime extends ChangeNotifier {
           case CheckEventKind.signed:
             audio.relay();
           case CheckEventKind.missed:
-            s.dread = math.min(100, s.dread + kMissDread * cardOf(s).dread);
+            bumpDread(kMissDread * cardOf(s).dread);
             audio.env('sawtooth', 120, 0.5, 0.10, 44);
             shake = math.max(shake, 6);
             // The book going unsigned is ALREADY on the screen, in the room,
@@ -2704,7 +2762,7 @@ class AnomalyRuntime extends ChangeNotifier {
       }
       // drift is a continuous tax on a neglected station
       if (checks.drift > 0) {
-        s.dread = math.min(100, s.dread + driftDread(checks) * dt);
+        bumpDread(driftDread(checks) * dt);
       }
     }
 
@@ -2900,6 +2958,48 @@ class AnomalyRuntime extends ChangeNotifier {
   }
 
   void _simulate(double dt) {
+    // --- THE RIG ---
+    // Whatever is on the air has its teeth in a named system. An arrival is no
+    // longer a free-floating prompt with a key attached.
+    rig.bite.clear();
+    final Anom? biting = active?.def;
+    if (biting != null && biting.rail != null && active!.stage >= 1) {
+      rig.bite[biting.rail!] = biting.bite;
+    }
+    // THE RERUN has no rail. It uses your hands, twelve seconds late.
+    rig.ghosting = sabOn('rerun');
+    // The old `dec` multipliers, kept as intent and moved to their one owner:
+    // a failsafe bleeds dread faster, aftermath faster still, and an unwritten
+    // hour bleeds slower. They used to be applied by a second write to s.dread
+    // three hundred lines below, which the rig silently made dead.
+    rig.recoveryScale = ((s.ups['failsafe'] ?? false) ? 1.6 : 0.8) *
+        recordDecayMul(s) *
+        (aftermath > 0 ? 2.6 : (calm > 0 ? 1.5 : 1.0));
+    rig.tick(dt, handsCommitted: handsUntil > tGlobal);
+
+    // DREAD IS THE HIGHER OF TWO THINGS, and both of them matter.
+    //
+    // The rig's half is EARNED: it climbs when the operator falls behind and
+    // bleeds off when they get back on top, which is the only way a player
+    // ever feels a causal link between their own hands and their own fear.
+    //
+    // The floor's half is ATMOSPHERIC: 05:00 is heavier than 23:00 whoever is
+    // sitting there. It is capped well under 100 so the room can never kill
+    // anybody on its own.
+    //
+    // Taking the max rather than letting the rig simply assign was not
+    // optional. Writing `s.dread = rig.dread` here made the floor applied 300
+    // lines below into dead code — overwritten every frame before anything
+    // could read it — and silently unhooked the presence, the red room wash
+    // and the lights, which is the exact class of bug the floor was written to
+    // fix in the first place. Two writers to one field is a defect even when
+    // both of them are right.
+    s.dread = math.max(rig.dread, dreadFloor(s));
+
+    if (rig.voided && !lost) {
+      licenceVoid();
+    }
+
     // --- economy ---
     final sr = sigRate(s, this);
     // THE TEST CARD GIRL: income goes into her lap instead of the bank. Nothing
@@ -2956,7 +3056,7 @@ class AnomalyRuntime extends ChangeNotifier {
             1200, advice[_stallAdvice % advice.length], ToastKind.gold);
         _stallAdvice++;
       }
-      s.dread = math.min(100, s.dread + dt * 0.9 * cardOf(s).dread);
+      bumpDread(dt * 0.9 * cardOf(s).dread);
     } else {
       if (s.stalled) {
         s.stalled = false;
@@ -2998,39 +3098,13 @@ class AnomalyRuntime extends ChangeNotifier {
       }
     }
 
-    // --- dread decay ---
-    // Bleeds off much faster inside a protection window. Recovering from a
-    // scare is supposed to be something you can watch happen, and the calm you
-    // bought with a clean kill should visibly pay for the last one.
-    // an hour nobody wrote down does not bleed off the way the others do
-    var dec = ((s.ups['failsafe'] ?? false) ? 1.6 : 0.8) * recordDecayMul(s);
-    if (aftermath > 0) {
-      dec *= 2.6;
-    } else if (calm > 0) {
-      dec *= 1.5;
-    }
-    // THE FLOOR. dreadFloor() and kDreadFloorClimb were written, documented
-    // with a worked table, and never called: decay clamped at 0 instead, so
-    // DREAD returned to empty after every single encounter.
-    //
-    // Measured on the shipped build: over a competently played night, DREAD
-    // sat under 1.0/100 for 96.4% of frames on night 1 and 99.6% on night 6.
-    // The widest gauge in the status strip — the thing the home screen names
-    // as the loss condition — was a flat empty rectangle for the whole game,
-    // and everything hanging off it (the canteen, the red room wash, the
-    // lights going out, the bot failures) was unreachable dead code.
-    //
-    // The night now has a rising tide under it. It is capped at
-    // kDreadFloorCap = 42 so atmosphere can never kill you on its own —
-    // SIGNAL LOST still has to be something you did.
-    if (active == null) {
-      final double floor = dreadFloor(s);
-      if (s.dread > floor) {
-        s.dread = math.max(floor, s.dread - dec * dt);
-      } else if (s.dread < floor) {
-        s.dread = math.min(floor, s.dread + kDreadFloorClimb * dt);
-      }
-    }
+    // --- dread ---
+    // Owned entirely by the rig now. Its recovery scale is set at the top of
+    // _simulate; the atmospheric floor is applied there too. There used to be
+    // a second decay written here, and it became dead code the moment the rig
+    // started assigning s.dread — silently unhooking the presence, the red
+    // room wash and the lights. Two writers to one field is a defect even when
+    // both of them are right.
 
     // (b) THE WINDOW IS A THREAT. lurkPressure was declared and written by
     // nobody; the field full of figures was scenery you could safely ignore.

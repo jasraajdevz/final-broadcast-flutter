@@ -537,7 +537,7 @@ class BotRuntime extends ChangeNotifier {
       final lvl = levelOf(b);
       if (lvl > 0 && enabled(b)) {
         final n = now - _wrongSeen;
-        s.dread = math.max(0, s.dread - gripDread(lvl) * n);
+        runtime.bumpDread(-(gripDread(lvl)) * n);
         final a = runtime.active;
         if (a != null) a.t = math.max(0, a.t - gripTime(lvl) * n);
         _gripCatches += n;
@@ -789,7 +789,7 @@ class BotRuntime extends ChangeNotifier {
     runtime.assistBanish();
     // And it costs something: the vault robot working the floor is its own
     // kind of wrong, and it closes the dread loop that used to sit at zero.
-    s.dread = math.min(100, s.dread + 4);
+    runtime.bumpDread(4);
   }
 
   // -------------------------------------------------------------------------

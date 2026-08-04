@@ -12,6 +12,8 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 /// Seeded, because these are whole-night sims and an unseeded generator makes
 /// them coin-flips: a guard written against one run fails on another with no
 /// code change between them, which is worse than no guard because it teaches
@@ -49,7 +51,8 @@ void main() {
     var t = 0.0;
     const dt = 1 / 30.0;
     while (t < 21 * 60 && !r.lost) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       bots.tick(dt);
       t += dt;
     }
@@ -75,7 +78,8 @@ void main() {
     var t = 0.0, peak = 0.0;
     const dt = 1 / 30.0;
     while (t < 21 * 60 && !r.lost) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       if (s.dread > peak) peak = s.dread;
       t += dt;
     }
@@ -97,7 +101,8 @@ void main() {
     var sawReset = false;
     while (t < 21 * 60 && !r.lost && !sawReset) {
       final before = s.segSig;
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
       if (segIndex(s) != seg) {
         seg = segIndex(s);
@@ -121,7 +126,8 @@ void main() {
     var wasActive = false;
     const dt = 1 / 60.0;
     while (t < 21 * 60 && !r.lost) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
       final now = r.active != null;
       if (now && !wasActive) manifests++;

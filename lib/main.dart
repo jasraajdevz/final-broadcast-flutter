@@ -284,7 +284,14 @@ class _GameRootState extends State<GameRoot>
       return KeyEventResult.ignored;
     }
     // KeyRepeatEvent is a different type, so `if(e.repeat)return` is implicit.
-    if (e is! KeyDownEvent) return KeyEventResult.ignored;
+    // Arrow repeats reach the desk; everything else is edge-triggered.
+    final bool isArrow = e.logicalKey == LogicalKeyboardKey.arrowUp ||
+        e.logicalKey == LogicalKeyboardKey.arrowDown ||
+        e.logicalKey == LogicalKeyboardKey.arrowLeft ||
+        e.logicalKey == LogicalKeyboardKey.arrowRight;
+    if (e is! KeyDownEvent && !(isArrow && e is KeyRepeatEvent)) {
+      return KeyEventResult.ignored;
+    }
     final key = e.logicalKey;
 
     if (_confirm != null) {
@@ -308,11 +315,35 @@ class _GameRootState extends State<GameRoot>
     // audio graph before the player has asked for any.
     if (!runtime.signedOn) return KeyEventResult.ignored;
 
+    // THE DESK. Up/Down wind the DRIVE, Left/Right trim the MODULATION. These
+    // are the only continuous controls in the game and they are on the arrow
+    // keys because that is where a hand rests without being told.
+    //
+    // Repeats are honoured: holding a dial down is how a dial is used, and the
+    // rig is a setpoint rather than a pump, so there is nothing to farm by it.
+    if (key == LogicalKeyboardKey.arrowUp) {
+      runtime.trimDrive(1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      runtime.trimDrive(-1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      runtime.nudgeMod(1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      runtime.nudgeMod(-1);
+      return KeyEventResult.handled;
+    }
+
     // ENTER signs the book. See checks.dart — one key, always the same,
     // because the station check is an attention test, not a memory test.
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
       runtime.pressCheck();
+      runtime.rig.sign();
       return KeyEventResult.handled;
     }
     // 9. Nothing in the game says this key exists.

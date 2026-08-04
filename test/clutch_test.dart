@@ -11,6 +11,8 @@ import 'package:final_broadcast/src/anomalies.dart';
 import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _seeded() {
   final s = GameState();
   for (final p in kProducers) {
@@ -32,7 +34,8 @@ GameState _seeded() {
   var t = 0.0;
   const dt = 1 / 60.0;
   while (t < 21 * 60 && !r.lost) {
-    r.tick(dt);
+    mindTheDesk(r);
+        r.tick(dt);
     t += dt;
     final a = r.active;
     if (a != null && a.stage == 1 && a.p >= at) {
@@ -81,7 +84,8 @@ void main() {
     const dt = 1 / 60.0;
     while (t < 21 * 60 && !r.lost) {
       final before = s.sig;
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
 
       final a = r.active;

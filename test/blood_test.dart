@@ -18,6 +18,8 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/paint/blood.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _station() {
   final s = GameState();
   for (final p in kProducers) {
@@ -49,7 +51,8 @@ void main() {
       const dt = 1 / 60.0;
       // never answer anything
       while (t < 21 * 60 && !r.lost && s.stats.scared < 1) {
-        r.tick(dt);
+        mindTheDesk(r);
+                r.tick(dt);
         t += dt;
         async.elapse(const Duration(milliseconds: 16));
       }
@@ -57,7 +60,8 @@ void main() {
       // let any staged beat finish landing
       async.elapse(const Duration(seconds: 3));
       for (var i = 0; i < 180; i++) {
-        r.tick(dt);
+        mindTheDesk(r);
+                r.tick(dt);
       }
       expect(r.blood.splats, isNotEmpty);
 
@@ -65,7 +69,8 @@ void main() {
       final int marked = r.blood.splats.length;
       var u = 0.0;
       while (u < 60 && !r.lost) {
-        r.tick(dt);
+        mindTheDesk(r);
+                r.tick(dt);
         u += dt;
       }
       expect(r.blood.splats.length, greaterThanOrEqualTo(marked),
@@ -82,7 +87,8 @@ void main() {
     const dt = 1 / 60.0;
     var afterFirst = 0;
     while (t < 21 * 60 && !r.lost) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
       if (s.stats.scared == 1 && afterFirst == 0) {
         afterFirst = r.blood.splats.length;

@@ -4,6 +4,8 @@ import 'package:final_broadcast/src/anomalies.dart';
 import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -23,7 +25,8 @@ void main() {
       var scares = 0;
       while (t < 12 * 60 && scares < 6) {
         final before = s.stats.scared;
-        r.tick(dt);
+        mindTheDesk(r);
+                r.tick(dt);
         t += dt;
         if (s.stats.scared > before) scares = s.stats.scared;
         if (r.blackoutAlpha > 0.02) sawBlackout = true;

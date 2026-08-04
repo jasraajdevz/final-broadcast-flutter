@@ -236,7 +236,10 @@ CheckEvent? beginSign(CheckRuntime c, GameState s) {
     // A false entry. This is what stops the key being mashed: the check is an
     // attention test, and answering a question nobody asked is its own answer.
     c.falseEntries++;
-    s.dread = math.min(100, s.dread + kFalseEntryDread);
+    // The price is NOT applied here. checks.dart cannot reach the rig, and the
+    // rig owns dread now — a write to GameState.dread from this file would be
+    // thrown away the next frame without anything failing. The caller applies
+    // kFalseEntryDread when it sees this event.
     return const CheckEvent(CheckEventKind.falseEntry, null);
   }
   c.signing = true;

@@ -15,6 +15,8 @@ import 'package:final_broadcast/src/anomalies.dart';
 import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _station() {
   final s = GameState();
   for (final p in kProducers) {
@@ -34,6 +36,7 @@ GameState _station() {
   r.startBroadcast();
   var t = 0.0;
   while (t < 21 * 60 && (r.active == null || r.active!.stage < 1) && !r.lost) {
+    mindTheDesk(r);
     r.tick(1 / 60.0);
     t += 1 / 60.0;
   }
@@ -48,6 +51,7 @@ void main() {
     final a = v.r.active!;
     // let the window run a while so there is something to push back
     for (var i = 0; i < 120; i++) {
+      mindTheDesk(v.r);
       v.r.tick(1 / 60.0);
     }
     final before = a.t;
@@ -60,6 +64,7 @@ void main() {
   test('it flinches, so the blow is something you DID', () {
     final v = _withThingOnTube(77);
     for (var i = 0; i < 60; i++) {
+      mindTheDesk(v.r);
       v.r.tick(1 / 60.0);
     }
     v.r.shake = 0;
@@ -85,6 +90,7 @@ void main() {
     // and with nothing but strikes, it still gets you
     var t = 0.0;
     while (t < 60 && v.r.active != null && !v.r.lost) {
+      mindTheDesk(v.r);
       v.r.tick(1 / 60.0);
       v.r.tuneStrike(kScr.center.dx, kScr.center.dy);
       t += 1 / 60.0;

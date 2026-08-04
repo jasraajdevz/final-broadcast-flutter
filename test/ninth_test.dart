@@ -19,6 +19,8 @@ import 'package:final_broadcast/src/career.dart';
 import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 ({GameState s, AnomalyRuntime r}) _boot({int survived = 20, int seed = 11}) {
   seedRandom(seed);
   final s = GameState()..survived = survived;
@@ -37,6 +39,7 @@ import 'package:final_broadcast/src/state.dart';
 void _hold(AnomalyRuntime r, double seconds) {
   var t = 0.0;
   while (t < seconds) {
+    mindTheDesk(r);
     r.tick(1 / 60.0);
     t += 1 / 60.0;
   }
@@ -99,6 +102,7 @@ void main() {
     final v = _boot(seed: 4242);
     var t = 0.0;
     while (t < 21 * 60 && (v.r.active == null || v.r.active!.stage < 1)) {
+      mindTheDesk(v.r);
       v.r.tick(1 / 60.0);
       t += 1 / 60.0;
     }

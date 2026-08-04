@@ -339,6 +339,12 @@ class Rig {
   double _splatterFor = 0;
   double _t = 0;
 
+  /// Scales how fast dread bleeds off. The runtime raises it inside a
+  /// protection window, because recovering from a scare is supposed to be
+  /// something the player can WATCH happen, and the calm bought with a clean
+  /// kill should visibly pay for the last one.
+  double recoveryScale = 1.0;
+
   final Tape tape = Tape();
   final List<Attach> attached = <Attach>[];
   final Map<Rail, double> bite = <Rail, double>{};
@@ -494,7 +500,7 @@ class Rig {
     // --- strain and dread ---
     busy += ((handsCommitted ? 1.0 : 0.0) - busy) * dt / kBusyTau;
     final dd = (strain - kDreadHold) * kDreadGain;
-    dread += (dd < 0 ? dd * kDreadRecover : dd) * dt;
+    dread += (dd < 0 ? dd * kDreadRecover * recoveryScale : dd) * dt;
     dread = dread.clamp(0.0, 100.0);
 
     _t += dt;
@@ -528,6 +534,19 @@ class Rig {
     }
     if (!ghost) tape.write(_t, act);
   }
+
+  /// SOMETHING FRIGHTENING HAPPENED, or stopped happening.
+  ///
+  /// Every penalty and relief in the game lands here, and NOT on
+  /// GameState.dread. The rig assigns that field once a frame, so a write to
+  /// it anywhere else is silently thrown away — which is exactly what happened
+  /// to the ninth key's escalating price, to a fumbled counter, to a false
+  /// entry in the book and to nineteen other places, all at once and all
+  /// without a single test noticing except the one that measured the price of
+  /// pressing 9 three times.
+  ///
+  /// One field, one owner, one door.
+  void bump(double d) => dread = (dread + d).clamp(0.0, 100.0);
 
   /// A window went unanswered. It does not leave.
   void attach(String id, Rail rail, double rate) =>

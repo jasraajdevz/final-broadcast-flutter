@@ -16,6 +16,8 @@ import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/nights.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 ({double secPerIntrusion, double onTubeFrac, int manifests}) _tempo(int night) {
   seedRandom(night * 7717 + 3);
   final s = GameState();
@@ -37,7 +39,8 @@ import 'package:final_broadcast/src/state.dart';
   var wasActive = false;
   const dt = 1 / 60.0;
   while (t < 21 * 60 && !r.lost) {
-    r.tick(dt);
+    mindTheDesk(r);
+        r.tick(dt);
     t += dt;
     frames++;
     final a = r.active;

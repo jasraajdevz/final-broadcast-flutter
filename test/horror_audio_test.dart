@@ -15,6 +15,8 @@ import 'package:final_broadcast/src/anomalies.dart';
 import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 /// Counts what the game asks the speakers to do.
 class RecordingAudio implements GameAudio {
   final List<int> holds = <int>[];
@@ -79,7 +81,8 @@ GameState _station() {
   const dt = 1 / 60.0;
   while (t < seconds && !r.lost) {
     r.lurkPressure = 0.3;
-    r.tick(dt);
+    mindTheDesk(r);
+        r.tick(dt);
     t += dt;
     final act = r.active;
     if (play && act != null && act.stage == 1 && act.p > 0.3) {
@@ -118,7 +121,8 @@ void main() {
     const dt = 1 / 60.0;
     while (t < 21 * 60 && !r.lost) {
       final before = a.holds.length;
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
       if (a.holds.length > before && r.active != null) holdsDuringEncounter++;
     }
@@ -187,6 +191,7 @@ void main() {
       // without one, so the night has to actually produce something first.
       var el = 0.0;
       while (el < 21 * 60 && r.active == null) {
+        mindTheDesk(r);
         r.tick(1 / 60.0);
         el += 1 / 60.0;
       }
@@ -233,6 +238,7 @@ void main() {
       r.startBroadcast();
       var el = 0.0;
       while (el < 21 * 60 && r.active == null) {
+        mindTheDesk(r);
         r.tick(1 / 60.0);
         el += 1 / 60.0;
       }

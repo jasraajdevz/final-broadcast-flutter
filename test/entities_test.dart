@@ -17,6 +17,8 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _station() {
   final s = GameState();
   for (final p in kProducers) {
@@ -47,7 +49,8 @@ GameState _station() {
   var t = 0.0;
   const dt = 1 / 60.0;
   while (t < seconds) {
-    r.tick(dt);
+    mindTheDesk(r);
+        r.tick(dt);
     t += dt;
   }
   return (s: s, r: r);
@@ -86,6 +89,7 @@ void main() {
     r.active!.window = 1e6;
     var t = 0.0;
     while (t < 8) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       t += 1 / 60.0;
     }

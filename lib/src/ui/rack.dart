@@ -320,7 +320,7 @@ class _RackState extends State<Rack> {
             : () {
                 audio.init();
                 s.sig -= price;
-                s.dread = math.max(0, s.dread - c.dread);
+                runtime.bumpDread(-(c.dread));
                 if (c.calm > 0) runtime.grantCalm(c.calm);
                 audio.env('sine', 300, 0.22, 0.10, 220);
                 s.toast('${c.nm} — DREAD ${s.dread.round()}', ToastKind.good);

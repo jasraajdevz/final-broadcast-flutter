@@ -15,6 +15,8 @@ import 'package:final_broadcast/src/checks.dart';
 import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _station() {
   final s = GameState();
   for (final p in kProducers) {
@@ -43,7 +45,8 @@ GameState _station() {
   var react = 0.0;
   const dt = 1 / 60.0;
   while (t < 21 * 60 && !r.lost) {
-    r.tick(dt);
+    mindTheDesk(r);
+        r.tick(dt);
     t += dt;
     frames++;
     // "busy" = the player has something they must act on THIS frame.
@@ -95,7 +98,8 @@ void main() {
     const dt = 1 / 60.0;
     var wasBoth = false;
     while (t < 21 * 60 && !r.lost) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
       final both = r.active != null && r.checks.pending;
       if (both && !wasBoth) collisions++;
@@ -140,6 +144,7 @@ void main() {
     r.checks.drift = 0.5;
     var t = 0.0;
     while (t < 120 && !r.checks.pending) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       t += 1 / 60.0;
     }
@@ -150,6 +155,7 @@ void main() {
     expect(r.checks.signed, 0, reason: 'it completed instantly');
     var held = 0.0;
     while (held < kSignSeconds + 0.1) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       held += 1 / 60.0;
     }
@@ -169,7 +175,8 @@ void main() {
       const dt = 1 / 60.0;
       // never answer anything: let it hit us repeatedly
       while (t < 21 * 60 && !r.lost && r.scars.length < 3 && guard < 200000) {
-        r.tick(dt);
+        mindTheDesk(r);
+                r.tick(dt);
         t += dt;
         guard++;
       }

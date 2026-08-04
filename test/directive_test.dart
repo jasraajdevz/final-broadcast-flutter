@@ -8,6 +8,8 @@ import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/objective.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _fresh() {
   final s = GameState();
   for (final p in kProducers) {
@@ -26,6 +28,7 @@ void main() {
     final s = _fresh();
     final r = AnomalyRuntime(s);
     r.startBroadcast();
+    mindTheDesk(r);
     r.tick(1 / 60.0);
 
     expect(s.stalled, isFalse, reason: 'nothing is held at 23:00');
@@ -79,7 +82,8 @@ void main() {
     var t = 0.0, warnFrames = 0, calmDuringWarn = 0;
     const dt = 1 / 60.0;
     while (t < 21 * 60 && !r.lost && warnFrames < 400) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
       if (r.warn > 0 && r.active == null) {
         warnFrames++;
@@ -103,7 +107,8 @@ void main() {
     var t = 0.0;
     const dt = 1 / 60.0;
     while (t < 21 * 60 && (r.active == null || r.active!.stage < 1) && !r.lost) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
     }
     final a = r.active!;

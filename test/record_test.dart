@@ -18,6 +18,8 @@ import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/record.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _s() {
   final s = GameState();
   for (final p in kProducers) {
@@ -111,6 +113,7 @@ void main() {
     // never touch a key, never fight, never sign, never take money: just be
     // beaten up by the game for a whole night
     while (t < 21 * 60 && !r.lost) {
+      mindTheDesk(r);
       r.tick(1 / 60.0);
       t += 1 / 60.0;
     }

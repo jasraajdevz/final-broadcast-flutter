@@ -9,6 +9,8 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -26,6 +28,7 @@ void main() {
     // keep striking: the lock should climb all four steps
     for (var i = 0; i < 60; i++) {
       r.tuneStrike(kScr.center.dx, kScr.center.dy);
+      mindTheDesk(r);
       r.tick(1 / 30.0);
     }
     expect(s.tune.tier, 4, reason: 'a sustained rhythm reaches full lock');
@@ -35,6 +38,7 @@ void main() {
     // stop, and it walks back down rather than dumping to zero
     final atTop = s.tune.tier;
     for (var i = 0; i < 60; i++) {
+      mindTheDesk(r);
       r.tick(1 / 30.0);
     }
     expect(s.tune.tier, lessThan(atTop), reason: 'the lock decays when idle');
@@ -47,6 +51,7 @@ void main() {
     r.startBroadcast();
     for (var i = 0; i < 40; i++) {
       r.tuneStrike(kScr.center.dx, kScr.center.dy);
+      mindTheDesk(r);
       r.tick(1 / 30.0);
     }
     expect(s.tune.tier, greaterThan(0));

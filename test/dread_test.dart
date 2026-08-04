@@ -14,6 +14,8 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/economy.dart';
 import 'package:final_broadcast/src/state.dart';
 
+import 'operator.dart';
+
 GameState _station(int night) {
   final s = GameState();
   for (final p in kProducers) {
@@ -44,7 +46,8 @@ GameState _station(int night) {
     // the window is part of the sim now: stand in for the painter that
     // normally writes lurkPressure each frame
     r.lurkPressure = 0.35;
-    r.tick(dt);
+    mindTheDesk(r);
+        r.tick(dt);
     t += dt;
     frames++;
     if (s.dread > peak) peak = s.dread;
@@ -122,7 +125,8 @@ void main() {
     const dt = 1 / 60.0;
     var firstResolved = false;
     while (t < 300 && !firstResolved && !r.lost) {
-      r.tick(dt);
+      mindTheDesk(r);
+            r.tick(dt);
       t += dt;
       final a = r.active;
       if (a != null && a.stage == 1 && a.p > 0.5) {
