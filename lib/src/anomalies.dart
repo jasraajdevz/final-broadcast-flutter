@@ -2471,9 +2471,16 @@ class AnomalyRuntime extends ChangeNotifier {
     audio.setDrone(0, 42);
     audio.deadAir(false);
     audio.setHeart(46, 0);
-    audio.env('sine', 523, 0.9, 0.12, 523);
-    _later(300, () => audio.env('sine', 659, 0.9, 0.12, 659));
-    _later(600, () => audio.env('sine', 784, 1.6, 0.14, 784));
+    // Was 523 / 659 / 784 — C, E, G, ascending. A victory fanfare.
+    //
+    // Sunrise is the one moment of relief this game grants and it should keep
+    // being relief, or the horror has nothing to be measured against. But
+    // relief here is not a jingle, it is the sound of a shift ENDING: the
+    // 1kHz line-up tone going out over the test card, held flat and steady,
+    // and the transmitter dropping to standby underneath it.
+    audio.env('sine', 1000, 1.5, 0.10, 1000);
+    _later(120, () => audio.relay());
+    _later(900, () => audio.env('sine', 50, 1.8, 0.09, 40));
     s.survived++;
     s.dawnBonus = 6; // surviving is worth more than bailing out
     final g = rpGain(s) + s.dawnBonus;
@@ -2601,7 +2608,10 @@ class AnomalyRuntime extends ChangeNotifier {
       s.sponsorEnd = 60;
       s.sponsorCd = 150;
       s.toast('SPONSORED SEGMENT — ×3 OUTPUT FOR 60s', ToastKind.gold);
-      audio.env('triangle', 440, 0.2, 0.14, 880);
+      // was a 440 -> 880 octave sweep, which is a jingle. A commercial break
+      // starts with the leader beep off the cart machine and the tape catching.
+      audio.env('square', 1000, 0.09, 0.11, 1000);
+      audio.relay();
       notifyListeners();
     });
   }
@@ -2956,8 +2966,11 @@ class AnomalyRuntime extends ChangeNotifier {
         final sg = segOf(s);
         s.toast('▶ ${shiftClock(s)}  ${sg.nm}', ToastKind.gold);
         s.toasts.pushDelayed(1100, sg.line, ToastKind.gold);
-        audio.env('sine', 392, 0.5, 0.10, 392);
-        _later(260, () => audio.env('sine', 523, 0.7, 0.10, 523));
+        // was 392 then 523 — G up to C, a rising fourth, i.e. a little
+        // "next chapter" sting. A segment change is a cart machine handing
+        // over: the outgoing tape stopping and the incoming one catching.
+        audio.relay();
+        _later(300, () => audio.env('square', 1000, 0.07, 0.07, 1000));
       }
       if (s.shiftMin >= kShiftMinutes) {
         if (longNight) {

@@ -1181,110 +1181,81 @@ class WebAudio implements GameAudio {
 
   /// "streak" — the station ident.
   void _ident(int n) {
+    // WAS A MAJOR TRIAD. Three triangle-wave notes — G, C, E — arpeggiated and
+    // transposed up a whole tone per tier, i.e. a small fanfare, fired every
+    // time the carrier lock promoted. On a good run that is a jingle every few
+    // seconds, and together with the old musical strike it was the "chain" of
+    // pleasant sound the player kept hearing.
+    //
+    // A station ident is not a fanfare. It is line-up tone: one frequency,
+    // held, that is supposed to be dead steady. This one is not quite. It
+    // arrives slightly flat, hunts, and settles — the sound of a carrier being
+    // captured by something rather than of a reward being granted.
     final c = _c, master = _master;
     if (c == null || master == null) return;
     final t = c.currentTime;
-    final rung = n <= 0 ? 0 : (n > 6 ? 6 : n - 1);
-    final k = math.pow(2.0, rung * 2 / 12.0).toDouble();
     final out = c.createGain();
     out.gain.value = 1;
     out.connect(master);
-    duck(0.62, 340);
+    duck(0.68, 300);
 
-    const notes = <double>[392, 523, 659];
-    for (var i = 0; i < notes.length; i++) {
-      final f = notes[i] * k;
-      final a = t + i * 0.085;
-      const dur = 0.85;
-      final o = c.createOscillator();
-      o.type = 'triangle';
-      o.frequency.value = f;
-      final o2 = c.createOscillator();
-      o2.type = 'sine';
-      o2.frequency.value = f * 3.01;
-      final g2 = c.createGain();
-      g2.gain.setValueAtTime(0.0001, a);
-      g2.gain.exponentialRampToValueAtTime(0.15 / (1 + i * 0.22), a + 0.01);
-      g2.gain.exponentialRampToValueAtTime(0.0001, a + dur);
-      final og2 = c.createGain();
-      og2.gain.value = 0.34;
-      o.connect(g2);
-      o2.connect(og2);
-      og2.connect(g2);
-      g2.connect(out);
-      o.start(a);
-      o.stop(a + dur + 0.05);
-      o2.start(a);
-      o2.stop(a + dur + 0.05);
-    }
+    // deeper into the lock is not HIGHER, it is steadier and colder
+    final double tier = (n.clamp(0, 6)) / 6.0;
+    const double target = 1000; // the line-up tone every operator knows
+    final o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(target * (0.955 - tier * 0.02), t);
+    // hunts either side before it captures
+    o.frequency.linearRampToValueAtTime(target * 1.018, t + 0.10);
+    o.frequency.linearRampToValueAtTime(target * 0.992, t + 0.19);
+    o.frequency.linearRampToValueAtTime(target, t + 0.30);
 
-    // the transmitter itself coming up under the chime
-    final sub = c.createOscillator();
-    sub.type = 'sine';
-    sub.frequency.setValueAtTime(64, t);
-    sub.frequency.exponentialRampToValueAtTime(98, t + 0.4);
-    final sg = c.createGain();
-    sg.gain.setValueAtTime(0.0001, t);
-    sg.gain.exponentialRampToValueAtTime(0.18, t + 0.05);
-    sg.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-    final ssh = _shaper(1.9);
-    if (ssh != null) {
-      sub.connect(ssh);
-      ssh.connect(sg);
-    } else {
-      sub.connect(sg);
-    }
-    sg.connect(out);
-    sub.start(t);
-    sub.stop(t + 0.75);
+    final g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.085, t + 0.02);
+    g.gain.setValueAtTime(0.085, t + 0.34);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.62);
+    o.connect(g);
+    g.connect(out);
+    o.start(t);
+    o.stop(t + 0.7);
 
-    _kill(out, 1.5);
+    // and the relay that put it there
+    _later(20, relay);
+    _kill(out, 0.9);
   }
 
   /// "banish" — the career plaque. Deliberately the slowest cue in the game.
   void _plaque(int n) {
+    // Was a transposed chord stack, one whole tone up per hundred kills.
+    //
+    // A hundred banishments is not a musical event. It is a rack of relays
+    // closing one after another down the desk — the station acknowledging the
+    // count the only way a building can.
     final c = _c, master = _master;
-    if (c == null || master == null) return;
-    final t = c.currentTime;
-    final out = c.createGain();
-    out.gain.value = 1;
-    out.connect(master);
-    duck(0.55, 900);
-    // one whole tone up per hundred kills, so a career has a shape too
-    final k = math.pow(2.0, math.min(4, n ~/ 100) * 2 / 12.0).toDouble();
-    for (final v in <List<double>>[
-      <double>[147 * k, 0],
-      <double>[220 * k, 0.34],
-    ]) {
-      final f = v[0], a = t + v[1];
-      final o = c.createOscillator();
-      o.type = 'triangle';
-      o.frequency.value = f;
-      final o2 = c.createOscillator();
-      o2.type = 'sine';
-      o2.frequency.value = f * 2;
-      final o2g = c.createGain();
-      o2g.gain.value = 0.4;
-      final g = c.createGain();
-      g.gain.setValueAtTime(0.0001, a);
-      g.gain.exponentialRampToValueAtTime(0.17, a + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, a + 1.5);
-      final sh = _shaper(1.5);
-      o.connect(g);
-      o2.connect(o2g);
-      o2g.connect(g);
-      if (sh != null) {
-        g.connect(sh);
-        sh.connect(out);
-      } else {
-        g.connect(out);
-      }
-      o.start(a);
-      o.stop(a + 1.6);
-      o2.start(a);
-      o2.stop(a + 1.6);
+    if (!_on || c == null || master == null || _holding) return;
+    duck(0.55, 700);
+    final int count = 3 + math.min(3, n ~/ 100);
+    for (var i = 0; i < count; i++) {
+      _later(i * 90, relay);
     }
-    _kill(out, 2.4);
+    // and the mains sags under the load of all of them
+    _later(40, () {
+      final cc = _c, mm = _master;
+      if (cc == null || mm == null) return;
+      final tt = cc.currentTime;
+      final o = cc.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(50, tt);
+      final g = cc.createGain();
+      g.gain.setValueAtTime(0.0001, tt);
+      g.gain.exponentialRampToValueAtTime(0.11, tt + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.55);
+      o.connect(g);
+      g.connect(mm);
+      o.start(tt);
+      o.stop(tt + 0.6);
+    });
   }
 
   /// "night" — the hour going, in the station's own time pips.
@@ -1304,16 +1275,40 @@ class WebAudio implements GameAudio {
 
   /// "clean" — a flourish, over before you have finished thinking about it.
   void _flourish(int n) {
-    if (_c == null) return;
-    final k = math.pow(2.0, math.min(5, n <= 0 ? 0 : n - 1) / 12.0).toDouble();
-    for (var i = 0; i < 3; i++) {
-      final f = <double>[1046, 1318, 1568][i] * k;
-      _later(i * 38, () {
-        env('triangle', f, 0.16, 0.075, f);
-        env('sine', f * 2, 0.09, 0.022, f * 2);
-      });
+    // Was 1046 / 1318 / 1568 — a major triad, octave-doubled, transposed up
+    // per milestone. A little fanfare for a clean kill.
+    //
+    // A clean kill should sound like the equipment agreeing with you, not like
+    // a game congratulating you: the tape transport catching, spooling up to
+    // speed, and locking. Mechanical, brief, and with no pitch you could hum.
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final t = c.currentTime;
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+
+    // the transport catches
+    _later(0, relay);
+
+    // and spins up: filtered noise rising in brightness, not in pitch
+    final sp = _noise(t, 0.42);
+    if (sp != null) {
+      final bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.q.value = 1.6;
+      bp.frequency.setValueAtTime(320, t + 0.02);
+      bp.frequency.exponentialRampToValueAtTime(2600, t + 0.26);
+      bp.frequency.exponentialRampToValueAtTime(1500, t + 0.42);
+      final g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.075, t + 0.12);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.44);
+      sp.connect(bp);
+      bp.connect(g);
+      g.connect(out);
     }
-    burst(0.06, 0.09, 3200, 6400);
+    _kill(out, 0.6);
   }
 
   /// The relief. [streak] is the run of consecutive banishes INCLUDING this
@@ -1691,34 +1686,104 @@ class WebAudio implements GameAudio {
   @override
   void click() => env('square', 900, 0.045, 0.09, 420);
 
-  /// Eight rungs, not a slide. A continuous `520 + p*180` made a rack of manual
-  /// strikes read as one siren going up and down, which is the sound of a knob
-  /// being turned rather than a set being hit. Quantising the heat onto a fixed
-  /// ladder makes a burst of strikes come out as a RISING FIGURE — the same
-  /// eight notes every time, so the player can hear how hard they are working
-  /// and hear it reset. The ladder is a major pentatonic so no two adjacent
-  /// rungs can sound like a mistake.
-  static const List<double> _tuneRungs = <double>[
-    440, 494, 554, 659, 740, 831, 988, 1109,
-  ];
-
-  /// Knocking the set: a dull thunk plus a squeal of carrier finding its lock.
+  /// STRIKING THE SET.
+  ///
+  /// This was a musical instrument. The rungs were 440, 494, 554, 659, 740,
+  /// 831, 988, 1109 — a pentatonic scale — played on a triangle wave with a
+  /// sine harmonic on top, stepping UP as the carrier lock tightened. So the
+  /// single most-repeated action in the game rewarded the player with an
+  /// ascending chime arpeggio: Cookie Clicker feedback, in a horror game,
+  /// several hundred times a night. It is the sound the player called ASMR and
+  /// they were right about it.
+  ///
+  /// It is now what it is supposed to be: a person hitting a live cathode ray
+  /// tube with the flat of their hand. Three physical layers, none of them
+  /// pitched to anything.
+  ///
+  ///   THE IMPACT — hand on warm plastic and glass. Low, dull, damped hard.
+  ///   THE PICTURE — the beam is disturbed and the raster tears for 40ms.
+  ///   THE FLYBACK — the line-output transformer complains. A real one sits
+  ///                 near 15.7kHz; that is unlistenable at volume, so this is
+  ///                 a filtered artefact of it that reads as the same thing.
+  ///
+  /// A tighter lock does not raise the PITCH, it raises the DISTRESS: more
+  /// coil, more tearing, a harder hit. And every strike is detuned randomly,
+  /// so two in a row can never form an interval and a run of them can never
+  /// become a melody.
   @override
   void tune(double p) {
-    final q = p.isNaN ? 0.0 : (p < 0 ? 0.0 : (p > 1 ? 1.0 : p));
-    final i = (q * (_tuneRungs.length - 1)).round();
-    final f = _tuneRungs[i];
-    env('triangle', f, 0.09, 0.10, f * 1.7);
-    env('sine', f * 2.4, 0.06, 0.05, f * 3.1);
-    // the thunk stays where it was: it is the set, and the set does not change
-    // pitch because you hit it faster
-    burst(0.05, 0.05, 2600, 700);
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final q = p.isNaN ? 0.0 : p.clamp(0.0, 1.0);
+    final t = c.currentTime;
+
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+
+    // 1. the impact — the case, not a note
+    final o = c.createOscillator();
+    o.type = 'sine';
+    final double body = 96 + rand() * 44; // never the same twice
+    o.frequency.setValueAtTime(body, t);
+    o.frequency.exponentialRampToValueAtTime(body * 0.42, t + 0.055);
+    final og = c.createGain();
+    og.gain.setValueAtTime(0.0001, t);
+    og.gain.exponentialRampToValueAtTime(0.20 + q * 0.10, t + 0.004);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + 0.075);
+    o.connect(og);
+    og.connect(out);
+    o.start(t);
+    o.stop(t + 0.10);
+
+    // 2. the picture tears
+    final n = _noise(t, 0.05);
+    if (n != null) {
+      final bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.q.value = 0.8;
+      bp.frequency.setValueAtTime(1800 + rand() * 900, t);
+      bp.frequency.exponentialRampToValueAtTime(420, t + 0.045);
+      final ng = c.createGain();
+      ng.gain.setValueAtTime(0.0001, t);
+      ng.gain.exponentialRampToValueAtTime(0.055 + q * 0.055, t + 0.003);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      n.connect(bp);
+      bp.connect(ng);
+      ng.connect(out);
+    }
+
+    // 3. the flyback complains, and complains more the harder it is driven
+    final fb = c.createOscillator();
+    fb.type = 'square';
+    final double fbf = 3100 + rand() * 700;
+    fb.frequency.setValueAtTime(fbf, t);
+    // warbles rather than sliding cleanly — a clean slide is a musical gesture
+    fb.frequency.setValueAtTime(fbf * 0.88, t + 0.018);
+    fb.frequency.setValueAtTime(fbf * 1.06, t + 0.032);
+    fb.frequency.exponentialRampToValueAtTime(fbf * 0.7, t + 0.09);
+    final lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2400;
+    final fg = c.createGain();
+    fg.gain.setValueAtTime(0.0001, t);
+    fg.gain.exponentialRampToValueAtTime(0.012 + q * 0.030, t + 0.006);
+    fg.gain.exponentialRampToValueAtTime(0.0001, t + 0.10 + q * 0.06);
+    fb.connect(lp);
+    lp.connect(fg);
+    fg.connect(out);
+    fb.start(t);
+    fb.stop(t + 0.20);
+
+    _kill(out, 0.3);
   }
 
   @override
+  /// Was a triangle at 660 sweeping to 1320 with a sine on top — a major
+  /// interval, which is to say a little fanfare. Now a relay in the desk
+  /// closing, because that is what confirms something in a building like this.
   void good() {
-    env('triangle', 660, 0.16, 0.16, 1320);
-    env('sine', 990, 0.3, 0.09, 1980);
+    relay();
   }
 
   @override
@@ -1728,15 +1793,83 @@ class WebAudio implements GameAudio {
   }
 
   @override
+  /// Was two square blips a fifth apart — an arcade purchase jingle. Now a
+  /// contactor throwing over: a heavy mechanical clack and the mains sagging
+  /// for an instant as something large comes on load.
   void buy() {
-    env('square', 520, 0.07, 0.09, 780);
-    _later(55, () => env('square', 780, 0.08, 0.08, 1100));
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final t = c.currentTime;
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+
+    final n = _noise(t, 0.04);
+    if (n != null) {
+      final hp = c.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 1400;
+      final ng = c.createGain();
+      ng.gain.setValueAtTime(0.0001, t);
+      ng.gain.exponentialRampToValueAtTime(0.09, t + 0.002);
+      ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+      n.connect(hp);
+      hp.connect(ng);
+      ng.connect(out);
+    }
+    // the sag: 50Hz mains dipping under the new load
+    final o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(50, t);
+    final g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.13, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    o.connect(g);
+    g.connect(out);
+    o.start(t);
+    o.stop(t + 0.3);
+    _kill(out, 0.4);
   }
 
   @override
+  /// Was 440 then 370 — A down to F#, a minor third. Two clean sine notes is
+  /// a motif, and a motif announcing danger is a soundtrack cue rather than a
+  /// building making a noise.
+  ///
+  /// It is now the transmitter's own warning: a low horn detuned against
+  /// itself so the two oscillators BEAT against each other a few times a
+  /// second. Nothing in it is a pitch you could name, and the beating is the
+  /// part that makes it unpleasant.
   void warn() {
-    env('sine', 440, 0.5, 0.11, 440);
-    _later(260, () => env('sine', 370, 0.5, 0.11, 370));
+    final c = _c, master = _master;
+    if (!_on || c == null || master == null || _holding) return;
+    final t = c.currentTime;
+    final out = c.createGain();
+    out.gain.value = 1;
+    out.connect(master);
+    final double f = 232 + rand() * 26;
+    for (var i = 0; i < 2; i++) {
+      final o = c.createOscillator();
+      o.type = 'sawtooth';
+      // ~5Hz apart: audible beating, not an interval
+      o.frequency.setValueAtTime(i == 0 ? f : f + 5.2, t);
+      o.frequency.linearRampToValueAtTime(
+          (i == 0 ? f : f + 5.2) * 0.82, t + 0.85);
+      final lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 900;
+      final g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.055, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+      o.connect(lp);
+      lp.connect(g);
+      g.connect(out);
+      o.start(t);
+      o.stop(t + 0.95);
+    }
+    _kill(out, 1.1);
   }
 
   /// A voice, not a noise burst. A glottal sawtooth with jitter + vibrato driven
@@ -1947,7 +2080,9 @@ class WebAudio implements GameAudio {
       scream(1.2, 330, 1);
       burst(0.9, 0.55, 4200, 90);
       env('sawtooth', 720, 1.1, 0.30, 55, 3);
-      env('square', 311, 0.7, 0.15, 44);
+      // detuned off any named pitch — it sits inside the noise wall, but a
+      // scare should not contain a note even accidentally
+      env('square', 303 + rand() * 14, 0.7, 0.15, 44);
     });
     _later(450, () => scream(0.8, 480, 0.55));
     _later(520, () => burst(0.5, 0.24, 1800, 120));
