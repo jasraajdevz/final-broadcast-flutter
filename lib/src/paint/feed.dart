@@ -436,6 +436,25 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         final double rl = 10 + ((i * 53) % 37).toDouble() * climb;
         fillRect(f, rx, top - rl, 2.5, rl, rgba(238, 240, 232, 0.55));
       }
+      // SAPHORA.
+      //
+      // Written in it, from the inside. Not painted on top of the milk but
+      // drawn in the gap it leaves — the strokes are the picture showing
+      // through where a finger has been, which is why they darken as the milk
+      // deepens rather than brightening. It arrives once there is enough on
+      // the glass to write in, and it is gone with him.
+      if (climb > 0.34) {
+        final double ink = clampD((climb - 0.34) / 0.5, 0, 1);
+        fillText(
+          f,
+          'SAPHORA',
+          ui.Offset(_fw / 2, top + (_fh - top) * 0.42),
+          mono(19, rgba(96, 104, 96, 0.30 + ink * 0.55),
+              weight: FontWeight.bold),
+          anchor: TextAnchor.center,
+          cache: feedText,
+        );
+      }
     }
     if (act.masked && act.stage == 0) {
       fillRect(f, 0, 0, _fw, _fh, rgba(0, 0, 0, 0.55));
