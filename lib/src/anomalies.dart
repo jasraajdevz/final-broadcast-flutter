@@ -3119,6 +3119,25 @@ class AnomalyRuntime extends ChangeNotifier {
         : 0.0;
     blood.grip = 1.0 - sat * 0.94;
 
+    // THE SECOND, UNDIAGNOSED PLATEAU.
+    //
+    // `sat` clamps at fourteen minutes. After that grip is pinned at 0.06, the
+    // glass period is pinned, _roomIn and _clockIn are pinned, and the only
+    // remaining input is dread, which oscillates rather than climbs. Minute 15
+    // and minute 40 received IDENTICAL input — measured, the rendered tube at
+    // minute 20 and minute 40 was the same to three significant figures. An
+    // endless mode whose every driver is a clamped ramp has an ending; it just
+    // does not tell you where.
+    //
+    // Logarithmic, not linear-to-a-clamp and not one-minus-exp, because a
+    // clamp is what got us here twice and every exponential form halves its
+    // remaining travel on a fixed schedule. 1636 is chosen so the derivative
+    // 1/(1636+t) falls only 37% between minute 15 and minute 40: the values
+    // are 0.036 / 0.168 / 0.438 / 0.903 at 1 / 5 / 15 / 40 minutes and 1.28 at
+    // ninety, and it never reaches a ceiling so it never needs one.
+    blood.deep =
+        s.nightmare ? math.log(1 + sessionSeconds() / 1636.0) : 0.0;
+
     // AND IT KNOWS WHAT TIME IT IS WHERE YOU ARE.
     //
     // Not the shift clock — the player's. Rare, escalating, and it goes on the
@@ -3186,8 +3205,15 @@ class AnomalyRuntime extends ChangeNotifier {
       // make it exist.
       _glassIn -= dt;
       if (_glassIn <= 0) {
-        _glassIn = (2.6 - (s.dread / 100) * 1.4) * (1 - sat * 0.55);
-        final double f = 0.28 + (s.dread / 100) * 0.6;
+        // RATE IS DELIBERATELY THE WEAKEST AXIS — 0.22, not 0.55. More
+        // frequent arrivals do not change what a wipe MEANS, they only demand
+        // more wipes a minute, which is the definition of busywork. The
+        // escalation the player feels is carried by permanence and by the slap
+        // in addGlass, not by the metronome.
+        _glassIn = (2.6 - (s.dread / 100) * 1.4) *
+            (1 - sat * 0.55) /
+            (1 + blood.deep * 0.22);
+        final double f = 0.28 + (s.dread / 100) * 0.6 + blood.deep * 0.10;
         blood.addGlass(f);
         // heard before it is found, which is worth more than seen
         audio.bloodImpact(0.35 + f * 0.5);

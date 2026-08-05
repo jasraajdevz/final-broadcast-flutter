@@ -267,6 +267,20 @@ const Rect kCrt = Rect.fromLTWH(238, 126, 466, 330); // CRT — monitor bezel
 /// SCR = {x:CRT.x+22, y:CRT.y+20, w:CRT.w-44, h:CRT.h-52}
 const Rect kScr = Rect.fromLTWH(260, 146, 422, 278);
 
+/// THE BAND THE PLAYER ACTUALLY READS.
+///
+/// Checked against every one of the eight entity painters: the snow crawler's
+/// focus sits at feed y 0.40, Mr Sleepwell's at 0.30, dead air's ghost at 0.58,
+/// the caller's horizon at 0.42 and its booth at 0.56, the vertical man rolls
+/// through the lot. Nothing that has to be IDENTIFIED is painted above 0.28 or
+/// below 0.66.
+///
+/// This exists because a ceiling on the whole-tube mean is satisfied by a tube
+/// whose middle is black, and a guarantee about the top of the tube protects
+/// the one strip with no information in it. NIGHTMARE's occlusion ceiling is
+/// stated here, and nowhere else.
+const Rect kRead = Rect.fromLTRB(260, 223.84, 682, 329.48);
+
 /// SIDE — the two security cameras, left of the tube. SW/SH is their size.
 const List<Offset> kSide = [Offset(132, 150), Offset(132, 296)];
 const double kSideW = 96; // SW

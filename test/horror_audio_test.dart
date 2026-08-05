@@ -298,13 +298,24 @@ void main() {
     // early on a wipe takes the glass back, and by forty minutes it moves what
     // is there without removing it, so the tube ends up behind an hour of the
     // operator's own cleaning.
-    final b = BloodLayer();
+    // MEASURED IN MATERIAL, NOT IN LIST LENGTH, and the difference is the
+    // whole test. The first version counted `glass.length` before and after
+    // with ZERO ticks in between — so every mark was maximally wet, nothing
+    // could have aged, set or bonded, and it was structurally incapable of
+    // detecting any permanence mechanism at all. It also could not see a wipe
+    // that thins a mark without deleting it, which is what a wipe mostly does.
+    //
+    // It ticks now, because erosion lives in tick(): wipe() only records where
+    // the hand went, so that the work done is proportional to distance
+    // travelled rather than to how many times the mouse happened to fire.
 
-    double clearedAt(double grip) {
-      b.glass.clear();
-      b.grip = grip;
+    double liftedAt(double grip) {
+      final b = BloodLayer()..grip = grip;
       b.addGlass(1.0);
-      final int before = b.glass.length;
+      for (var i = 0; i < 40; i++) {
+        b.tick(1 / 30.0); // 1.33s — still well inside the liftable window
+      }
+      final double before = b.soil;
       // a hand ACROSS the whole tube, not a thumb in the middle: the marks
       // scatter over 422x278 and the wipe radius is 62, so wiping one point
       // touches almost none of them and measures nothing
@@ -313,14 +324,15 @@ void main() {
           for (var gy = 0; gy < 5; gy++) {
             b.wipe(kScr.left + kScr.width * (gx / 7),
                 kScr.top + kScr.height * (gy / 4));
+            b.tick(1 / 30.0);
           }
         }
       }
-      return (before - b.glass.length) / before;
+      return (before - b.soil) / before;
     }
 
-    final fresh = clearedAt(1.0);
-    final worn = clearedAt(0.08);
+    final fresh = liftedAt(1.0);
+    final worn = liftedAt(0.08);
     expect(fresh, greaterThan(0.5),
         reason: 'a hand does not clear the glass even at the start');
     expect(worn, lessThan(fresh * 0.6),

@@ -18,6 +18,7 @@
 // distance between those two is a whole night of your decisions.
 
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import '../bake.dart';
@@ -67,6 +68,32 @@ class Splat {
   double dripIn = 0;
 }
 
+/// ONE MARK ON THE TUBE ITSELF.
+///
+/// Was an inline record, which meant it could not change: `age += dt` on an
+/// immutable record is a rebuild-and-write-back of every mark every frame, and
+/// a mark that cannot age cannot set, cannot darken and cannot ever stop being
+/// liftable. Everything below is downstream of that one limitation.
+class GlassMark {
+  GlassMark(this.x, this.y, this.r, this.seed, this.a)
+      : r0 = r,
+        a0 = a;
+
+  double x, y, r, a;
+
+  /// Spawn values. [r0] is what bounds the smear — see [BloodLayer.tick].
+  final double r0, a0, seed;
+
+  double age = 0;
+
+  /// House style, the same curve as [Splat.dry]. One drying constant for the
+  /// whole game rather than two that drift apart.
+  double get dry => (1 - math.exp(-age / 70)).clamp(0.0, 1.0);
+
+  /// The optical area this mark is currently costing the picture, in px².
+  double get optical => math.pi * (r * 0.5) * (r * 0.5) * a;
+}
+
 /// A hand, pressed flat and dragged. Drawn on the window, from the OUTSIDE.
 class Handprint {
   Handprint({required this.x, required this.y, required this.seed, required this.flip});
@@ -110,23 +137,217 @@ class BloodLayer {
   /// than into the game hiding the keys from you.
   ///
   /// It never fully clears. Wiping thins a mark and smears what is left.
-  final List<({double x, double y, double r, double seed, double a})> glass =
-      <({double x, double y, double r, double seed, double a})>[];
+  final List<GlassMark> glass = <GlassMark>[];
+
+  // --- THE CAP WAS A CONVEYOR -----------------------------------------------
+  //
+  // `while (glass.length > 26) glass.removeAt(0)` read as a saturation point
+  // and behaved as a DELETE. Measured against the live feed: arrivals run
+  // 1.93/s at minute one and 3.49/s at minute ten, so mean residence was
+  // 26/3.49 = 7.4 SECONDS and everything older than that was annihilated. The
+  // arrival rate had already risen 1.8x across those nine minutes and the cap
+  // ate the entire increase — the material to escalate with was being
+  // generated and thrown away, every seven seconds, forever.
+  //
+  // Rendered, the result was a mode that stopped changing at minute fourteen:
+  //
+  //   min  1  coverage 28.6%  damage 2.03%
+  //   min  2  coverage 23.1%  damage 1.64%   <- went DOWN
+  //   min 10  coverage 39.8%  damage 2.85%
+  //   min 20  coverage 38.2%  damage 3.19%
+  //   min 40  coverage 38.2%  damage 3.19%   <- identical to minute 20
+  //
+  // So the cap becomes a BOND. Nothing that lands on a tube leaves it except
+  // down the glass or on a hand: a mark that retires does not vanish, it
+  // stamps what is left of it into [crust], which has no ceiling anywhere in
+  // its update path. What is DRAWN is clamped; what ACCUMULATES is not. Every
+  // way of getting this wrong puts the ceiling on the accumulator.
+
+  /// The permanent layer, as optical depth per cell over an 8x6 grid on the
+  /// tube. UNBOUNDED BY CONSTRUCTION — there is deliberately no `min`, no
+  /// `clamp` and no subtract-the-oldest anywhere that writes to it. The
+  /// clamping happens once, in the painter.
+  final Float32List crust = Float32List(kCells);
+
+  static const int kGx = 8, kGy = 6, kCells = 48;
+
+  /// 422 x 278 — consts.dart's kScr.
+  static const double kScrArea = 117316.0;
+  static const double kCellArea = kScrArea / kCells;
+
+  /// How much of a retiring mark survives as permanent staining. The rest is
+  /// what ran down the glass and off the bottom.
+  static const double kBond = 0.55;
+
+  /// Seconds a mark stays liftable. After this it has set, and a hand moves it
+  /// rather than lifting it. Ten because it must be shorter than the old 7.4s
+  /// conveyor was long — a mark has to survive its own replacement — and long
+  /// enough that a player who reacts to a mark can still get it.
+  static const double kSet = 10.0;
+
+  /// Population bound. Does the same thing retirement does (bond, then
+  /// remove), so no mechanism can be starved by it — the distinction that
+  /// every version of this that failed got wrong.
+  static const int kLive = 64;
+
+  /// Running total of [crust], so `soil` and `isEmpty` are O(1) rather than
+  /// O(48) on a path the painter and the sim both touch every frame.
+  double _crustSum = 0;
+
+  /// How deep into the session we are, written by the runtime. Logarithmic and
+  /// unclamped — see anomalies.dart. Drives how much of each mark bonds.
+  double deep = 0;
+
+  /// THE INSTRUMENT: mean optical depth over the tube, 1.0 being one full
+  /// opaque covering. No ceiling exists in its update path, which is the whole
+  /// point — `glass.length` was pegged at a cap and read as "saturated" when
+  /// it meant "capped", and it had been a tautology since 26 was written.
+  double get soil {
+    var s = _crustSum / kCells;
+    for (final GlassMark m in glass) {
+      s += m.optical / kScrArea;
+    }
+    return s;
+  }
+
+  int _cellAt(double x, double y) {
+    final int gx =
+        (((x - kScr.left) / kScr.width) * kGx).floor().clamp(0, kGx - 1);
+    final int gy =
+        (((y - kScr.top) / kScr.height) * kGy).floor().clamp(0, kGy - 1);
+    return gy * kGx + gx;
+  }
+
+  /// Seventeen points on a fixed lattice inside the unit disc. Deterministic
+  /// on purpose: a stamp that consumed rand() would make every seeded trace in
+  /// the suite depend on how many marks happened to retire that frame.
+  static const List<double> _diskA = <double>[
+    0, 0.785, 1.571, 2.356, 3.142, 3.927, 4.712, 5.498, //
+    0.393, 1.178, 1.963, 2.749, 3.534, 4.320, 5.105, 5.890,
+  ];
+
+  /// Spreads [optical] px² of bonded mass over the cells a disc of radius [r]
+  /// at ([x],[y]) covers, then converts to per-cell optical DEPTH by dividing
+  /// through by the cell area — which is what makes the crust term and the
+  /// live term of [soil] the same unit and therefore addable.
+  /// IT RUNS DOWN, and that is what stops the floor becoming a filter.
+  ///
+  /// Measured with a plain disc: by minute forty the ratio between the
+  /// thickest and thinnest cell was 1.4x and every cell had passed the alpha
+  /// clamp, so the whole tube was one flat 30% wash. That is the cap defect
+  /// again, moved from the model into the render — the number kept climbing
+  /// and the picture stopped changing at minute ten.
+  ///
+  /// A share of every mark is therefore laid into the cells BELOW it rather
+  /// than around it. It is the right physics on a vertical piece of glass and
+  /// it is the thing that gives the permanent layer structure: the tube grows
+  /// vertical streaks that deepen for as long as the session lasts, instead of
+  /// converging on a uniform grey.
+  static const double kRunShare = 0.42;
+
+  void _stamp(double x, double y, double r, double optical) {
+    if (optical <= 0) return;
+    _crustSum += optical / kCellArea;
+    final double q = optical / kCellArea;
+
+    final double disc = q * (1 - kRunShare) / 17.0;
+    crust[_cellAt(x, y)] += disc;
+    for (var i = 0; i < 16; i++) {
+      final double rr = r * (i < 8 ? 0.55 : 0.85);
+      crust[_cellAt(x + math.cos(_diskA[i]) * rr, y + math.sin(_diskA[i]) * rr)]
+          += disc;
+    }
+
+    // The tail. Weighted toward the top of the run, because that is where a
+    // run is fattest before it thins out and pins.
+    const List<double> tail = <double>[0.34, 0.26, 0.19, 0.13, 0.08];
+    for (var i = 0; i < tail.length; i++) {
+      crust[_cellAt(x, y + r * (1.1 + i * 1.35))] += q * kRunShare * tail[i];
+    }
+    _crustDirty = true;
+  }
+
+  /// A mark stops being liftable and becomes part of the floor.
+  void _bond(GlassMark m) {
+    if (m.a <= 0.02) return;
+    _stamp(m.x, m.y, m.r * 0.5, m.optical * kBond * (1 + deep * 0.30));
+  }
 
   /// Something got on the glass. NIGHTMARE only.
   void addGlass(double force) {
     final int n = 2 + (force * 4).round();
     for (var i = 0; i < n; i++) {
-      glass.add((
-        x: kScr.left + rand() * kScr.width,
-        y: kScr.top + rand() * kScr.height,
-        r: (14 + rand() * 46) * (0.6 + force),
-        seed: rand(),
-        a: 0.34 + force * 0.34,
-      ));
-    }
-    while (glass.length > 26) {
-      glass.removeAt(0);
+      // REJECTION SAMPLING, BOUNDED AT FOUR TRIES so it can never spin. A mean
+      // occlusion figure cannot tell a readable tube from one with a hole
+      // punched through the entity's face; this refuses to stack a mark where
+      // a cell is already near opaque, so the mess spreads into the clean.
+      double x = 0, y = 0;
+      for (var tryN = 0; tryN < 4; tryN++) {
+        x = kScr.left + rand() * kScr.width;
+        y = kScr.top + rand() * kScr.height;
+        if (1 - math.exp(-_liveCell[_cellAt(x, y)]) <= kCellMax) break;
+      }
+      // A SLAP. Escalating VARIANCE rather than rate or mean size: a rare
+      // double-size mark reads as the night getting worse and lands as a beat,
+      // while contributing barely more ink than the ordinary ones. Raising the
+      // mean instead just raises the odds of one unlucky mark eating the face
+      // the player is trying to read, which is felt as unfairness.
+      final bool slap = rand() < 0.06 + deep * 0.10;
+      // CAPPED IN ABSOLUTE TERMS, at 28% of the tube's width. Looked at rather
+      // than measured: without this a slapped top-of-range mark at minute
+      // forty spawns at 190 and smears to 361 on a 422px tube, and the tube
+      // reads as four big red circles instead of as filthy glass. Size is the
+      // weakest escalation axis anyway — a bigger mean mark mostly raises the
+      // odds of one unlucky mark eating the face the player is reading, which
+      // is felt as unfairness rather than as pressure. The slap stays; only
+      // how far it can run is bounded.
+      final double r = math.min(kMarkMax,
+          (14 + rand() * 46) * (0.6 + force) * (slap ? 2.0 : 1.0));
+      final double a = 0.34 + force * 0.34;
+      final double seed = rand();
+      // PROPORTIONAL, NOT BANG-BANG.
+      //
+      // A hard `if (readOcc >= ceiling) divert` against a measurement that
+      // refreshes every 0.12s and a feed running 13 marks a second is a relay,
+      // and it behaved like one: everything diverted, the live marks aged out,
+      // occlusion collapsed, arrivals resumed, repeat. Sampled at the minute
+      // boundary that showed twelve live marks on a tube that should carry a
+      // hundred — the tube went DARK AND STILL, which is the one thing this
+      // mode must never be.
+      //
+      // Diverting with probability proportional to the overshoot settles at an
+      // equilibrium instead of ringing, and costs the escalation metric
+      // nothing either way: a diverted mark is bonded, not dropped.
+      //
+      // THE THIRD TERM IS THE ONE THAT MATTERS. A ceiling on MEAN occlusion is
+      // satisfied by a tube that is evenly half-covered everywhere, with no
+      // sample anybody can actually read through: measured, liveOcc sat
+      // obediently at 0.28 while the fraction of the read band still clear
+      // fell to 0.4%. What a player needs is not a good average, it is
+      // SOMEWHERE TO LOOK, so the governor is told to keep some.
+      final double over = math
+          .max(
+            math.max(
+              (readOcc - kReadCeil) / 0.10,
+              (liveOcc - kLiveCeil) / 0.10,
+            ),
+            (kClearMin - readClear) / 0.10,
+          )
+          .clamp(0.0, 1.0);
+      if (over > 0 && rand() < over) {
+        // NO ROOM LEFT IN THE PICTURE. It still landed — it goes straight to
+        // the floor instead of into the layer a hand can lift.
+        //
+        // This is why the playability ceiling costs the escalation metric
+        // nothing. The governor gates the LIVE list; `crust` never sees a
+        // bound. By minute forty most of every arrival is being diverted
+        // straight into the permanent layer, so `soil` keeps climbing while
+        // what the player can actually see holds flat at the ceiling.
+        _stamp(x, y, r * 0.5,
+            math.pi * (r * 0.5) * (r * 0.5) * a * kBond * (1 + deep * 0.30));
+        continue;
+      }
+      glass.add(GlassMark(x, y, r, seed, a));
     }
   }
 
@@ -146,31 +367,51 @@ class BloodLayer {
   /// told it will.
   double grip = 1.0;
 
-  /// A hand goes across the tube. Thins anything under it and leaves the rest
-  /// dragged — a wiped screen is never a clean screen, and after long enough
-  /// it is not even a wiped screen.
+  /// A hand goes across the tube. THIS ONLY RECORDS THE PATH — all of the
+  /// erosion happens in [tick], against a swept-distance budget.
+  ///
+  /// It has to, and this is the single most load-bearing change in the file.
+  /// wipe() takes no dt and is called once per PointerMoveEvent plus once per
+  /// PointerDownEvent — up to about 120 times a second on a trackpad, against
+  /// the "one pass" that every constant here was originally written for. The
+  /// old code survived that only because its removal term was subtractive and
+  /// small; anything multiplicative or accumulating is catastrophic at 120Hz
+  /// (a 0.40-per-call retention is 1e-24 over half a second of drag) and every
+  /// tuning number is meaningless until the rate is pinned. Path LENGTH is the
+  /// same whether it is sampled at 60Hz or 120Hz, so that is what is budgeted.
   void wipe(double x, double y) {
-    for (var i = glass.length - 1; i >= 0; i--) {
-      final g = glass[i];
-      final double d =
-          math.sqrt((g.x - x) * (g.x - x) + (g.y - y) * (g.y - y));
-      if (d > 62) continue;
-      final double cut = (1 - d / 62) * 0.55 * grip;
-      final double left = g.a - cut;
-      if (left <= 0.05) {
-        glass.removeAt(i);
-      } else {
-        glass[i] = (
-          // it drags further the less the hand is achieving
-          x: g.x + (g.x - x) * (0.05 + (1 - grip) * 0.16),
-          y: g.y + (g.y - y) * (0.05 + (1 - grip) * 0.16),
-          r: g.r * (1.04 + (1 - grip) * 0.10),
-          seed: g.seed,
-          a: left,
-        );
-      }
+    if (_hand.isNotEmpty) {
+      final ui.Offset l = _hand.last;
+      if ((l.dx - x).abs() < 6 && (l.dy - y).abs() < 6) return; // coalesce
     }
+    if (_hand.length < 64) _hand.add(ui.Offset(x, y));
   }
+
+  final List<ui.Offset> _hand = <ui.Offset>[];
+
+  static const double kWipeR = 62.0;
+
+  /// A teleporting pointer is worth one segment, not the whole jump.
+  static const double kSegMax = 40.0;
+
+  /// px/s — a palm held still is still scrubbing.
+  static const double kDwell = 90.0;
+
+  /// px/s — two crossings of a 422px tube per second, and the reason a
+  /// pathological scrubber cannot outrun the arrivals.
+  static const double kMaxSweep = 900.0;
+
+  static const double kLiftRate = 0.0035;
+  static const double kCrustTake = 0.0015;
+  static const double kCrustLift = 0.22;
+  static const double kDrag = 0.055;
+
+  /// What the last tick's wiping actually bought, 0..1 — optical mass lifted
+  /// over optical mass that was under the hand. This is the player's own
+  /// question ("what did that get me?") as a number, and it falls as ~1/soil
+  /// with no floor, which is how constraint 2 is honoured rather than merely
+  /// asserted.
+  double wipeYield = 0;
 
   void clear() {
     glass.clear();
@@ -178,7 +419,23 @@ class BloodLayer {
     hands.clear();
     trail.clear();
     drips.clear();
+    _hand.clear();
+    _lastPoint = null;
+    _handIdle = 0;
     wash = 0;
+    // A Float32List is invisible to isEmpty, so a permanent layer that
+    // survived startBroadcast()'s clear() would have shipped green.
+    crust.fillRange(0, kCells, 0);
+    _crustSum = 0;
+    // One image is one image, but a mode with no ending is exactly where you
+    // do not want to find out you were wrong about that.
+    _crustImg?.dispose();
+    _crustImg = null;
+    _liveCell.fillRange(0, kCells, 0);
+    readOcc = liveOcc = readWorst = 0;
+    readClear = 1;
+    wipeYield = 0;
+    _crustDirty = true;
   }
 
   /// Something put a hand on the window. From the outside.
@@ -256,9 +513,344 @@ class BloodLayer {
       trail.removeAt(0);
     }
     wash = math.max(0, wash - dt * 0.012);
+
+    _tickGlass(dt);
   }
 
-  bool get isEmpty => splats.isEmpty && hands.isEmpty && wash <= 0.002;
+  // --- the tube --------------------------------------------------------------
+
+  void _tickGlass(double dt) {
+    for (final GlassMark m in glass) {
+      m.age += dt;
+    }
+
+    _erode(dt);
+
+    // RETIREMENT IS UNCONDITIONAL AND TIME-BASED, which is the structural
+    // point. Any exit a mark can decline to satisfy leaves most of the tube
+    // immortal — a 62px hand reaches pi*62^2 / 117316 = 10.3% of the glass and
+    // the player only ever wipes where they are looking, so ~90% of marks are
+    // never touched by anything. These retire on their own.
+    for (var i = glass.length - 1; i >= 0; i--) {
+      final GlassMark m = glass[i];
+      if (m.age > kSet || m.a <= 0.02) {
+        _bond(m);
+        glass.removeAt(i);
+      }
+    }
+    while (glass.length > kLive) {
+      _bond(glass[0]);
+      glass.removeAt(0);
+    }
+
+    _measureAge += dt;
+    if (_measureAge >= kMeasureEvery) {
+      _measureAge = 0;
+      measureRead();
+    }
+  }
+
+  /// Where the hand was when the last tick ended.
+  ///
+  /// THE PATH DOES NOT RESTART EVERY FRAME. Measuring travel only within one
+  /// tick's buffer throws away the distance between the last point of the
+  /// previous frame and the first point of this one — and a 60Hz mouse against
+  /// a 60fps loop delivers exactly ONE point per tick, so that is not an edge
+  /// case, it is the common case: every stroke would have measured as a palm
+  /// resting on the glass. Caught by the wipe-degradation test reading a lift
+  /// of 0.061 where it should read 0.9.
+  ui.Offset? _lastPoint;
+  double _handIdle = 0;
+
+  /// All of the hand's work for this frame, budgeted on distance travelled.
+  void _erode(double dt) {
+    wipeYield = 0;
+    if (_hand.isEmpty) {
+      // A hand that has been off the glass for a moment starts a fresh stroke
+      // rather than teleporting across the tube when it comes back.
+      _handIdle += dt;
+      if (_handIdle > 0.25) _lastPoint = null;
+      return;
+    }
+    _handIdle = 0;
+
+    final List<ui.Offset> path = <ui.Offset>[?_lastPoint, ..._hand];
+    _lastPoint = _hand.last;
+
+    var swept = kDwell * dt;
+    for (var i = 1; i < path.length; i++) {
+      swept += math.min(kSegMax, (path[i] - path[i - 1]).distance);
+    }
+    swept = math.min(swept, kMaxSweep * dt);
+
+    var under = 0.0, lifted = 0.0;
+    final int segs = math.max(1, path.length - 1);
+    final double share = swept / segs;
+
+    for (var s = 0; s < segs; s++) {
+      final ui.Offset a = path[s];
+      final ui.Offset b = path.length > 1 ? path[s + 1] : a;
+      final double len = (b - a).distance;
+      final double ux = len > 0.001 ? (b.dx - a.dx) / len : 0.0;
+      final double uy = len > 0.001 ? (b.dy - a.dy) / len : 0.0;
+
+      for (final GlassMark m in glass) {
+        final double dx = m.x - b.dx, dy = m.y - b.dy;
+        final double d2 = dx * dx + dy * dy;
+        if (d2 > kWipeR * kWipeR) continue;
+        final double w = 1 - math.sqrt(d2) / kWipeR;
+
+        // THE 0.10 FLOOR IS CONSTRAINT 2 AS A CONSTANT. A blood-slick palm has
+        // lost FRICTION, not the ability to move liquid — whatever just landed
+        // can always be taken off, and what is permanent is the floor
+        // underneath it. At grip 0.06 a full pass still lifts enough that nine
+        // passes clear a mark: bad value the player cannot decline, which is
+        // the mode's thesis stated in the wrist instead of in a meter.
+        final double lift = kLiftRate * (0.10 + 0.90 * grip) * share * w;
+        final double take = math.min(m.a, lift);
+        under += m.optical;
+        lifted += take * math.pi * (m.r * 0.5) * (m.r * 0.5);
+        m.a -= take;
+
+        // ALONG THE HAND, not radially outward. Pushing marks away from a
+        // point builds a starburst; a hand moving left to right drags
+        // everything left to right, and parallel streaks are the single most
+        // recognisable thing about a smeared windscreen.
+        m.x = (m.x + ux * kDrag * (1 - grip) * share)
+            .clamp(kScr.left + 4, kScr.right - 4);
+        m.y = (m.y + uy * kDrag * (1 - grip) * share)
+            .clamp(kScr.top + 4, kScr.bottom - 4);
+        // SPREADING CONSERVES. The same blood over more glass is thinner
+        // blood, so growing r must thin a by the same area factor — and this
+        // is not a nicety, it is the difference between a wipe helping and a
+        // wipe helping the mess. Optical cost goes as r², so growth alone
+        // multiplied a mark's eventual bonded mass by up to 3.6x: measured,
+        // an operator who wiped for forty minutes finished with MORE permanent
+        // staining (302) than one who never lifted a finger (258). Wiping made
+        // it worse, which inverts the entire mechanic.
+        //
+        // BOUNDED too. Unclamped, r reached 357 from a spawn of 61 in forty
+        // touches — painted at 179px on a 278px tube, spilling 40px past the
+        // bezel, and the glass pass used to be drawn outside the room clip.
+        final double rNew = math.min(
+            m.r0 * 1.9, m.r * (1 + (1 - grip) * 0.10 * share / kWipeR));
+        m.a *= (m.r * m.r) / (rNew * rNew);
+        m.r = rNew;
+      }
+
+      // THE CRUST. Sub-linear with NO FLOOR: `take` goes to zero as thickness
+      // grows, so soil is monotone under ANY wipe rate including a 120Hz
+      // scrubber. A constant floor here would make drain scale with input
+      // frequency while inflow does not, and a fast enough hand would invert
+      // the sign of the entire curve.
+      final int ci = _cellAt(b.dx, b.dy);
+      if (crust[ci] > 0) {
+        final double take =
+            math.min(crust[ci], kCrustTake * grip * share / (1 + crust[ci]));
+        crust[ci] -= take;
+        // WHAT THE HAND IS UP AGAINST INCLUDES THE FLOOR. Counting only the
+        // live layer flattered the wipe badly — by minute forty almost
+        // everything under the palm is bonded, so a yield computed over live
+        // marks alone reports what the hand does to the 3% it can still move
+        // and says nothing about the 97% it cannot.
+        under += crust[ci] * kCellArea;
+        // Mostly moved, not removed. The rest of it is on the hand now.
+        final int cj = _cellAt(
+            (b.dx + ux * 40).clamp(kScr.left, kScr.right - 1),
+            (b.dy + uy * 40).clamp(kScr.top, kScr.bottom - 1));
+        final double moved = take * (1 - kCrustLift * grip);
+        crust[cj] += moved;
+        lifted += (take - moved) * kCellArea;
+        _crustSum -= take - moved;
+        _crustDirty = true;
+      }
+    }
+
+    wipeYield = under > 0 ? (lifted / under).clamp(0.0, 1.0) : 0.0;
+    _hand.clear();
+  }
+
+  // --- what the player can still read ---------------------------------------
+
+  static const int kSx = 32, kSy = 8, kSamples = kSx * kSy;
+  static const double kMeasureEvery = 0.12;
+  /// How fast bonded thickness turns into opacity.
+  ///
+  /// 0.020 puts the permanent layer at its 0.30 alpha ceiling at a thickness
+  /// of ~18, which the reference feed reaches around minute fourteen — early
+  /// enough that the first quarter hour has a real coverage curve, late enough
+  /// that the tube is not a brown filter by minute three.
+  static const double kOptical = 0.020;
+  /// The permanent floor's share of the light, and it is deliberately the
+  /// SMALLER share.
+  ///
+  /// At 0.30 against a 0.44 read ceiling the floor ate two thirds of the
+  /// budget and the governor starved the live layer to twelve marks — the tube
+  /// went dark and STOPPED BEING BUSY, which is worse than either. The live
+  /// layer is the one the player actually fights; the floor is what makes the
+  /// fight unwinnable, and it does that job at 0.22 just as well.
+  static const double kBakedMax = 0.22;
+  static const double kCellMax = 0.78;
+
+  /// The largest a single mark may ever spawn — 28% of the tube's width.
+  static const double kMarkMax = 118.0;
+
+  /// The governor setpoint, on TOTAL occlusion of the read band.
+  ///
+  /// 0.44 and not the 0.50 it was first set to: measured, 0.50 realised as
+  /// 0.56-0.60 because the check runs at 4Hz and marks already alive keep
+  /// growing after it. The gap between setpoint and outcome is the thing to
+  /// tune, not the setpoint's resemblance to the target.
+  /// 0.42, and the number it SETTLES at is 0.50 — proportional control has a
+  /// steady-state offset and the setpoint is not the outcome. Set to 0.48 it
+  /// realised 0.56, over the legibility line. Tune the outcome, not the
+  /// constant's resemblance to the target.
+  static const double kReadCeil = 0.42;
+
+  /// AND a second gate on the LIVE layer alone.
+  ///
+  /// A total-occlusion ceiling can be satisfied entirely by permanent crust,
+  /// at which point the live layer is free to blanket whatever is left — which
+  /// measured as 6% of the read band still clear at minute thirty. The player
+  /// has to be able to find the picture under the mess, and this is the term
+  /// that guarantees it.
+  static const double kLiveCeil = 0.28;
+
+  /// How much of the read band must stay legible. THE playability guarantee —
+  /// the other two ceilings are about averages and this one is about whether
+  /// there is anywhere left to look.
+  ///
+  /// 0.38 as a setpoint realises a floor of ~0.15 across seeds; at 0.30 it
+  /// realised 0.086, because the governor is proportional and lags a 0.12s
+  /// measurement. Again: tune the outcome, not the constant.
+  static const double kClearMin = 0.38;
+
+  double _measureAge = kMeasureEvery;
+  bool _crustDirty = true;
+  ui.Image? _crustImg;
+
+  final Float32List _liveCell = Float32List(kCells);
+
+  /// 1 - mean transmittance over the read band, 0..1.
+  double readOcc = 0;
+
+  /// Live-only occlusion, which is what the governor gates on — the permanent
+  /// floor must not be able to starve the live layer out of existence.
+  double liveOcc = 0;
+
+  /// Fraction of samples the live layer has left essentially clear.
+  double readClear = 1;
+
+  /// Worst single sample. A mean cannot see a hole punched through one face.
+  double readWorst = 0;
+
+  /// Composites the layer over the read band and reports what is left of the
+  /// picture.
+  ///
+  /// Accumulation is OVER-COMPOSITE held as a transmittance product, not a sum
+  /// and not a max. A sum is unbounded and unphysical and would be `glass 26`
+  /// wearing a new hat; a max under-reports exactly the layering that smearing
+  /// produces. A product is bounded in [0,1], is literally what the painter
+  /// does, and can only flatten when the tube is genuinely opaque — so a flat
+  /// trace always means a real problem rather than a measurement artefact.
+  void measureRead() {
+    _liveCell.fillRange(0, kCells, 0);
+    for (final GlassMark m in glass) {
+      _liveCell[_cellAt(m.x, m.y)] += m.optical / kCellArea;
+    }
+
+    var occ = 0.0, live = 0.0, clear = 0.0, worst = 0.0;
+    for (var sy = 0; sy < kSy; sy++) {
+      final double py = kRead.top + (sy + 0.5) * kRead.height / kSy;
+      for (var sx = 0; sx < kSx; sx++) {
+        final double px = kRead.left + (sx + 0.5) * kRead.width / kSx;
+        final double tBaked = 1 - bakedAlphaAt(px, py);
+        var tLive = 1.0;
+        for (final GlassMark m in glass) {
+          final double rr = m.r * 0.5 + 2.2; // painted radius plus the blur
+          final double dx = m.x - px, dy = m.y - py;
+          final double d2 = dx * dx + dy * dy;
+          if (d2 > rr * rr) continue; // squared — no sqrt in the reject path
+          tLive *= 1 - m.a * (1 - math.sqrt(d2) / rr);
+        }
+        final double o = 1 - tBaked * tLive;
+        occ += o;
+        live += 1 - tLive;
+        if (1 - tLive <= 0.10) clear += 1;
+        if (o > worst) worst = o;
+      }
+    }
+    readOcc = occ / kSamples;
+    liveOcc = live / kSamples;
+    readClear = clear / kSamples;
+    readWorst = worst;
+  }
+
+  /// The permanent layer's alpha at a point, bilinear over [crust].
+  ///
+  /// THIS is where the clamp lives, and it is the only one: the accumulator
+  /// underneath it has no ceiling, so the mode keeps getting worse long after
+  /// the picture has stopped getting darker.
+  double bakedAlphaAt(double x, double y) {
+    final double fx =
+        (((x - kScr.left) / kScr.width) * kGx - 0.5).clamp(0.0, kGx - 1.0);
+    final double fy =
+        (((y - kScr.top) / kScr.height) * kGy - 0.5).clamp(0.0, kGy - 1.0);
+    final int x0 = fx.floor(), y0 = fy.floor();
+    final int x1 = math.min(x0 + 1, kGx - 1), y1 = math.min(y0 + 1, kGy - 1);
+    final double tx = fx - x0, ty = fy - y0;
+    final double c = crust[y0 * kGx + x0] * (1 - tx) * (1 - ty) +
+        crust[y0 * kGx + x1] * tx * (1 - ty) +
+        crust[y1 * kGx + x0] * (1 - tx) * ty +
+        crust[y1 * kGx + x1] * tx * ty;
+    return math.min(kBakedMax, 1 - math.exp(-c * kOptical));
+  }
+
+  /// Rebaked only when the field has actually moved, and at most four times a
+  /// second. Null when there is nothing on the floor yet.
+  ui.Image? _crustImage() {
+    if (_crustSum <= 1e-9) {
+      _crustImg?.dispose();
+      _crustImg = null;
+      return null;
+    }
+    if (_crustImg != null && !_crustDirty) return _crustImg;
+    _crustDirty = false;
+    final ui.Image? old = _crustImg;
+    _crustImg = bakeImageSync(kGx, kGy, (ui.Canvas c) {
+      final ui.Paint p = ui.Paint();
+      for (var i = 0; i < kCells; i++) {
+        final double d = crust[i];
+        if (d <= 0) continue;
+        // ONE clamp, here, on what is DRAWN. Nothing upstream of this has a
+        // ceiling — that is the entire design.
+        final double a = math.min(kBakedMax, 1 - math.exp(-d * kOptical));
+        // and it keeps DARKENING after the alpha has topped out, which is the
+        // axis that carries escalation once coverage cannot
+        p.color = ui.Color.lerp(
+                _kGlassDried, _kCrustDeep, 1 - math.exp(-d * 0.004))!
+            .withValues(alpha: a);
+        c.drawRect(
+            ui.Rect.fromLTWH(
+                (i % kGx).toDouble(), (i ~/ kGx).toDouble(), 1, 1),
+            p);
+      }
+    });
+    old?.dispose();
+    return _crustImg;
+  }
+
+  void dispose() {
+    _crustImg?.dispose();
+    _crustImg = null;
+  }
+
+  bool get isEmpty =>
+      splats.isEmpty &&
+      hands.isEmpty &&
+      glass.isEmpty &&
+      _crustSum <= 1e-9 &&
+      wash <= 0.002;
 }
 
 // --- painting ---------------------------------------------------------------
@@ -343,19 +935,61 @@ void drawBlood(ui.Canvas g, BloodLayer b, double t) {
   // Drawn last and deliberately outside the clip that protects the screen
   // everywhere else, because here it is supposed to be in the way — and it is
   // answerable, which is the difference. b.wipe() takes it off.
-  for (final s in b.glass) {
-    final ui.Paint p = ui.Paint()
-      ..color = rgba(96, 8, 8, s.a)
-      ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 2.2);
-    g.drawCircle(ui.Offset(s.x, s.y), s.r * 0.5, p);
-    // it does not sit still on a vertical piece of glass
-    final double run = 8 + s.seed * 34 * s.a;
-    g.drawRect(
-        ui.Rect.fromLTWH(s.x - s.r * 0.10, s.y, s.r * 0.20, run),
-        ui.Paint()..color = rgba(84, 6, 6, s.a * 0.75));
+  g.save();
+  // Clipped to the tube, which is both the fix and the correct fiction: these
+  // marks are ON the glass, so one overhanging the bezel by 35px was always
+  // wrong. Unclamped smearing used to put a 179px mark on a 278px tube.
+  g.clipRect(kScr);
+
+  // THE PERMANENT LAYER, in ONE draw call at any session length.
+  //
+  // 8x6 pixels, 192 bytes, stretched over the tube with hardware bilinear —
+  // so the grid is invisible and the cost is flat at minute 1 and at minute
+  // 120. A full-resolution crust texture was the obvious alternative and it is
+  // 1.9MB per bake in a mode with no ending, plus a 0.6-1.5ms rasteriser
+  // hitch that can land on a jump scare.
+  final ui.Image? crustImg = b._crustImage();
+  if (crustImg != null) {
+    g.drawImageRect(
+        crustImg,
+        ui.Rect.fromLTWH(0, 0, BloodLayer.kGx.toDouble(),
+            BloodLayer.kGy.toDouble()),
+        kScr,
+        smoothPaint());
   }
 
+  // THE LIVE MARKS.
+  //
+  // The blur stays exactly as it was. Measured on this repo's backend: 26
+  // per-mark MaskFilter circles cost 0.331ms, the same 26 with no blur at all
+  // cost 0.190ms, the same 26 inside one saveLayer(ImageFilter.blur) cost
+  // 0.558ms and as a single multi-oval Path 0.630ms. drawCircle plus
+  // MaskFilter.normal hits Skia's analytic circle blur — one quad, no render
+  // target. Batching only pays above about sixty marks. What DID need fixing
+  // was allocating two Paints per mark per frame; there are now two, hoisted.
+  final ui.Paint body = ui.Paint()
+    ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 2.2);
+  final ui.Paint tail = ui.Paint();
+  for (final GlassMark s in b.glass) {
+    // fresh is bright and thin, set is brown and flat — the same cue the
+    // splat layer already uses, so one mark tells you how old it is
+    body.color = ui.Color.lerp(_kGlassFresh, _kGlassDried, s.dry)!
+        .withValues(alpha: s.a);
+    g.drawCircle(ui.Offset(s.x, s.y), s.r * 0.5, body);
+    // it does not sit still on a vertical piece of glass
+    final double run = 8 + s.seed * 34 * s.a;
+    tail.color = rgba(84, 6, 6, s.a * 0.75);
+    g.drawRect(
+        ui.Rect.fromLTWH(s.x - s.r * 0.10, s.y, s.r * 0.20, run), tail);
+  }
+  g.restore();
 }
+
+const ui.Color _kGlassFresh = ui.Color(0xFF800A0A);
+const ui.Color _kGlassDried = ui.Color(0xFF4A0C0A);
+
+/// The floor, once it has been there long enough to go black.
+const ui.Color _kCrustDeep = ui.Color(0xFF1C0606);
 
 /// A palm and four fingers, smeared downward. Deliberately a little too big
 /// and with the fingers a little too long — a hand you recognise instantly and
