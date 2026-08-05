@@ -436,12 +436,21 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         final double rl = 10 + ((i * 53) % 37).toDouble() * climb;
         fillRect(f, rx, top - rl, 2.5, rl, rgba(238, 240, 232, 0.55));
       }
-      // SORRY I / MISSED YOU
+      // TWO PINTS / LIKE ALWAYS
       //
-      // What a milkman writes on the card when nobody came to the door. It is
-      // the most ordinary sentence in the world and it is the wrong one: he
-      // did not miss you. You are sitting right here, you have been all night,
-      // and he has been close enough to write on the inside of the glass.
+      // SORRY I MISSED YOU was the first attempt and it read as a dad joke:
+      // mundane in the wrong direction, a note about a doorstep. The horror in
+      // a milkman is not that he called round. It is that he knows the size of
+      // the household.
+      //
+      // There is one operator at this station. There has been one operator at
+      // this station every night since 1963. He leaves two, he has always left
+      // two, and he has never once been corrected — which means either he is
+      // wrong about the building, or he is not, and the thing the presence
+      // system has been putting in the room behind the chair all along has
+      // been getting its share.
+      //
+      // Nothing anywhere else in the game mentions it.
       //
       // Written IN the milk rather than on it — drawn in the gap it leaves, so
       // the strokes are the picture showing through where a finger has been.
@@ -453,9 +462,9 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         final TextStyle hand = mono(15, rgba(96, 104, 96, 0.30 + ink * 0.55),
             weight: FontWeight.bold);
         final double mid = top + (_fh - top) * 0.40;
-        fillText(f, 'SORRY I', ui.Offset(_fw / 2, mid), hand,
+        fillText(f, 'TWO PINTS', ui.Offset(_fw / 2, mid), hand,
             anchor: TextAnchor.center, cache: feedText);
-        fillText(f, 'MISSED YOU', ui.Offset(_fw / 2, mid + 17), hand,
+        fillText(f, 'LIKE ALWAYS', ui.Offset(_fw / 2, mid + 17), hand,
             anchor: TextAnchor.center, cache: feedText);
       }
     }
