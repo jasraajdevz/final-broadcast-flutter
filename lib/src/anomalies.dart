@@ -292,6 +292,7 @@ class ActiveAnom {
     this.cold = false,
     this.mod = EncounterMod.none,
     this.partner,
+    this.milk = false,
   });
 
   final Anom def;
@@ -306,6 +307,22 @@ class ActiveAnom {
 
   /// Arrived wearing someone else's face (depth >= 28, 22% chance).
   final bool masked;
+
+  /// THE MILKMAN came instead.
+  ///
+  /// Not a ninth thing in the signal — eight is load-bearing all the way down,
+  /// from the 4x2 deck to "Each one dies to exactly one button" on the boot
+  /// screen to the ninth key's whole mystique — so he is a VARIANT. He arrives
+  /// wearing one of the eight, he dies to that one's key, and he takes no slot
+  /// on the grid.
+  ///
+  /// What he does is cover the tube. Milk goes up the inside of the glass from
+  /// the moment he lands, and it keeps going until it has taken the picture
+  /// away — so the tell is legible for about a second and a half and then it
+  /// is not, and the answer has to come from what was seen rather than from
+  /// what is there. He punishes reading the screen instead of remembering it,
+  /// which is the one habit the eight otherwise reward.
+  final bool milk;
 
   /// 0 = masked and not yet stripped, 1 = present and sabotaging.
   int stage;
@@ -1228,6 +1245,9 @@ class AnomalyRuntime extends ChangeNotifier {
           ? 0.5
           : (soft ? 0.7 : (nightAnoms == 0 && metaHasPorter(s) ? 0.65 : 1)),
       seed: rand(),
+      // He needs a roster to hide in: no debut, and not until the operator
+      // has catalogued enough that a familiar tell is worth taking away.
+      milk: !first && depth(s) >= 12 && rand() < 0.14,
       cold: cold,
       mod: mod,
       partner: partner,

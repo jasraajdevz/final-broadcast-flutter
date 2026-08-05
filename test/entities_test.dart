@@ -179,4 +179,43 @@ void main() {
         reason: 'a strike is still worth as much against a huge rack '
             '($small -> $huge) — the machine never takes over');
   });
+
+  test('THE MILKMAN is a variant, not a ninth thing in the signal', () {
+    // Eight is load-bearing all the way down: the deck's 4x2 grid, keys 1-8,
+    // "Each one dies to exactly one button" on the boot screen, the archive,
+    // the bot roster, kAnoms.length in the encounter maths, and the ninth
+    // key's entire mystique. He wears one of the eight and dies to its key.
+    expect(kAnoms.length, 8, reason: 'something added a ninth entity');
+    expect(kCounters.length, 8, reason: 'something added a ninth key');
+    expect(kAnoms.any((Anom a) => a.nm.toUpperCase().contains('MILK')), isFalse,
+        reason: 'THE MILKMAN got his own roster slot — he is a variant');
+  });
+
+  test('and he takes the picture away without making it unanswerable', () {
+    // The whole beat is that the tell is legible for about a second and a half
+    // and then it is not, so the answer comes from what was SEEN rather than
+    // from what is there. If the milk reached the top there would be nothing
+    // to have seen, and it would be a coin flip rather than a memory test.
+    final a = ActiveAnom(
+      def: kAnoms.first,
+      window: 7,
+      masked: false,
+      stage: 1,
+      intensity: 1,
+      seed: 0.5,
+      milk: true,
+    );
+    expect(a.milk, isTrue);
+    // legible at the start
+    a.t = 0.2;
+    expect((a.t / 1.6).clamp(0.0, 1.0), lessThan(0.2),
+        reason: 'the tell is already covered when it lands');
+    // and covered, but never completely, by the end
+    a.t = 6.0;
+    final climb = (a.t / 1.6).clamp(0.0, 1.0);
+    expect(climb, 1.0);
+    expect(0.86 * climb, lessThan(1.0),
+        reason: 'the milk reaches the top of the glass and the visit becomes '
+            'a coin flip');
+  });
 }

@@ -411,6 +411,32 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
   if (act != null) {
     final prog = act.t / act.window;
     drawAnom(f, act.def, t, prog);
+    // THE MILKMAN. Not a ninth thing in the signal — he wears one of the eight
+    // and dies to its key. What he does is take the picture away: milk climbs
+    // the inside of the glass from the moment he lands and keeps climbing, so
+    // the tell is readable for about a second and a half and then it is not.
+    //
+    // Drawn AFTER the entity and BEFORE everything else that reads the tube,
+    // because the whole point is that it occludes the thing the player is
+    // trying to identify. It never quite reaches the top: an answer has to
+    // stay possible for someone who kept their nerve.
+    if (act.milk) {
+      final double climb = clampD(act.t / 1.6, 0, 1);
+      final double top = _fh * (1 - 0.86 * climb);
+      // the body of it, with a curdled edge rather than a clean waterline
+      fillRect(f, 0, top + 4, _fw, _fh - top, rgba(238, 240, 232, 0.93));
+      for (var i = 0.0; i < _fw; i += 4) {
+        final double lip = math.sin(i * 0.21 + t * 1.7) * 2.2 +
+            math.sin(i * 0.07 - t * 0.9) * 2.6;
+        fillRect(f, i, top + lip, 4, 6, rgba(238, 240, 232, 0.93));
+      }
+      // and it runs down the glass from where it first hit
+      for (var i = 0; i < 7; i++) {
+        final double rx = ((i * 71) % 311) / 311 * _fw;
+        final double rl = 10 + ((i * 53) % 37).toDouble() * climb;
+        fillRect(f, rx, top - rl, 2.5, rl, rgba(238, 240, 232, 0.55));
+      }
+    }
     if (act.masked && act.stage == 0) {
       fillRect(f, 0, 0, _fw, _fh, rgba(0, 0, 0, 0.55));
       final n = noiseTile(t, 30);
