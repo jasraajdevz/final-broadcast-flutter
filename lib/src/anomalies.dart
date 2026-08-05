@@ -604,6 +604,9 @@ class AnomalyRuntime extends ChangeNotifier {
   /// Seconds until the next thing lands on the tube. NIGHTMARE only.
   double _glassIn = 4;
 
+  /// Seconds until the room makes a noise. NIGHTMARE only.
+  double _roomIn = 2;
+
   /// Registered by the ad-break controller. If null, the spot is skipped and
   /// `done` fires immediately.
   PlayAdFn? playAd;
@@ -2788,8 +2791,22 @@ class AnomalyRuntime extends ChangeNotifier {
     // The floor under the room. Dread sets the bed; an anomaly on the tube
     // pushes it most of the way up on its own, so the room gets HEAVY the
     // moment something is present even on a calm night.
+    // NIGHTMARE'S BED NEVER LETS GO.
+    //
+    // Everywhere else the floor under the room falls back to nothing between
+    // arrivals — that recovery is what makes the next one land, and removing
+    // it would ruin the normal game. Here it is exactly what should be taken
+    // away: the sub never returns below 0.42, so there is no moment in a
+    // nightmare run where the room sounds like a room.
+    //
+    // Cheap in DSP terms and the single biggest difference in how long a
+    // session is bearable, which is the honest reason it is in the audio and
+    // not in the blood.
     audio.setSub(math.min(
-        1.0, s.dread / 100 * 0.75 + (active != null && active!.stage >= 1 ? 0.55 : 0)));
+        1.0,
+        (s.nightmare ? 0.42 : 0.0) +
+            s.dread / 100 * 0.75 +
+            (active != null && active!.stage >= 1 ? 0.55 : 0)));
 
     // THE STATION CHECKS. Runs on its own clock, deliberately unsynchronised
     // with the anomaly scheduler — the collision is the interesting part.
@@ -3041,6 +3058,26 @@ class AnomalyRuntime extends ChangeNotifier {
   }
 
   void _simulate(double dt) {
+    // AND SOMETHING IS ALWAYS IN THE ROOM WITH YOU.
+    //
+    // The presence system already puts something behind the chair, rarely, and
+    // takes it away again. In NIGHTMARE it does not leave: a breath every few
+    // seconds from a side that keeps changing, and a whisper or a creak on top
+    // of it. The side changing is the part that works — a sound that stays put
+    // becomes furniture, and one that moves is being made by something.
+    if (s.nightmare) {
+      _roomIn -= dt;
+      if (_roomIn <= 0) {
+        _roomIn = 3.4 - (s.dread / 100) * 1.9;
+        audio.breath(rand() < 0.5 ? -1 : 1, 0.55 + (s.dread / 100) * 0.4);
+        if (rand() < 0.34) {
+          rand() < 0.5 ? audio.whisper() : audio.creak();
+        }
+      }
+      // and a heart that is not yours, because yours does not run at 104
+      audio.setHeart(96 + (s.dread / 100) * 34, 0.16 + (s.dread / 100) * 0.20);
+    }
+
     // NIGHTMARE: THE GLASS KEEPS TAKING IT.
     //
     // The mode's promise is that it does not stop, so the marks cannot only
@@ -3053,7 +3090,10 @@ class AnomalyRuntime extends ChangeNotifier {
       _glassIn -= dt;
       if (_glassIn <= 0) {
         _glassIn = 5.5 - (s.dread / 100) * 3.4;
-        blood.addGlass(0.28 + (s.dread / 100) * 0.6);
+        final double f = 0.28 + (s.dread / 100) * 0.6;
+        blood.addGlass(f);
+        // heard before it is found, which is worth more than seen
+        audio.bloodImpact(0.35 + f * 0.5);
       }
     }
 

@@ -249,6 +249,42 @@ void main() {
           reason: 'losing one kill is not a loss worth scoring');
     });
   });
+
+  test('NIGHTMARE never lets the room go quiet', () {
+    // Everywhere else the floor under the room falls back to nothing between
+    // arrivals, and that recovery is what makes the next one land. Here it is
+    // exactly what gets taken away — there is no moment in a nightmare run
+    // where the room sounds like a room.
+    //
+    // This is the single biggest difference in how long a session is bearable
+    // and it costs almost nothing in DSP, which is the honest reason it lives
+    // in the audio rather than in the blood.
+    double lowestSub(bool nightmare) {
+      seedRandom(31);
+      final s = GameState()
+        ..night = 2
+        ..nightmare = nightmare;
+      for (final p in kProducers) {
+        s.prod[p.id] = 0;
+      }
+      final probe = _SubProbe();
+      final r = AnomalyRuntime(s, audio: probe);
+      r.startBroadcast();
+      for (var i = 0; i < 30 * 60; i++) {
+        mindTheDesk(r);
+        r.tick(1 / 30.0);
+        if (r.lost) break;
+      }
+      return probe.lowest;
+    }
+
+    expect(lowestSub(false), lessThan(0.05),
+        reason: 'a normal night never gets quiet, so nothing is being taken '
+            'away in nightmare');
+    expect(lowestSub(true), greaterThan(0.35),
+        reason: 'the nightmare room goes quiet, which is the one thing it must '
+            'never do');
+  });
 }
 
 // --- appended: the screams -------------------------------------------------
@@ -258,3 +294,19 @@ void main() {
 // FAILED. A competent operator finished an entire career without hearing a
 // single one, and spent every night in a pleasant hum. The horror was gated
 // behind losing, which is the one state a good player never reaches.
+
+
+/// Records the quietest the floor under the room ever gets.
+///
+/// PER INSTANCE, not static. The first version held `lowest` in a static
+/// because NullAudio is const, so the second measurement inherited the first
+/// one's minimum and the nightmare case read 0.0 — a probe that carries state
+/// between the two things it is comparing measures neither.
+class _SubProbe extends NullAudio {
+  _SubProbe();
+  double lowest = 9;
+  @override
+  void setSub(double v) {
+    if (v < lowest) lowest = v;
+  }
+}
