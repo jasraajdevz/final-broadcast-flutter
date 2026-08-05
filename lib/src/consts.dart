@@ -954,7 +954,8 @@ const double kAdSkipAt = 5;
 // ---------------------------------------------------------------------------
 
 const String kBootStationLine =
-    'STATION KBLK-7  ·  1,140 kHz  ·  LICENSE REVOKED 1987';
+    'STATION KBLK-7  ·  1,140 kHz  ·  LICENSE REVOKED 1987  ·  '
+    'ARE U HAVING SOME ADHD RN!?';
 const String kBootTitle = 'FINAL BROADCAST';
 const String kBootBody1 =
     'You have the night shift. Keep the carrier up, keep the numbers climbing — '
