@@ -10137,8 +10137,8 @@ else if(m>1)m=1
 a0=A.c_(c4,c4,A.m(96,104,96,m),c4,c4,c4,c4,c4,"Courier New",B.T,c4,15,c4,c4,B.H,c4,c4,!0,c4,c4,c4,c4,c4,c4,c4,c4)
 a1=k+j*0.4
 j=$.hf()
-A.bV(c6,"SORRY I",new A.h(160,a1),a0,B.ab,j)
-A.bV(c6,"MISSED YOU",new A.h(160,a1+17),a0,B.ab,j)}}if(n.a!=="dead"){a2=A.mc(c9,26)
+A.bV(c6,"TWO PINTS",new A.h(160,a1),a0,B.ab,j)
+A.bV(c6,"LIKE ALWAYS",new A.h(160,a1+17),a0,B.ab,j)}}if(n.a!=="dead"){a2=A.mc(c9,26)
 if(a2!=null){n=0.06+o*0.2
 if(n<0)n=0
 else if(n>1)n=1
