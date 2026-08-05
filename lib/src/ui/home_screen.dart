@@ -27,6 +27,7 @@ class HomeScreen extends StatelessWidget {
     required this.onSignOn,
     required this.onManual,
     required this.onEndless,
+    required this.onNightmare,
     required this.onSetup,
   });
 
@@ -34,6 +35,7 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onSignOn;
   final VoidCallback onManual;
   final VoidCallback onEndless;
+  final VoidCallback onNightmare;
   final VoidCallback onSetup;
 
   bool get _returning => s.started && (s.night > 1 || s.survived > 0);
@@ -171,6 +173,22 @@ class HomeScreen extends StatelessWidget {
                         ? 'NO 06:00  ·  BEST ${_mmss(s.bestEndless)}'
                         : 'NO 06:00. IT JUST KEEPS GOING.',
                     onTap: onEndless,
+                  ),
+                  const SizedBox(height: 8),
+                  // NIGHTMARE.
+                  //
+                  // Behind a warning, and the warning is the point. What this
+                  // turns up is the blood and the sounds, not the numbers —
+                  // the glass stops being clean and has to be wiped by hand
+                  // while everything else is still falling.
+                  //
+                  // Offered further down than THE LONG SHIFT and last of the
+                  // three, because nobody should arrive at it by accident.
+                  _Secondary(
+                    ui: s.ui,
+                    label: 'NIGHTMARE',
+                    sub: 'GRAPHIC · NO 06:00 · WIPE THE GLASS YOURSELF',
+                    onTap: onNightmare,
                   ),
                   const SizedBox(height: 8),
                 ],

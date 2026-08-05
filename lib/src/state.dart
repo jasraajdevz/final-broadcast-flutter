@@ -429,6 +429,12 @@ class GameState extends ChangeNotifier {
   /// of a run, because a mode is a choice made at the door.
   bool endless = false;
 
+  /// NIGHTMARE. Endless, harder, and the glass stops being clean.
+  ///
+  /// Opt-in only, behind a warning, because what it turns up is the blood and
+  /// the sounds rather than the numbers.
+  bool nightmare = false;
+
   /// Longest endless run, in real seconds. The only score in the game that
   /// goes UP, and it is a duration rather than a currency.
   double bestEndless = 0;

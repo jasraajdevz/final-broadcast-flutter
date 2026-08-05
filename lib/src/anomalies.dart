@@ -593,7 +593,8 @@ class AnomalyRuntime extends ChangeNotifier {
   /// count what the county heard instead of you. This replaced the economy
   /// that used to sit at the middle of this loop — see desk.dart, and
   /// test/demand_test.dart for the measurement that forced it.
-  late final Rig rig = Rig(s.night, endless: s.endless);
+  late final Rig rig =
+      Rig(s.night, endless: s.endless || s.nightmare);
 
   /// Wall time until which the operator's hands are committed. Feeds the BUSY
   /// term of the rig's strain, which is its largest — difficulty arrives as
@@ -1394,6 +1395,7 @@ class AnomalyRuntime extends ChangeNotifier {
     wrongFx = 1;
     // A fumble puts a little of it on the glass too. Being wrong should cost
     // something you can SEE for the rest of the night, not just a number.
+    if (s.nightmare) blood.addGlass(0.5);
     blood.add(0.12,
         ox: kScr.center.dx + (rand() - 0.5) * 500,
         oy: kScr.bottom + 30 + rand() * 80,
@@ -3064,9 +3066,9 @@ class AnomalyRuntime extends ChangeNotifier {
     // promise about a system that no longer exists. These three are the rig's
     // own dials and are what the faces now name.
     final card = cardOf(s);
-    rig.decayMul = card.decay;
-    rig.cardDriftMul = card.drift;
-    rig.ceilingMul = card.ceiling;
+    rig.decayMul = card.decay * (s.nightmare ? 1.30 : 1.0);
+    rig.cardDriftMul = card.drift * (s.nightmare ? 1.35 : 1.0);
+    rig.ceilingMul = card.ceiling * (s.nightmare ? 0.70 : 1.0);
 
     rig.recoveryScale = ((s.ups['failsafe'] ?? false) ? 1.6 : 0.8) *
         recordDecayMul(s) *

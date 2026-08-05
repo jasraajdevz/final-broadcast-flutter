@@ -16,7 +16,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(MaterialApp(
       home: Material(
-        child: HomeScreen(s: s, onSignOn: () {}, onManual: () {}, onEndless: () {}, onSetup: () {}),
+        child: HomeScreen(s: s, onSignOn: () {}, onManual: () {}, onEndless: () {}, onNightmare: () {}, onSetup: () {}),
       ),
     ));
     await tester.pump(const Duration(milliseconds: 16));

@@ -97,7 +97,65 @@ class BloodLayer {
   final List<({double x, double y, double r, double seed})> trail =
       <({double x, double y, double r, double seed})>[];
 
+  /// ON THE TUBE ITSELF, and only in NIGHTMARE.
+  ///
+  /// Every other mark in this game is kept OFF the screen on purpose — that
+  /// was a real bug once, blood spawning at kScr.center and covering the one
+  /// thing the player has to read, and it was fixed by clipping the tube out.
+  ///
+  /// This is the same thing done deliberately and made answerable: it lands on
+  /// the glass, it occludes the picture, and THE OPERATOR CAN WIPE IT OFF with
+  /// a hand. That turns an obstruction into a fifth thing competing for two
+  /// hands, which is the design the rest of the rewrite is built on, rather
+  /// than into the game hiding the keys from you.
+  ///
+  /// It never fully clears. Wiping thins a mark and smears what is left.
+  final List<({double x, double y, double r, double seed, double a})> glass =
+      <({double x, double y, double r, double seed, double a})>[];
+
+  /// Something got on the glass. NIGHTMARE only.
+  void addGlass(double force) {
+    final int n = 2 + (force * 4).round();
+    for (var i = 0; i < n; i++) {
+      glass.add((
+        x: kScr.left + rand() * kScr.width,
+        y: kScr.top + rand() * kScr.height,
+        r: (14 + rand() * 46) * (0.6 + force),
+        seed: rand(),
+        a: 0.34 + force * 0.34,
+      ));
+    }
+    while (glass.length > 26) {
+      glass.removeAt(0);
+    }
+  }
+
+  /// A hand goes across the tube. Thins anything under it and leaves the rest
+  /// dragged — a wiped screen is never a clean screen.
+  void wipe(double x, double y) {
+    for (var i = glass.length - 1; i >= 0; i--) {
+      final g = glass[i];
+      final double d =
+          math.sqrt((g.x - x) * (g.x - x) + (g.y - y) * (g.y - y));
+      if (d > 62) continue;
+      final double cut = (1 - d / 62) * 0.55;
+      final double left = g.a - cut;
+      if (left <= 0.05) {
+        glass.removeAt(i);
+      } else {
+        glass[i] = (
+          x: g.x + (g.x - x) * 0.05,
+          y: g.y + (g.y - y) * 0.05,
+          r: g.r * 1.04,
+          seed: g.seed,
+          a: left,
+        );
+      }
+    }
+  }
+
   void clear() {
+    glass.clear();
     splats.clear();
     hands.clear();
     trail.clear();
@@ -262,6 +320,23 @@ void drawBlood(ui.Canvas g, BloodLayer b, double t) {
     _hand(g, h);
   }
   g.restore();
+  // AND THEN, IN NIGHTMARE ONLY, THE PART THAT IS ON THE TUBE.
+  //
+  // Drawn last and deliberately outside the clip that protects the screen
+  // everywhere else, because here it is supposed to be in the way — and it is
+  // answerable, which is the difference. b.wipe() takes it off.
+  for (final s in b.glass) {
+    final ui.Paint p = ui.Paint()
+      ..color = rgba(96, 8, 8, s.a)
+      ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 2.2);
+    g.drawCircle(ui.Offset(s.x, s.y), s.r * 0.5, p);
+    // it does not sit still on a vertical piece of glass
+    final double run = 8 + s.seed * 34 * s.a;
+    g.drawRect(
+        ui.Rect.fromLTWH(s.x - s.r * 0.10, s.y, s.r * 0.20, run),
+        ui.Paint()..color = rgba(84, 6, 6, s.a * 0.75));
+  }
+
 }
 
 /// A palm and four fingers, smeared downward. Deliberately a little too big

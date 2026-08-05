@@ -265,7 +265,28 @@ class _GameRootState extends State<GameRoot>
         p.dx <= kScr.right &&
         p.dy >= kScr.top &&
         p.dy <= kScr.bottom) {
+      runtime.blood.wipe(p.dx, p.dy);
       runtime.tuneStrike(p.dx, p.dy);
+    }
+  }
+
+  /// A HAND ACROSS THE GLASS.
+  ///
+  /// In NIGHTMARE the tube gets marked and the marks occlude the picture. This
+  /// is how they come off: drag over them. It thins what is under the hand and
+  /// smears the rest outward, so a wiped screen is never a clean screen — it
+  /// is a screen somebody has wiped.
+  ///
+  /// Mechanically it is a fifth thing competing for two hands, which is the
+  /// point. The alternative — an obstruction with no answer — is the game
+  /// hiding the keys from the player, and their death has to stay their own.
+  void _onPointerMove(PointerMoveEvent e) {
+    final p = e.localPosition;
+    if (p.dx >= kScr.left &&
+        p.dx <= kScr.right &&
+        p.dy >= kScr.top &&
+        p.dy <= kScr.bottom) {
+      runtime.blood.wipe(p.dx, p.dy);
     }
   }
 
@@ -447,6 +468,13 @@ class _GameRootState extends State<GameRoot>
     _signOn();
   }
 
+  /// NIGHTMARE. Endless, harder, and the tube gets marked.
+  void _signOnNightmare() {
+    s.endless = true;
+    s.nightmare = true;
+    _signOn();
+  }
+
   void _closeLog() {
     runtime.paused = false;
     setState(() => _pendingLog = null);
@@ -612,6 +640,7 @@ class _GameRootState extends State<GameRoot>
                   cursor: SystemMouseCursors.precise,
                   child: Listener(
                     onPointerDown: _onPointerDown,
+            onPointerMove: _onPointerMove,
                     behavior: HitTestBehavior.opaque,
                     child: AnimatedBuilder(
                       animation: runtime,
@@ -806,6 +835,7 @@ class _GameRootState extends State<GameRoot>
                       onSignOn: _signOn,
                       onManual: _openManual,
                       onEndless: _signOnEndless,
+                      onNightmare: _signOnNightmare,
                       onSetup: () => setState(() => _showSetup = true),
                     )),
               // THE LINE-UP CARD sits on top of the home screen, because a
