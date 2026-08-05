@@ -105,8 +105,21 @@ class HomeScreen extends StatelessWidget {
                 // bigger numbers": every night after the first has a name and
                 // a shape, and you know both before you sign on.
                 if (s.night > 1) _Card(ui: s.ui, night: s.night),
-                if (s.night > 1) const SizedBox(height: 11),
+                if (s.night > 1) const SizedBox(height: 9),
                 if (s.night <= 1) const SizedBox(height: 6),
+                // THE CONTENT WARNING GOES ABOVE THE BUTTON THAT STARTS IT.
+                //
+                // It used to sit at the very bottom, under the buttons and
+                // under the settings link, which put it below the fold on a
+                // 720-high screen — reachable by a scroll nobody thinks to
+                // try on a screen that looks finished. A warning about
+                // flashing images is the one line here that has to be read
+                // BEFORE the thing it warns about, and it is the one line
+                // that was hardest to reach.
+                Text(kBootFine,
+                    textAlign: TextAlign.center,
+                    style: t.at(9, K.bootFine, ls: 2)),
+                const SizedBox(height: 9),
                 _Big(
                   ui: s.ui,
                   label: _returning ? 'TAKE THE NIGHT SHIFT' : 'SIGN ON',
@@ -160,10 +173,6 @@ class HomeScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: t.at(12, K.bootBody, h: 1.9),
                 ),
-                const SizedBox(height: 8),
-                Text(kBootFine,
-                    textAlign: TextAlign.center,
-                    style: t.at(9, K.bootFine, ls: 2)),
               ],
                       ),
                     ),
