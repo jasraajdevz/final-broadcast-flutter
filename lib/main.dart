@@ -139,6 +139,9 @@ class _GameRootState extends State<GameRoot>
   double _saveAcc = 0;
 
   bool _manualOpen = false;
+
+  /// The rack, as an overlay, on a layout too narrow to give it a column.
+  bool _rackOpen = false;
   String? _kbDown;
   Timer? _kbTimer;
   _PendingConfirm? _confirm;
@@ -463,11 +466,28 @@ class _GameRootState extends State<GameRoot>
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints box) {
         final w = box.maxWidth, h = box.maxHeight;
-        final scale = math.min(w / kCabW, h / kCabH);
+        // NARROW: DROP THE RACK AND GIVE ITS WIDTH TO THE PICTURE.
+        //
+        // The cabinet is 1280 wide, of which 940 is the status strip, the room
+        // and the deck — everything you need to work the desk — and the right
+        // 340 is the equipment rack, which is a shop you visit between
+        // arrivals. On a 390-wide phone the whole 1280 scales to 0.30 and the
+        // deck keys land at about four millimetres. Laying out only the 940
+        // scales to 0.41, a 36% bigger picture, and costs nothing that is
+        // needed WHILE the transmitter is running.
+        //
+        // This is the cheap half of a mobile layout and it is honest about
+        // being that: the rack becomes an overlay behind a tab rather than a
+        // column, and the room's own geometry is untouched, because kScr and
+        // everything the painters draw against it are baked at fixed
+        // coordinates inside kRoom. Reflowing THOSE is the expensive half.
+        final bool narrow = w / h < 1.15 || w < 900;
+        final double cabW = narrow ? kRoom.width : kCabW;
+        final scale = math.min(w / cabW, h / kCabH);
         // Centre explicitly. The HTML has a comment about why grid/flex
         // centring cannot do this; Transform.scale from the top-left plus an
         // arithmetic offset is the same fix.
-        final dx = (w - kCabW * scale) / 2;
+        final dx = (w - cabW * scale) / 2;
         final dy = (h - kCabH * scale) / 2;
         final portrait = h > w;
         final tight = math.min(w, h) < 560;
@@ -493,7 +513,7 @@ class _GameRootState extends State<GameRoot>
             Positioned(
               left: dx,
               top: dy,
-              width: kCabW * scale,
+              width: cabW * scale,
               height: kCabH * scale,
               // BoxFit.fill onto a box of exactly kCabW:kCabH aspect is a
               // uniform scale, and FittedBox lays the cabinet out at its own
@@ -504,9 +524,9 @@ class _GameRootState extends State<GameRoot>
               child: FittedBox(
                 fit: BoxFit.fill,
                 child: SizedBox(
-                  width: kCabW,
+                  width: cabW,
                   height: kCabH,
-                  child: _cabinet(),
+                  child: _cabinet(narrow),
                 ),
               ),
             ),
@@ -572,7 +592,7 @@ class _GameRootState extends State<GameRoot>
     ];
   }
 
-  Widget _cabinet() {
+  Widget _cabinet(bool narrow) {
     return Focus(
       focusNode: _focus,
       autofocus: true,
@@ -629,8 +649,55 @@ class _GameRootState extends State<GameRoot>
               ),
 
               // --- equipment rack ---
-              Positioned(
-                left: kRackRect.left,
+              // Not laid out at all when narrow: the cabinet is only 940 wide
+              // there, so a panel at x=940 would be off the edge. It is
+              // reachable as an overlay instead.
+              // On a narrow layout it opens over the room instead, behind a
+              // tab on the right edge. Everything in it is a between-arrivals
+              // decision, so covering the picture to read it costs nothing the
+              // player needs at that moment.
+              if (narrow) ...<Widget>[
+                Positioned(
+                  right: 0,
+                  top: kStatusRect.height + 8,
+                  width: 26,
+                  height: 132,
+                  child: Pressable(
+                    onTap: () => setState(() => _rackOpen = !_rackOpen),
+                    builder: (_, bool hover, bool down) => Container(
+                      decoration: BoxDecoration(
+                        color: down || _rackOpen ? K.tabOnBg : K.tabBg,
+                        border: Border.all(color: K.itemBorder),
+                      ),
+                      child: RotatedBox(
+                        quarterTurns: 1,
+                        child: Center(
+                          child: Text(_rackOpen ? 'CLOSE' : 'HARDWARE',
+                              style: mono(11, hover ? K.green : K.tabInk)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_rackOpen)
+                  Positioned(
+                    left: 0,
+                    top: kStatusRect.height,
+                    width: kRoom.width,
+                    height: kCabH - kStatusRect.height,
+                    child: AnimatedBuilder(
+                      animation: _uiListen,
+                      builder: (_, _) => ColoredBox(
+                        color: K.panel,
+                        child: Rack(
+                            s: s, runtime: runtime, confirm: _showConfirm),
+                      ),
+                    ),
+                  ),
+              ],
+              if (!narrow)
+                Positioned(
+                  left: kRackRect.left,
                 top: kRackRect.top,
                 width: kRackRect.width,
                 height: kRackRect.height,
