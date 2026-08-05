@@ -94,10 +94,13 @@ class GameRoot extends StatefulWidget {
 }
 
 class _PendingConfirm {
-  const _PendingConfirm(this.message, this.onYes, this.danger);
+  const _PendingConfirm(this.message, this.onYes, this.danger,
+      {this.yesLabel = 'OK', this.noLabel = 'CANCEL'});
   final String message;
   final VoidCallback onYes;
   final bool danger;
+  final String yesLabel;
+  final String noLabel;
 }
 
 class _GameRootState extends State<GameRoot>
@@ -494,6 +497,8 @@ class _GameRootState extends State<GameRoot>
         _signOn();
       },
       danger: true,
+      yesLabel: 'I AGREE — I AM 18 OR OVER',
+      noLabel: 'NO — TAKE ME BACK',
     );
   }
 
@@ -503,8 +508,12 @@ class _GameRootState extends State<GameRoot>
     runtime.startBroadcast();
   }
 
-  void _showConfirm(String message, VoidCallback onYes, {bool danger = false}) {
-    setState(() => _confirm = _PendingConfirm(message, onYes, danger));
+  void _showConfirm(String message, VoidCallback onYes,
+      {bool danger = false,
+      String yesLabel = 'OK',
+      String noLabel = 'CANCEL'}) {
+    setState(() => _confirm = _PendingConfirm(message, onYes, danger,
+        yesLabel: yesLabel, noLabel: noLabel));
   }
 
   // -------------------------------------------------------------------------
@@ -834,22 +843,6 @@ class _GameRootState extends State<GameRoot>
                 Positioned.fill(
                   child: EndSheet(s: s, runtime: runtime),
                 ),
-              if (_confirm != null)
-                Positioned.fill(
-                  child: ModalScrim(
-                    child: ConfirmSheet(
-                      ui: s.ui,
-                      message: _confirm!.message,
-                      danger: _confirm!.danger,
-                      onYes: () {
-                        final yes = _confirm!.onYes;
-                        setState(() => _confirm = null);
-                        yes();
-                      },
-                      onNo: () => setState(() => _confirm = null),
-                    ),
-                  ),
-                ),
               if (!runtime.signedOn)
                 Positioned.fill(
                     child: HomeScreen(
@@ -869,6 +862,33 @@ class _GameRootState extends State<GameRoot>
                     s: s,
                     runtime: runtime,
                     onDone: () => setState(() => _showSetup = false),
+                  ),
+                ),
+              // LAST IN THE STACK, DELIBERATELY.
+              //
+              // This sat above the home screen and NIGHTMARE shipped
+              // unenterable: pressing the button set _confirm, the sheet was
+              // built, and then Positioned.fill(HomeScreen) painted straight
+              // over it and ate the pointer. The gate existed and was
+              // invisible. A confirmation is by definition the topmost thing
+              // on screen — anything that can cover it is a way to answer a
+              // question the player was never shown.
+              if (_confirm != null)
+                Positioned.fill(
+                  child: ModalScrim(
+                    child: ConfirmSheet(
+                      ui: s.ui,
+                      message: _confirm!.message,
+                      danger: _confirm!.danger,
+                      yesLabel: _confirm!.yesLabel,
+                      noLabel: _confirm!.noLabel,
+                      onYes: () {
+                        final yes = _confirm!.onYes;
+                        setState(() => _confirm = null);
+                        yes();
+                      },
+                      onNo: () => setState(() => _confirm = null),
+                    ),
                   ),
                 ),
             ],

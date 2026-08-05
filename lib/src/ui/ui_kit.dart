@@ -389,6 +389,8 @@ class ConfirmSheet extends StatelessWidget {
     required this.onYes,
     required this.onNo,
     this.danger = false,
+    this.yesLabel = 'OK',
+    this.noLabel = 'CANCEL',
   });
 
   final double ui;
@@ -396,6 +398,12 @@ class ConfirmSheet extends StatelessWidget {
   final VoidCallback onYes;
   final VoidCallback onNo;
   final bool danger;
+
+  /// NIGHTMARE overrides these. A content warning that is dismissed with a
+  /// button reading OK has not been agreed to — the player has acknowledged a
+  /// dialog. The word has to be the one they are being asked to mean.
+  final String yesLabel;
+  final String noLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -416,9 +424,23 @@ class ConfirmSheet extends StatelessWidget {
             ),
             child: Text('CONFIRM', style: t.at(17, K.amber, ls: 3)),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
-            child: Text(message, style: t.at(15, K.fldVal, h: 1.6)),
+          // THE MESSAGE SCROLLS; THE BUTTONS DO NOT.
+          //
+          // Every confirmation in the game was one short line until the
+          // NIGHTMARE content warning, which is nine — and a fixed Column
+          // overflowed a 1280x720 cabinet by 251px, taking the bottom of the
+          // warning and BOTH buttons off the sheet with it. A warning you
+          // cannot finish reading in front of a button you cannot reach is
+          // worse than no warning, because it looks like one.
+          //
+          // Flexible caps the text at whatever is left after the header and
+          // the buttons have taken theirs, so those two are always on screen
+          // no matter how long the message or how large the TEXT SIZE.
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+              child: Text(message, style: t.at(15, K.fldVal, h: 1.6)),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
@@ -437,7 +459,7 @@ class ConfirmSheet extends StatelessWidget {
                         border: Border.all(
                             color: danger ? K.lostBorder : UX.bigBtnBorder),
                       ),
-                      child: Text('OK',
+                      child: Text(yesLabel,
                           style: t.at(14, danger ? UX.acceptInk : K.amber,
                               ls: 1.5)),
                     ),
@@ -454,8 +476,7 @@ class ConfirmSheet extends StatelessWidget {
                         color: hover ? UX.mrowHoverBg : UX.sheetHeadBg,
                         border: Border.all(color: K.sheetBorder),
                       ),
-                      child:
-                          Text('CANCEL', style: t.at(14, K.ink, ls: 1.5)),
+                      child: Text(noLabel, style: t.at(14, K.ink, ls: 1.5)),
                     ),
                   ),
                 ),
