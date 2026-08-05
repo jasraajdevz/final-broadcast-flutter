@@ -105,7 +105,7 @@ class HomeScreen extends StatelessWidget {
                 // bigger numbers": every night after the first has a name and
                 // a shape, and you know both before you sign on.
                 if (s.night > 1) _Card(ui: s.ui, night: s.night),
-                if (s.night > 1) const SizedBox(height: 9),
+                if (s.night > 1) const SizedBox(height: 7),
                 if (s.night <= 1) const SizedBox(height: 6),
                 // THE CONTENT WARNING GOES ABOVE THE BUTTON THAT STARTS IT.
                 //
@@ -119,7 +119,7 @@ class HomeScreen extends StatelessWidget {
                 Text(kBootFine,
                     textAlign: TextAlign.center,
                     style: t.at(9, K.bootFine, ls: 2)),
-                const SizedBox(height: 9),
+                const SizedBox(height: 7),
                 _Big(
                   ui: s.ui,
                   label: _returning ? 'TAKE THE NIGHT SHIFT' : 'SIGN ON',
@@ -163,7 +163,7 @@ class HomeScreen extends StatelessWidget {
                   label: 'AUDIO / SCREEN CHECK',
                   onTap: onSetup,
                 ),
-                const SizedBox(height: 11),
+                const SizedBox(height: 9),
                 Text(
                   _returning
                       ? 'The eight keys under the tube are the only thing that '
