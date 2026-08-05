@@ -436,19 +436,21 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         final double rl = 10 + ((i * 53) % 37).toDouble() * climb;
         fillRect(f, rx, top - rl, 2.5, rl, rgba(238, 240, 232, 0.55));
       }
-      // TWO PINTS / LIKE ALWAYS
+      // I DID NOT / BRING THIS
       //
-      // SORRY I MISSED YOU was the first attempt and it read as a dad joke:
-      // mundane in the wrong direction, a note about a doorstep. The horror in
-      // a milkman is not that he called round. It is that he knows the size of
-      // the household.
+      // The words have to do the work here, because clean white fluid climbing
+      // a screen has an obvious reading and it is not dread. Two earlier goes
+      // failed in different directions: SORRY I MISSED YOU was a note about a
+      // doorstep, mundane in the wrong way, and TWO PINTS LIKE ALWAYS was a
+      // joke about the size of the household.
       //
-      // There is one operator at this station. There has been one operator at
-      // this station every night since 1963. He leaves two, he has always left
-      // two, and he has never once been corrected — which means either he is
-      // wrong about the building, or he is not, and the thing the presence
-      // system has been putting in the room behind the chair all along has
-      // been getting its share.
+      // This is the delivery man disclaiming the delivery. He came, he wrote
+      // on the inside of the glass, and the first thing he wanted the operator
+      // to know is that whatever is filling the tube is not his and he did not
+      // put it there.
+      //
+      // Which makes him a witness rather than the source, leaves the stuff on
+      // the screen unexplained, and means something else got here first.
       //
       // Nothing anywhere else in the game mentions it.
       //
@@ -462,9 +464,9 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         final TextStyle hand = mono(15, rgba(96, 104, 96, 0.30 + ink * 0.55),
             weight: FontWeight.bold);
         final double mid = top + (_fh - top) * 0.40;
-        fillText(f, 'TWO PINTS', ui.Offset(_fw / 2, mid), hand,
+        fillText(f, 'I DID NOT', ui.Offset(_fw / 2, mid), hand,
             anchor: TextAnchor.center, cache: feedText);
-        fillText(f, 'LIKE ALWAYS', ui.Offset(_fw / 2, mid + 17), hand,
+        fillText(f, 'BRING THIS', ui.Offset(_fw / 2, mid + 17), hand,
             anchor: TextAnchor.center, cache: feedText);
       }
     }
