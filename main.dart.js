@@ -46260,7 +46260,7 @@ A.WQ.prototype={
 $1(a){return a},
 $S:184}
 A.WR.prototype={
-$2(a,b){var s,r,q,p=null,o=this.b,n=this.a,m=n.c,l=t.p,k=A.b([A.P("STATION KBLK-7  \xb7  1,140 kHz  \xb7  LICENSE REVOKED 1987",p,p,p,o.ae(11,B.ih,8),B.a6),B.aV,new A.Oz(m.k1,p),B.dl],l)
+$2(a,b){var s,r,q,p=null,o=this.b,n=this.a,m=n.c,l=t.p,k=A.b([A.P("STATION KBLK-7  \xb7  1,140 kHz  \xb7  LICENSE REVOKED 1987  \xb7  ARE U HAVING SOME ADHD RN!?",p,p,p,o.ae(11,B.ih,8),B.a6),B.aV,new A.Oz(m.k1,p),B.dl],l)
 if(n.goH())k.push(new A.Lh(m,this.c,p))
 else k.push(new A.Js(m.k1,p))
 k.push(B.Tl)
