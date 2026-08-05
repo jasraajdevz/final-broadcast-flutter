@@ -636,6 +636,40 @@ class WindowScene {
       g.drawRect(ui.Rect.fromLTWH(wx + x * ww, wy + y * wh, sz, sz), flakeP);
     }
 
+    // SOMETHING HAS BEEN AT THE GLASS.
+    //
+    // The field already has lurkers that come closer across a night, which is
+    // horror at a distance — a thing out there, getting nearer. This is the
+    // other register, and the room needed it: evidence that the distance has
+    // ALREADY been closed at some point while the operator was looking at the
+    // tube.
+    //
+    // Handprints, on the OUTSIDE, in the condensation. They accumulate with
+    // dread and they never wipe off, so by 05:00 a bad night has a row of them
+    // and a clean one has none. Drawn UNDER the frost so they read as being in
+    // the moisture rather than painted on the room's side of the pane, and
+    // they are always at the same height, which is the part that does the
+    // work: whatever left them was standing.
+    //
+    // No toast, no sound, no archive entry. It is just there when you look.
+    final int prints = (s.dread / 18).floor().clamp(0, 5);
+    for (var i = 0; i < prints; i++) {
+      final double hx = wx + ww * (0.13 + ((i * 37) % 7) / 7 * 0.72);
+      final double hy = wy + wh * (0.30 + ((i * 23) % 3) / 3 * 0.08);
+      final double sc = ww * 0.052;
+      final ui.Paint smear = ui.Paint()
+        ..color = rgba(214, 228, 238, 0.20 + (i.isEven ? 0.05 : 0));
+      // the palm
+      _ellipse(g, hx, hy + sc * 0.55, sc * 0.42, sc * 0.50, smear);
+      // and four fingers, splayed, longer than they should be
+      for (var k = 0; k < 4; k++) {
+        final double a0 = -1.95 + k * 0.42;
+        final double fx = hx + math.cos(a0) * sc * 0.30;
+        final double fy = hy + sc * 0.25 + math.sin(a0) * sc * 0.30;
+        _ellipse(g, fx, fy, sc * 0.11, sc * 0.34, smear);
+      }
+    }
+
     // the pane itself: frost, condensation, and the lit room reflected in it
     final frost = _frost;
     if (frost != null) {
