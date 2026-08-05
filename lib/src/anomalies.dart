@@ -1529,7 +1529,23 @@ class AnomalyRuntime extends ChangeNotifier {
   /// lost write, but is just as wrong and is exactly as quiet.
   void bumpDread(double d) {
     rig.bump(d);
+    // AND NIGHTMARE HAS A FLOOR OF ITS OWN THAT ONLY RISES.
+    //
+    // _openNightmare() bumped dread 38 at sign-on and it was gone in SIX
+    // SECONDS — the rig recovers at 3x below its hold point, which is right
+    // everywhere else and useless as an opening here. Measured: the mode still
+    // started at 0 and took six minutes to leave single digits.
+    //
+    // A bump is a moment. This is a floor: 30 at the door, rising to 60 by the
+    // fourteen minute mark, and it never comes down. The operator who is
+    // coping still sees dread move — it just never returns to a room that is
+    // fine, because the room is not fine.
     s.dread = math.max(rig.dread, dreadFloor(s));
+    if (s.nightmare) {
+      final double nf = 30 +
+          (sessionSeconds() / (14 * 60)).clamp(0.0, 1.0) * 30;
+      if (s.dread < nf) s.dread = nf;
+    }
   }
 
   /// Wind the drive. A SETPOINT, not a pump — see the note at the top of
@@ -1720,6 +1736,8 @@ class AnomalyRuntime extends ChangeNotifier {
         // (was a third copy of what the marquee already says)
         .pushDelayed(1600, 'KBLK-7 IS ON AIR', ToastKind.gold);
     notifyListeners();
+    // LAST, because everything above resets the run and would wipe it.
+    _openNightmare();
   }
 
   // -------------------------------------------------------------------------
@@ -2390,6 +2408,19 @@ class AnomalyRuntime extends ChangeNotifier {
   /// The drums reached the licence allowance. Named, because a death the
   /// player cannot explain is a death they blame on the game, and every line
   /// on this invoice is something they watched happen.
+  /// NIGHTMARE DOES NOT START FROM CALM.
+  ///
+  /// Dread took six minutes of a ten minute run to leave single digits, which
+  /// meant the opening of the mode was a normal night with a worse palette.
+  /// The room is already wrong when the operator sits down; what they do from
+  /// there decides whether it gets worse.
+  void _openNightmare() {
+    if (!s.nightmare) return;
+    rig.bump(38);
+    blood.addGlass(0.55);
+    audio.setSub(0.7);
+  }
+
   void licenceVoid() {
     if (lost) return;
     if (s.endless && rig.t > s.bestEndless) s.bestEndless = rig.t;
@@ -3075,10 +3106,18 @@ class AnomalyRuntime extends ChangeNotifier {
     //
     // Everything below is driven by it and nothing announces it. The wipe just
     // stops working. The room just gets busier. The gaps just close.
+    // FOURTEEN MINUTES, NOT FORTY.
+    //
+    // Measured over a ten minute run at the forty minute curve: grip only
+    // fell to 0.80, so the wipe was still 80% effective at the point most
+    // people would have stopped playing, and the compounding I built to make
+    // duration bite did not bite inside a session anyone would sit through.
+    // A curve whose interesting part is beyond the median session length is
+    // not a curve, it is a footnote.
     final double sat = s.nightmare
-        ? (sessionSeconds() / (40 * 60)).clamp(0.0, 1.0)
+        ? (sessionSeconds() / (14 * 60)).clamp(0.0, 1.0)
         : 0.0;
-    blood.grip = 1.0 - sat * 0.92;
+    blood.grip = 1.0 - sat * 0.94;
 
     // AND IT KNOWS WHAT TIME IT IS WHERE YOU ARE.
     //
@@ -3134,9 +3173,20 @@ class AnomalyRuntime extends ChangeNotifier {
     // keep the transmitter inside its limits, and the way to lose the picture
     // is to already be losing.
     if (s.nightmare) {
+      // AND IT LANDS FROM THE FIRST MINUTE.
+      //
+      // This was gated behind dread and measured at 0-2 marks on the glass for
+      // the first SEVEN MINUTES of a ten minute run — the mechanic the mode is
+      // named for, the one the warning is about, absent for seventy percent of
+      // the session while dread crawled out of single digits. A signature
+      // mechanic that waits for a second system to warm up is not a signature
+      // mechanic.
+      //
+      // It is constant now, and dread and duration make it worse rather than
+      // make it exist.
       _glassIn -= dt;
       if (_glassIn <= 0) {
-        _glassIn = (5.5 - (s.dread / 100) * 3.4) * (1 - sat * 0.62);
+        _glassIn = (2.6 - (s.dread / 100) * 1.4) * (1 - sat * 0.55);
         final double f = 0.28 + (s.dread / 100) * 0.6;
         blood.addGlass(f);
         // heard before it is found, which is worth more than seen
@@ -3198,7 +3248,23 @@ class AnomalyRuntime extends ChangeNotifier {
     // and the lights, which is the exact class of bug the floor was written to
     // fix in the first place. Two writers to one field is a defect even when
     // both of them are right.
+    // AND NIGHTMARE HAS A FLOOR OF ITS OWN THAT ONLY RISES.
+    //
+    // _openNightmare() bumped dread 38 at sign-on and it was gone in SIX
+    // SECONDS — the rig recovers at 3x below its hold point, which is right
+    // everywhere else and useless as an opening here. Measured: the mode still
+    // started at 0 and took six minutes to leave single digits.
+    //
+    // A bump is a moment. This is a floor: 30 at the door, rising to 60 by the
+    // fourteen minute mark, and it never comes down. The operator who is
+    // coping still sees dread move — it just never returns to a room that is
+    // fine, because the room is not fine.
     s.dread = math.max(rig.dread, dreadFloor(s));
+    if (s.nightmare) {
+      final double nf = 30 +
+          (sessionSeconds() / (14 * 60)).clamp(0.0, 1.0) * 30;
+      if (s.dread < nf) s.dread = nf;
+    }
 
     if (rig.voided && !lost) {
       licenceVoid();
