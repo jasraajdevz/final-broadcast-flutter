@@ -436,24 +436,27 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
         final double rl = 10 + ((i * 53) % 37).toDouble() * climb;
         fillRect(f, rx, top - rl, 2.5, rl, rgba(238, 240, 232, 0.55));
       }
-      // SAPHORA.
+      // SORRY I / MISSED YOU
       //
-      // Written in it, from the inside. Not painted on top of the milk but
-      // drawn in the gap it leaves — the strokes are the picture showing
-      // through where a finger has been, which is why they darken as the milk
-      // deepens rather than brightening. It arrives once there is enough on
-      // the glass to write in, and it is gone with him.
+      // What a milkman writes on the card when nobody came to the door. It is
+      // the most ordinary sentence in the world and it is the wrong one: he
+      // did not miss you. You are sitting right here, you have been all night,
+      // and he has been close enough to write on the inside of the glass.
+      //
+      // Written IN the milk rather than on it — drawn in the gap it leaves, so
+      // the strokes are the picture showing through where a finger has been.
+      // That is why they DARKEN as the milk deepens instead of brightening,
+      // which is the whole difference between a word on the glass and a word
+      // in the milk. Two lines, because it is a note and not a sign.
       if (climb > 0.34) {
         final double ink = clampD((climb - 0.34) / 0.5, 0, 1);
-        fillText(
-          f,
-          'SAPHORA',
-          ui.Offset(_fw / 2, top + (_fh - top) * 0.42),
-          mono(19, rgba(96, 104, 96, 0.30 + ink * 0.55),
-              weight: FontWeight.bold),
-          anchor: TextAnchor.center,
-          cache: feedText,
-        );
+        final TextStyle hand = mono(15, rgba(96, 104, 96, 0.30 + ink * 0.55),
+            weight: FontWeight.bold);
+        final double mid = top + (_fh - top) * 0.40;
+        fillText(f, 'SORRY I', ui.Offset(_fw / 2, mid), hand,
+            anchor: TextAnchor.center, cache: feedText);
+        fillText(f, 'MISSED YOU', ui.Offset(_fw / 2, mid + 17), hand,
+            anchor: TextAnchor.center, cache: feedText);
       }
     }
     if (act.masked && act.stage == 0) {
