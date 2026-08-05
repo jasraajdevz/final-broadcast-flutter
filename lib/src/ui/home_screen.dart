@@ -177,9 +177,7 @@ class HomeScreen extends StatelessWidget {
                 _Secondary(
                   ui: s.ui,
                   label: "OPERATOR'S MANUAL",
-                  sub: _returning
-                      ? '$logged OF ${kAnoms.length} CATALOGUED  ·  KEY M'
-                      : 'READ IT FIRST  ·  KEY M',
+                  sub: _returning ? 'KEY M' : 'READ IT FIRST  ·  KEY M',
                   onTap: onManual,
                 ),
                 const SizedBox(height: 9),

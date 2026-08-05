@@ -63,8 +63,14 @@ class StatusBar extends StatelessWidget {
             value: rig.carrier.toStringAsFixed(0),
             valueColor: rig.lowPower ? K.red : K.green,
             valueSize: 17,
-            sub: 'DRIVE ${rig.drive.toStringAsFixed(0)}  UP/DN',
-            subColor: K.lbl,
+            subWidget: _Pads(
+              ui: s.ui,
+              label: 'DRIVE ${rig.drive.toStringAsFixed(0)}',
+              minus: '\u25BC',
+              plus: '\u25B2',
+              onMinus: () => runtime.trimDrive(-1),
+              onPlus: () => runtime.trimDrive(1),
+            ),
             below: Padding(
               padding: const EdgeInsets.only(top: 3),
               child: _Meter(
@@ -115,8 +121,14 @@ class StatusBar extends StatelessWidget {
             valueColor:
                 (rig.modulation - 50).abs() > kModGreen ? K.red : K.green,
             valueSize: 17,
-            sub: '< >',
-            subColor: K.lbl,
+            subWidget: _Pads(
+              ui: s.ui,
+              label: '',
+              minus: '\u25C0',
+              plus: '\u25B6',
+              onMinus: () => runtime.nudgeMod(-1),
+              onPlus: () => runtime.nudgeMod(1),
+            ),
             below: Padding(
               padding: const EdgeInsets.only(top: 3),
               child: _CentreMeter(value: (rig.modulation - 50) / 50),
@@ -200,6 +212,7 @@ class _Rdo extends StatelessWidget {
     required this.value,
     required this.valueColor,
     this.sub,
+    this.subWidget,
     this.subColor,
     this.below,
     this.minWidth = 112,
@@ -212,6 +225,12 @@ class _Rdo extends StatelessWidget {
   final String value;
   final Color valueColor;
   final String? sub;
+
+  /// Replaces [sub] with something tappable. THE DESK HAS TO BE USABLE
+  /// WITHOUT A KEYBOARD: drive and modulation were arrow-keys-only, which
+  /// made the whole game unplayable on a phone while every other control —
+  /// the eight counters, the tools, the manual — was already a button.
+  final Widget? subWidget;
   final Color? subColor;
   final Widget? below;
   final double minWidth;
@@ -265,7 +284,9 @@ class _Rdo extends StatelessWidget {
             style: t.at(valueSize, valueColor,
                 ls: 1, h: 1.15, sh: glow(valueColor, 8, 0.45)),
           ),
-          if (sub != null)
+          if (subWidget != null)
+            subWidget!
+          else if (sub != null)
             Text(sub!,
                 maxLines: 1,
                 softWrap: false,
@@ -449,6 +470,59 @@ class _CentreMeter extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+
+/// The two ends of a dial, as things you can actually put a finger on.
+///
+/// DRIVE and MODULATION were arrow-keys-only, which made the game unplayable
+/// on a phone while every other control in it — the eight counters, the five
+/// tools, the manual — was already a button. The strip was even labelling
+/// them "UP/DN" and "< >", which is a keyboard hint pretending to be a
+/// control. Now it is the control, and the keys still work.
+class _Pads extends StatelessWidget {
+  const _Pads({
+    required this.ui,
+    required this.label,
+    required this.minus,
+    required this.plus,
+    required this.onMinus,
+    required this.onPlus,
+  });
+
+  final double ui;
+  final String label;
+  final String minus;
+  final String plus;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Sty(ui);
+    Widget pad(String glyph, VoidCallback onTap) => Pressable(
+          onTap: onTap,
+          builder: (BuildContext _, bool hover, bool down) => Container(
+            padding: EdgeInsets.symmetric(horizontal: 5 * ui, vertical: 1),
+            margin: const EdgeInsets.only(right: 3),
+            decoration: BoxDecoration(
+              color: down ? K.tabOnBg : (hover ? K.tabBg : const Color(0x00000000)),
+              border: Border.all(color: K.itemBorder, width: 0.5),
+            ),
+            child: Text(glyph,
+                style: t.at(10, hover || down ? K.green : K.lbl, h: 1.2)),
+          ),
+        );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        pad(minus, onMinus),
+        pad(plus, onPlus),
+        if (label.isNotEmpty)
+          Text(label, maxLines: 1, softWrap: false, style: t.at(11, K.lbl)),
+      ],
     );
   }
 }
