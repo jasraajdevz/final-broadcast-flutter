@@ -270,6 +270,7 @@ class Deck extends StatelessWidget {
       sub = '×3 · 60s';
     }
     // .skey.ready — a 2.2s glow cycle
+    final bool signDue = runtime.checks.active != null;
     final pulse = ready
         ? 0.5 - 0.5 * math.cos(runtime.tGlobal / 2.2 * tau)
         : 0.0;
@@ -287,6 +288,35 @@ class Deck extends StatelessWidget {
               runtime.audio.init();
               runtime.audio.resume();
               runtime.takeSponsor();
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        // THE BOOK, AS A THING YOU CAN PUT A FINGER ON.
+        //
+        // Signing was ENTER and nothing else, and the hour comes due every
+        // sixty seconds and costs twenty seconds of licence when it is missed.
+        // On a touch screen that made the book a guaranteed loss condition
+        // reachable by no control on the device.
+        //
+        // It lights and pulses only while a check is actually open, so it is
+        // the one key on the deck that tells you when to press it — which is
+        // right, because it is the one action in the game whose timing is
+        // scheduled rather than reactive.
+        Expanded(
+          child: _SKey(
+            ui: s.ui,
+            label: 'SIGN',
+            sub: signDue ? 'THE BOOK IS OPEN' : 'KEY: ENTER',
+            enabled: signDue,
+            glow: signDue
+                ? 0.5 - 0.5 * math.cos(runtime.tGlobal / 1.6 * tau)
+                : 0.0,
+            onTap: () {
+              runtime.audio.init();
+              runtime.audio.resume();
+              runtime.pressCheck();
+              runtime.rig.sign();
             },
           ),
         ),

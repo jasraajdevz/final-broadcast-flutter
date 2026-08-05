@@ -94,6 +94,41 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
   });
 
+  testWidgets('every control the game needs can be reached by touch',
+      (WidgetTester tester) async {
+    // THE GAME HAS TO BE PLAYABLE WITHOUT A KEYBOARD. Drive and modulation
+    // were arrow-keys-only and signing the book was ENTER-only, while every
+    // other control — the eight counters, the tools, the manual — had been a
+    // button all along. On a phone that made the book a guaranteed loss: the
+    // hour comes due every sixty seconds and costs twenty seconds of licence,
+    // reachable by no control on the device.
+    await tester.binding.setSurfaceSize(const Size(1280, 720));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final s = GameState()
+      ..started = true
+      ..night = 3
+      ..survived = 2;
+    // NOT startBroadcast(): it schedules delayed toasts, and a pending timer
+    // fails the widget tester. The deck renders its keys either way.
+    final r = AnomalyRuntime(s, audio: const NullAudio());
+    await tester.pumpWidget(MaterialApp(
+      home: Material(
+        child: Column(children: <Widget>[
+          StatusBar(s: s, runtime: r),
+          Expanded(
+            child: Deck(
+                s: s, runtime: r, tools: Tools(r), onManual: () {}),
+          ),
+        ]),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 16));
+    expect(find.text('SIGN'), findsOneWidget,
+        reason: 'the book cannot be signed without a keyboard');
+    expect(find.textContaining('DRIVE'), findsWidgets,
+        reason: 'the drive has no on-screen control');
+  });
+
   for (final scale in <double>[1.15, 1.8]) {
     group('TEXT SIZE ${(scale * 100).round()}%', () {
       late GameState s;
