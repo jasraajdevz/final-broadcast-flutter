@@ -469,10 +469,32 @@ class _GameRootState extends State<GameRoot>
   }
 
   /// NIGHTMARE. Endless, harder, and the tube gets marked.
+  ///
+  /// GATED BEHIND AN EXPLICIT AGREEMENT, and the gate names what is actually
+  /// in there rather than saying "graphic content" and leaving the player to
+  /// find out. A warning that does not say WHAT is not a warning, it is a
+  /// disclaimer — it protects the game rather than the person reading it.
+  ///
+  /// Defaults to no. It has to be chosen.
   void _signOnNightmare() {
-    s.endless = true;
-    s.nightmare = true;
-    _signOn();
+    _showConfirm(
+      'NIGHTMARE is a different game and you should know what is in it '
+      'before you agree.\n\n'
+      'SUSTAINED GORE. Blood lands ON the screen you are reading and stays '
+      'there until you wipe it off by hand. It does not stop.\n\n'
+      'JUMP SCARES WITHOUT WARNING, full-screen, with sound.\n\n'
+      'FLASHING AND STROBING IMAGES.\n\n'
+      'IT DOES NOT END. There is no 06:00 and no winning — only how long you '
+      'lasted before the licence went.\n\n'
+      'If you are unsure, take a night shift instead. Nothing here is needed '
+      'to see the rest of the game.',
+      () {
+        s.endless = true;
+        s.nightmare = true;
+        _signOn();
+      },
+      danger: true,
+    );
   }
 
   void _closeLog() {

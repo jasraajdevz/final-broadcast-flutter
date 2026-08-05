@@ -601,6 +601,9 @@ class AnomalyRuntime extends ChangeNotifier {
   /// workload, not as worse gauges.
   double handsUntil = 0;
 
+  /// Seconds until the next thing lands on the tube. NIGHTMARE only.
+  double _glassIn = 4;
+
   /// Registered by the ad-break controller. If null, the spot is skipped and
   /// `done` fires immediately.
   PlayAdFn? playAd;
@@ -3038,6 +3041,22 @@ class AnomalyRuntime extends ChangeNotifier {
   }
 
   void _simulate(double dt) {
+    // NIGHTMARE: THE GLASS KEEPS TAKING IT.
+    //
+    // The mode's promise is that it does not stop, so the marks cannot only
+    // arrive on a fumble — a careful operator would never see the mechanic the
+    // warning is about. It bleeds onto the tube as a function of how badly the
+    // night is going, which means the way to keep the picture readable is to
+    // keep the transmitter inside its limits, and the way to lose the picture
+    // is to already be losing.
+    if (s.nightmare) {
+      _glassIn -= dt;
+      if (_glassIn <= 0) {
+        _glassIn = 5.5 - (s.dread / 100) * 3.4;
+        blood.addGlass(0.28 + (s.dread / 100) * 0.6);
+      }
+    }
+
     // --- THE RIG ---
     // Whatever is on the air has its teeth in a named system. An arrival is no
     // longer a free-floating prompt with a key attached.
