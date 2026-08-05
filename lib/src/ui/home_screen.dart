@@ -76,11 +76,30 @@ class HomeScreen extends StatelessWidget {
             // layout regression that has bitten this screen twice now. The
             // FittedBox scales the whole desk down rather than clipping it,
             // and the scroll view is the backstop at 180% TEXT SIZE.
+            // THE SCROLL VIEW WAS THE BUG, AND IT HID ITSELF FOR SIX COMMITS.
+            //
+            // SingleChildScrollView gives its child UNBOUNDED height, so the
+            // FittedBox below it never had a vertical constraint to scale
+            // against — scaleDown did nothing, the column overflowed, and the
+            // extra spilled into a scroll that on a game's front desk nobody
+            // thinks to try. Every row added to this screen therefore pushed
+            // the bottom one out of reach: first the manual, then the audio
+            // check, and finally NIGHTMARE, which shipped completely
+            // unclickable.
+            //
+            // It also defeated every measurement I took of it. getRect
+            // reported positions in the unscaled child space and I read them
+            // as "off screen", changed the layout on that basis, and had to
+            // back it out — the numbers were right about the overflow and I
+            // was wrong about the cause.
+            //
+            // Bounded to the viewport, the FittedBox does what its comment
+            // always claimed: scales the whole desk down rather than clipping
+            // it, so every row stays reachable however many there are.
             child: LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints box) =>
-                  SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: box.maxHeight),
+              builder: (BuildContext context, BoxConstraints box) => SizedBox(
+                height: box.maxHeight,
+                child: Center(
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.center,

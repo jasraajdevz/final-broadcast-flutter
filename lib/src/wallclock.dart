@@ -107,3 +107,53 @@ String? returnLine(GameState s) {
   return 'YOU WERE GONE ${plainDuration(away).toUpperCase()}. '
       'IT WAS ON THE WHOLE TIME.';
 }
+
+
+// ---------------------------------------------------------------------------
+// NIGHTMARE
+//
+// Everything above is used once, gently, in a personnel note. This is the
+// same three facts — the hour where the player is, how long they have been
+// sitting there, how long they were away — put on the tube while they are
+// trying to work.
+//
+// It is the only thing in this build with real teeth, and the reason is that
+// it is TRUE. A drawn face is a drawn face however much blood is on it, and
+// the player's defence against it is knowing it was drawn. There is no
+// defence against a station that knows it is twenty past three in the morning
+// where they are, because it is twenty past three in the morning where they
+// are.
+//
+// Used sparingly on purpose. The line only lands while it is rare enough to
+// be a mistake rather than a feature — the first one should read as the game
+// glitching, not as a system.
+// ---------------------------------------------------------------------------
+
+/// The station saying something true about the room the player is sitting in.
+///
+/// Returns null most of the time. [sat] is real seconds at the desk this
+/// sitting, [visits] is how many of these have already fired tonight.
+String? nightmareIntrusion(GameState s, double sat, int visits) {
+  final n = gNow();
+  // it does not repeat itself and it does not start immediately
+  if (sat < 100) return null;
+  switch (visits) {
+    case 0:
+      return 'IT IS ${realClock()} WHERE YOU ARE';
+    case 1:
+      return 'YOU HAVE BEEN HERE ${plainDuration(sat).toUpperCase()}';
+    case 2:
+      return isSmallHours()
+          ? 'YOU SHOULD NOT BE AWAKE'
+          : 'NOBODY ELSE IS ON THIS FREQUENCY';
+    case 3:
+      return 'THE OPERATOR BEFORE YOU SAT ${plainDuration(sat * 1.6)
+          .toUpperCase()}';
+    case 4:
+      return n.weekday >= 6
+          ? 'IT IS THE WEEKEND. YOU CAME ANYWAY.'
+          : 'YOU HAVE SOMEWHERE TO BE IN THE MORNING';
+    default:
+      return null;
+  }
+}

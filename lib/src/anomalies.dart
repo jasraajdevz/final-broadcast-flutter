@@ -607,6 +607,10 @@ class AnomalyRuntime extends ChangeNotifier {
   /// Seconds until the room makes a noise. NIGHTMARE only.
   double _roomIn = 2;
 
+  /// Seconds until the station says something true. NIGHTMARE only.
+  double _clockIn = 110;
+  int _clockSaid = 0;
+
   /// Registered by the ad-break controller. If null, the spot is skipped and
   /// `done` fires immediately.
   PlayAdFn? playAd;
@@ -3058,6 +3062,31 @@ class AnomalyRuntime extends ChangeNotifier {
   }
 
   void _simulate(double dt) {
+    // AND IT KNOWS WHAT TIME IT IS WHERE YOU ARE.
+    //
+    // Not the shift clock — the player's. Rare, escalating, and it goes on the
+    // marquee rather than in a toast, so it reads as the station having said
+    // it rather than as the game telling you something.
+    //
+    // This is the only thing here that is TRUE. A drawn face is a drawn face
+    // however much blood is on it, and knowing it was drawn is the player's
+    // defence. There is no defence against a station that knows it is twenty
+    // past three in the morning where they are.
+    if (s.nightmare) {
+      _clockIn -= dt;
+      if (_clockIn <= 0) {
+        _clockIn = 95 + rand() * 70;
+        final String? line =
+            nightmareIntrusion(s, sessionSeconds(), _clockSaid);
+        if (line != null) {
+          _clockSaid++;
+          s.toast(line, ToastKind.bad);
+          audio.whisper();
+          audio.setSub(1.0);
+        }
+      }
+    }
+
     // AND SOMETHING IS ALWAYS IN THE ROOM WITH YOU.
     //
     // The presence system already puts something behind the chair, rarely, and
