@@ -16,6 +16,7 @@ import 'package:final_broadcast/src/consts.dart';
 import 'package:final_broadcast/src/state.dart';
 
 import 'operator.dart';
+import 'package:final_broadcast/src/paint/blood.dart';
 
 /// Counts what the game asks the speakers to do.
 class RecordingAudio implements GameAudio {
@@ -284,6 +285,47 @@ void main() {
     expect(lowestSub(true), greaterThan(0.35),
         reason: 'the nightmare room goes quiet, which is the one thing it must '
             'never do');
+  });
+
+  test('NIGHTMARE gets worse for sitting there, not just for losing', () {
+    // Everything else in this mode keys off DREAD, which recovers — an
+    // operator who is coping sees it relax. That is correct for the rest of
+    // the game and wrong for this one.
+    //
+    // Duration does not recover. It is the only axis left once the player has
+    // understood every jump the game can make, and it is what makes STAYING
+    // the mistake. The clearest expression is that the hand stops working:
+    // early on a wipe takes the glass back, and by forty minutes it moves what
+    // is there without removing it, so the tube ends up behind an hour of the
+    // operator's own cleaning.
+    final b = BloodLayer();
+
+    double clearedAt(double grip) {
+      b.glass.clear();
+      b.grip = grip;
+      b.addGlass(1.0);
+      final int before = b.glass.length;
+      // a hand ACROSS the whole tube, not a thumb in the middle: the marks
+      // scatter over 422x278 and the wipe radius is 62, so wiping one point
+      // touches almost none of them and measures nothing
+      for (var pass = 0; pass < 4; pass++) {
+        for (var gx = 0; gx < 8; gx++) {
+          for (var gy = 0; gy < 5; gy++) {
+            b.wipe(kScr.left + kScr.width * (gx / 7),
+                kScr.top + kScr.height * (gy / 4));
+          }
+        }
+      }
+      return (before - b.glass.length) / before;
+    }
+
+    final fresh = clearedAt(1.0);
+    final worn = clearedAt(0.08);
+    expect(fresh, greaterThan(0.5),
+        reason: 'a hand does not clear the glass even at the start');
+    expect(worn, lessThan(fresh * 0.6),
+        reason: 'forty minutes in, the wipe still works as well as it did at '
+            'the start — nothing is compounding');
   });
 }
 

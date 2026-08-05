@@ -2808,7 +2808,10 @@ class AnomalyRuntime extends ChangeNotifier {
     // not in the blood.
     audio.setSub(math.min(
         1.0,
-        (s.nightmare ? 0.42 : 0.0) +
+        (s.nightmare
+                ? 0.42 +
+                    (sessionSeconds() / (40 * 60)).clamp(0.0, 1.0) * 0.22
+                : 0.0) +
             s.dread / 100 * 0.75 +
             (active != null && active!.stage >= 1 ? 0.55 : 0)));
 
@@ -3062,6 +3065,21 @@ class AnomalyRuntime extends ChangeNotifier {
   }
 
   void _simulate(double dt) {
+    // HOW LONG THEY HAVE BEEN SITTING THERE, 0..1 over forty minutes.
+    //
+    // NIGHTMARE's difficulty is otherwise a function of DREAD, which recovers
+    // — the operator who is coping sees the mode relax, which is correct for
+    // the rest of the game and wrong for this one. Duration does not recover.
+    // It is the only axis left once the player has understood every jump the
+    // game can make, and it is the axis that makes staying the mistake.
+    //
+    // Everything below is driven by it and nothing announces it. The wipe just
+    // stops working. The room just gets busier. The gaps just close.
+    final double sat = s.nightmare
+        ? (sessionSeconds() / (40 * 60)).clamp(0.0, 1.0)
+        : 0.0;
+    blood.grip = 1.0 - sat * 0.92;
+
     // AND IT KNOWS WHAT TIME IT IS WHERE YOU ARE.
     //
     // Not the shift clock — the player's. Rare, escalating, and it goes on the
@@ -3075,7 +3093,7 @@ class AnomalyRuntime extends ChangeNotifier {
     if (s.nightmare) {
       _clockIn -= dt;
       if (_clockIn <= 0) {
-        _clockIn = 95 + rand() * 70;
+        _clockIn = (95 + rand() * 70) * (1 - sat * 0.55);
         final String? line =
             nightmareIntrusion(s, sessionSeconds(), _clockSaid);
         if (line != null) {
@@ -3097,7 +3115,7 @@ class AnomalyRuntime extends ChangeNotifier {
     if (s.nightmare) {
       _roomIn -= dt;
       if (_roomIn <= 0) {
-        _roomIn = 3.4 - (s.dread / 100) * 1.9;
+        _roomIn = (3.4 - (s.dread / 100) * 1.9) * (1 - sat * 0.6);
         audio.breath(rand() < 0.5 ? -1 : 1, 0.55 + (s.dread / 100) * 0.4);
         if (rand() < 0.34) {
           rand() < 0.5 ? audio.whisper() : audio.creak();
@@ -3118,7 +3136,7 @@ class AnomalyRuntime extends ChangeNotifier {
     if (s.nightmare) {
       _glassIn -= dt;
       if (_glassIn <= 0) {
-        _glassIn = 5.5 - (s.dread / 100) * 3.4;
+        _glassIn = (5.5 - (s.dread / 100) * 3.4) * (1 - sat * 0.62);
         final double f = 0.28 + (s.dread / 100) * 0.6;
         blood.addGlass(f);
         // heard before it is found, which is worth more than seen

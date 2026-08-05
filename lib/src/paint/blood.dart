@@ -130,23 +130,41 @@ class BloodLayer {
     }
   }
 
+  /// HOW WELL WIPING STILL WORKS, 1 down to 0.
+  ///
+  /// Set from how long the operator has actually been sitting there. This is
+  /// the one thing in NIGHTMARE that exploits DURATION rather than dread, and
+  /// duration is the only axis a horror game has left once the player has
+  /// understood every jump it can make.
+  ///
+  /// For the first ten minutes a hand takes the glass back. By forty it moves
+  /// what is there without removing it, so the tube ends up with everything
+  /// that ever landed on it dragged into streaks, and the picture the operator
+  /// is trying to read is behind an hour of their own cleaning.
+  ///
+  /// Nothing announces this. It just stops working, which is worse than being
+  /// told it will.
+  double grip = 1.0;
+
   /// A hand goes across the tube. Thins anything under it and leaves the rest
-  /// dragged — a wiped screen is never a clean screen.
+  /// dragged — a wiped screen is never a clean screen, and after long enough
+  /// it is not even a wiped screen.
   void wipe(double x, double y) {
     for (var i = glass.length - 1; i >= 0; i--) {
       final g = glass[i];
       final double d =
           math.sqrt((g.x - x) * (g.x - x) + (g.y - y) * (g.y - y));
       if (d > 62) continue;
-      final double cut = (1 - d / 62) * 0.55;
+      final double cut = (1 - d / 62) * 0.55 * grip;
       final double left = g.a - cut;
       if (left <= 0.05) {
         glass.removeAt(i);
       } else {
         glass[i] = (
-          x: g.x + (g.x - x) * 0.05,
-          y: g.y + (g.y - y) * 0.05,
-          r: g.r * 1.04,
+          // it drags further the less the hand is achieving
+          x: g.x + (g.x - x) * (0.05 + (1 - grip) * 0.16),
+          y: g.y + (g.y - y) * (0.05 + (1 - grip) * 0.16),
+          r: g.r * (1.04 + (1 - grip) * 0.10),
           seed: g.seed,
           a: left,
         );
