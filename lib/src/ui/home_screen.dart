@@ -116,20 +116,35 @@ class HomeScreen extends StatelessWidget {
                 // flashing images is the one line here that has to be read
                 // BEFORE the thing it warns about, and it is the one line
                 // that was hardest to reach.
-                // The check goes above the buttons for the same reason the
-                // warning did: it is the thing you want BEFORE you sign on,
-                // not after, and below the buttons it sat under the fold on a
-                // 720-high screen. Warning nearest the button it warns about.
-                _Tertiary(
-                  ui: s.ui,
-                  label: 'AUDIO / SCREEN CHECK',
-                  onTap: onSetup,
+                // SIDE BY SIDE, ON ONE ROW.
+                //
+                // Both of these belong above the buttons — they are things you
+                // want BEFORE signing on, and below the buttons they sat under
+                // the fold on a 720-high screen. But promoting a row pushes
+                // everything under it down by exactly that row's height, and
+                // stacking them cost the OPERATOR'S MANUAL button its bottom
+                // edge. Two peers on one line buys the height back without
+                // dropping a word of either.
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    _Tertiary(
+                      ui: s.ui,
+                      label: 'AUDIO / SCREEN CHECK',
+                      onTap: onSetup,
+                    ),
+                    SizedBox(width: 14 * s.ui),
+                    Flexible(
+                      child: Text(kBootFine,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: t.at(9, K.bootFine, ls: 2)),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 7),
-                Text(kBootFine,
-                    textAlign: TextAlign.center,
-                    style: t.at(9, K.bootFine, ls: 2)),
-                const SizedBox(height: 7),
+                const SizedBox(height: 8),
                 _Big(
                   ui: s.ui,
                   label: _returning ? 'TAKE THE NIGHT SHIFT' : 'SIGN ON',
