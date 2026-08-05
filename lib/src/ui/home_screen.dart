@@ -116,6 +116,16 @@ class HomeScreen extends StatelessWidget {
                 // flashing images is the one line here that has to be read
                 // BEFORE the thing it warns about, and it is the one line
                 // that was hardest to reach.
+                // The check goes above the buttons for the same reason the
+                // warning did: it is the thing you want BEFORE you sign on,
+                // not after, and below the buttons it sat under the fold on a
+                // 720-high screen. Warning nearest the button it warns about.
+                _Tertiary(
+                  ui: s.ui,
+                  label: 'AUDIO / SCREEN CHECK',
+                  onTap: onSetup,
+                ),
+                const SizedBox(height: 7),
                 Text(kBootFine,
                     textAlign: TextAlign.center,
                     style: t.at(9, K.bootFine, ls: 2)),
@@ -156,12 +166,6 @@ class HomeScreen extends StatelessWidget {
                       ? '$logged OF ${kAnoms.length} CATALOGUED  ·  KEY M'
                       : 'READ IT FIRST  ·  KEY M',
                   onTap: onManual,
-                ),
-                const SizedBox(height: 8),
-                _Tertiary(
-                  ui: s.ui,
-                  label: 'AUDIO / SCREEN CHECK',
-                  onTap: onSetup,
                 ),
                 const SizedBox(height: 9),
                 Text(
