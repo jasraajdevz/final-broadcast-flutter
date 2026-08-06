@@ -1178,8 +1178,27 @@ class AnomalyRuntime extends ChangeNotifier {
   /// a SURGE. The gap timer runs during a calm window but cannot FIRE inside
   /// the guaranteed head — see [_simulate].
   void scheduleNext({bool afterScare = false, bool afterBanish = false}) {
+    // NIGHTMARE surges on schedule, not on a coin. The debt accumulates the
+    // exact per-roll probability and fires on crossing 1, so the RATE is
+    // identical to the Bernoulli it replaces and the CLUSTERING is gone —
+    // a run can no longer draw three surges in a row, and a run can no
+    // longer draw none.
+    bool? force;
+    if (s.nightmare && nightAnoms >= kSurgeGrace) {
+      _surgeDebt +=
+          surgeChance(s, afterScare: afterScare, afterBanish: afterBanish);
+      if (_surgeDebt >= 1) {
+        _surgeDebt -= 1;
+        force = true;
+      } else {
+        force = false;
+      }
+    }
     final roll = rollGap(s, nightAnoms,
-        afterScare: afterScare, afterBanish: afterBanish);
+        afterScare: afterScare,
+        afterBanish: afterBanish,
+        forceSurge: force,
+        jitter: s.nightmare ? _fairJitter() : null);
     nextAt = roll.seconds;
     gapSpan = roll.seconds;
     surgeIncoming = roll.surge;
@@ -1228,19 +1247,129 @@ class AnomalyRuntime extends ChangeNotifier {
     }
   }
 
+  // --- FAIR DICE -----------------------------------------------------------
+  //
+  // "make it if u playwell tho it shouldnt be luck nased."
+  //
+  // Measured at fixed skill, the outcome varied by a fifth of the whole run
+  // on seed alone, and the variance was traceable to four iid rolls: WHICH
+  // entity (rail bites differ, and the carrier-biters feed LOW POWER — the
+  // top line of every invoice; one run drew DEAD AIR 12 times in 47), whether
+  // a gap SURGES (Bernoulli, clusters), whether THE MILKMAN rides along (iid
+  // 0.14 — four in one run, none in the next), and whether a mark SLAPS.
+  //
+  // The fix is not determinism — the ORDER stays unpredictable or the dread
+  // dies — it is fairness in AGGREGATE: a shuffled bag for the entity draw
+  // (every window of pool-size arrivals contains every entity once, order
+  // shuffled), and error-accumulator ("pity") timers for the three Bernoulli
+  // rolls, which keep each roll's exact mean rate while deleting clustering
+  // outright. Tetris has shipped bag randomness since 2001 for exactly this
+  // reason: records are not comparable under iid draws.
+  //
+  // ALL of it is NIGHTMARE-gated. An ordinary night must consume the global
+  // rand() stream in exactly the shipped order, or every seeded test in the
+  // suite silently measures a different game — demand_test's byte-identity
+  // rows are the guard.
+
+  /// The bag. Entity ids not yet drawn from the current shuffle.
+  final List<String> _bag = <String>[];
+  String? _lastDraw;
+
+  /// Accumulated surge probability. Fires when it crosses 1.
+  double _surgeDebt = 0;
+
+  /// Same machinery for THE MILKMAN and for the slap in blood.dart.
+  double _milkDebt = 0;
+
+  /// The cold open, on the same cadence machinery. The scripted operator has
+  /// perfect information so this never shows in a headless number — it is for
+  /// the human, for whom an untelegraphed arrival is the single largest
+  /// reaction-time swing in the game, and three of them in a row was a wall
+  /// nobody built on purpose.
+  double _coldDebt = 0;
+  bool _rollCold(Anom def) {
+    final double c = coldOpenChance(s, def, nightAnoms);
+    if (!s.nightmare) return rand() < c;
+    if (c <= 0) return false;
+    _coldDebt += c;
+    if (_coldDebt >= 1) {
+      _coldDebt -= 1;
+      return true;
+    }
+    return false;
+  }
+
+  /// Antithetic gap jitter: consecutive gaps draw mirrored halves of the
+  /// jitter band, so a run cannot roll long-long-long or short-short-short.
+  /// The mean is exactly the band's mean; only the CLUSTERING dies.
+  double? _jitU;
+  double _fairJitter() {
+    if (_jitU == null) {
+      _jitU = rand();
+      return 0.86 + _jitU! * 0.32;
+    }
+    final double u = 1 - _jitU!;
+    _jitU = null;
+    return 0.86 + u * 0.32;
+  }
+
+  /// THE MILKMAN, on a fair cadence. Same 0.14 rate as the coin it replaces;
+  /// what is gone is the run where he came four times and the run where he
+  /// never came — the single hardest modifier in the game (he takes the tell
+  /// away) landing 4-0 by luck was the difference between two identical
+  /// operators' nights.
+  bool _rollMilk(bool first) {
+    if (first || depth(s) < 12) return false;
+    if (!s.nightmare) return rand() < 0.14;
+    _milkDebt += 0.14;
+    if (_milkDebt >= 1) {
+      _milkDebt -= 1;
+      return true;
+    }
+    return false;
+  }
+
+  Anom _drawFair(List<Anom> pool) {
+    if (_bag.isEmpty) {
+      _bag.addAll(pool.map((Anom a) => a.id));
+      // Fisher-Yates on the shared stream — NIGHTMARE-only, so ordinary
+      // nights never see these draws.
+      for (var i = _bag.length - 1; i > 0; i--) {
+        final int j = (rand() * (i + 1)).floor().clamp(0, i);
+        final String t = _bag[i];
+        _bag[i] = _bag[j];
+        _bag[j] = t;
+      }
+      // A bag boundary must not read as a rule: if the fresh bag opens with
+      // the entity that just left, swap it deeper so the same thing cannot
+      // arrive twice running across the seam.
+      if (_bag.length > 1 && _bag.first == _lastDraw) {
+        final int j = 1 + (rand() * (_bag.length - 1)).floor();
+        _bag[0] = _bag[j];
+        _bag[j] = _lastDraw!;
+      }
+    }
+    final String id = _bag.removeAt(0);
+    _lastDraw = id;
+    return pool.firstWhere((Anom a) => a.id == id,
+        // The pool is fixed for a run (unlockedAnoms reads s.night, which
+        // does not change mid-shift) — this is belt and braces, not a path.
+        orElse: () => pick(pool));
+  }
+
   void beginWarn() {
     // Belt and braces: the caller already checked, but nothing may telegraph
     // inside the GUARANTEED head of a calm window under any circumstances.
     if (calmGuard > 0 || aftermath > 0 || lost) return;
     final pool = unlockedAnoms(s);
-    final def = pick(pool);
+    final def = s.nightmare ? _drawFair(pool) : pick(pool);
     warnDef = def;
 
     // --- the cold open ---
     // No riser at all. Rises with dread and with the night, never on a debut,
     // never in the opening minutes of a shift, and paid back with a much
     // longer window when it fires.
-    if (rand() < coldOpenChance(s, def, nightAnoms)) {
+    if (_rollCold(def)) {
       warn = 0;
       manifest(cold: true);
       return;
@@ -1322,7 +1451,7 @@ class AnomalyRuntime extends ChangeNotifier {
       seed: rand(),
       // He needs a roster to hide in: no debut, and not until the operator
       // has catalogued enough that a familiar tell is worth taking away.
-      milk: !first && depth(s) >= 12 && rand() < 0.14,
+      milk: _rollMilk(first),
       cold: cold,
       mod: mod,
       partner: partner,
@@ -2507,6 +2636,15 @@ class AnomalyRuntime extends ChangeNotifier {
     rig.bump(38);
     blood.addGlass(0.55);
     audio.setSub(0.7);
+    // Random PHASE on the fair timers, so the accumulators do not put the
+    // first surge and the first MILKMAN at the same arrival index every
+    // single run. The rate is fixed; when it starts collecting is not.
+    _surgeDebt = rand() * 0.9;
+    _milkDebt = rand() * 0.8;
+    _coldDebt = rand() * 0.7;
+    _jitU = null;
+    _bag.clear();
+    _lastDraw = null;
     // NO FORTY SECONDS OF NOTHING. startBroadcast just scheduled the first
     // arrival with the ordinary night's ease-in (openingEase(0) = 2.05, ~41s
     // measured), which is the right courtesy for a shift and the wrong one

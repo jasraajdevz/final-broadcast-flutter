@@ -292,7 +292,14 @@ class BloodLayer {
       // while contributing barely more ink than the ordinary ones. Raising the
       // mean instead just raises the odds of one unlucky mark eating the face
       // the player is trying to read, which is felt as unfairness.
-      final bool slap = rand() < 0.06 + deep * 0.10;
+      // On the same fair-accumulator machinery as the surge and THE MILKMAN
+      // (see anomalies.dart, FAIR DICE): exact same mean rate as the coin it
+      // replaces, no clustering — a double-size mark on the read band is a
+      // scare beat, and two of them in three seconds was a blinding nobody
+      // chose. addGlass only ever runs in NIGHTMARE, so no gate is needed.
+      _slapDebt += 0.06 + deep * 0.10;
+      final bool slap = _slapDebt >= 1;
+      if (slap) _slapDebt -= 1;
       // CAPPED IN ABSOLUTE TERMS, at 28% of the tube's width. Looked at rather
       // than measured: without this a slapped top-of-range mark at minute
       // forty spawns at 190 and smears to 361 on a 422px tube, and the tube
@@ -429,6 +436,7 @@ class BloodLayer {
     _hand.clear();
     _lastPoint = null;
     _handIdle = 0;
+    _slapDebt = 0;
     wash = 0;
     // A Float32List is invisible to isEmpty, so a permanent layer that
     // survived startBroadcast()'s clear() would have shipped green.
@@ -701,6 +709,9 @@ class BloodLayer {
 
   /// The largest a single mark may ever spawn — 28% of the tube's width.
   static const double kMarkMax = 118.0;
+
+  /// Accumulated slap probability; fires on crossing 1. Reset by clear().
+  double _slapDebt = 0;
 
   /// The governor setpoint, on TOTAL occlusion of the read band.
   ///

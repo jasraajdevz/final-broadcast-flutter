@@ -315,8 +315,8 @@ double anomIntervalMean(GameState s, int nightIndex) {
 /// The jitter is tighter than the original's rr(0.78,1.25) so the pacing is
 /// legible: you can learn roughly how long you have, which is the only way the
 /// ALL CLEAR window below can mean anything.
-double anomInterval(GameState s, int nightIndex) =>
-    anomIntervalMean(s, nightIndex) * rr(0.86, 1.18);
+double anomInterval(GameState s, int nightIndex, {double? jitter}) =>
+    anomIntervalMean(s, nightIndex) * (jitter ?? rr(0.86, 1.18));
 
 /// The real roll. Mostly the long legible interval; sometimes a SURGE — a quick
 /// follow-up at [kSurgeMul] of it, never sooner than [kSurgeFloor].
@@ -330,9 +330,20 @@ GapRoll rollGap(
   int nightIndex, {
   bool afterScare = false,
   bool afterBanish = false,
+  bool? forceSurge,
+  double? jitter,
 }) {
-  final full = anomInterval(s, nightIndex);
+  final full = anomInterval(s, nightIndex, jitter: jitter);
   if (nightIndex < kSurgeGrace) return GapRoll(full, false);
+  // NIGHTMARE passes the decision in — its surges run on an accumulator with
+  // the same mean rate and no clustering, because two surges back to back by
+  // Bernoulli luck is a death the player did not choose. The rand() below is
+  // deliberately NOT consumed on that path; ordinary nights take it exactly
+  // as they always did.
+  if (forceSurge != null) {
+    if (!forceSurge) return GapRoll(full, false);
+    return GapRoll(math.max(kSurgeFloor, full * kSurgeMul), true);
+  }
   final c = surgeChance(s, afterScare: afterScare, afterBanish: afterBanish);
   if (rand() >= c) return GapRoll(full, false);
   return GapRoll(math.max(kSurgeFloor, full * kSurgeMul), true);

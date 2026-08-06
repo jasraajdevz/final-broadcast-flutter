@@ -197,6 +197,130 @@ void main() {
     expect(occ, lessThan(0.40));
   });
 
+  test('FAIR DICE — the draws are fair by construction, not by average', () {
+    // "make it if u playwell tho it shouldnt be luck nased."
+    //
+    // Before the fair-dice pass one run drew DEAD AIR 12 times in 47 arrivals
+    // and THE MILKMAN four times, while another drew him never — and the
+    // carrier-biters feed LOW POWER, the top line of every invoice, so the
+    // DRAW was deciding the death. These assertions are structural: they hold
+    // on every seed or the machinery is broken, no statistics involved.
+    seedRandom(20260805);
+    final DateTime t0 = DateTime(2026, 8, 5, 2, 30);
+    var wall = t0;
+    gNow = () => wall;
+    addTearDown(() => gNow = DateTime.now);
+    resetSession();
+    final s = GameState()
+      ..night = 2
+      ..survived = 1
+      ..endless = true
+      ..nightmare = true;
+    for (final p in kProducers) {
+      s.prod[p.id] = 0;
+    }
+    for (final a in kAnoms) {
+      s.seen[a.id] = true;
+    }
+    final r = AnomalyRuntime(s, audio: const NullAudio());
+    r.startBroadcast();
+
+    final List<String> draws = <String>[];
+    final List<bool> milks = <bool>[];
+    final List<bool> surges = <bool>[];
+    const double dt = 1 / 30.0;
+    var t = 0.0;
+    var wasActive = false;
+    while (t < 45 * 60 && !r.lost) {
+      mindTheDesk(r);
+      r.tick(dt);
+      if (r.rig.offAir > 20) r.rig.offAir = 20;
+      r.lost = false;
+      final a = r.active;
+      if (a != null && !wasActive) {
+        draws.add(a.def.id);
+        milks.add(a.milk);
+        surges.add(r.surgeIncoming);
+      }
+      wasActive = a != null;
+      if (a != null && a.t > 1.2) r.pressCounter(a.def.counter);
+      t += dt;
+      wall = t0.add(Duration(milliseconds: (t * 1000).round()));
+    }
+    expect(draws.length, greaterThan(40), reason: 'the trace is too short');
+
+    // 1. COMPOSITION. Over any 16 consecutive arrivals, every unlocked
+    //    entity appears — and none dominates. A bag guarantees this; a coin
+    //    does not (iid put DEAD AIR at 6+ per 16 routinely).
+    //
+    //    The roster GROWS mid-run — depth() is banished + scared*2, so the
+    //    tier-2 entities join around the sixteenth banish — which means early
+    //    windows legitimately lack the late arrivals. The windows are checked
+    //    from the first bag cycle in which the roster is complete.
+    final Set<String> pool = draws.toSet();
+    var start = 0;
+    final Set<String> seen = <String>{};
+    for (var i = 0; i < draws.length; i++) {
+      seen.add(draws[i]);
+      if (seen.length == pool.length) {
+        start = i + pool.length; // one full bag past completion
+        break;
+      }
+    }
+    expect(start + 16, lessThan(draws.length),
+        reason: 'the roster never completed early enough to check');
+    for (var i = start; i + 16 <= draws.length; i++) {
+      final List<String> w = draws.sublist(i, i + 16);
+      for (final String id in pool) {
+        final int n = w.where((String x) => x == id).length;
+        expect(n, greaterThanOrEqualTo(1),
+            reason: '$id absent from arrivals $i..${i + 16} — the bag is not '
+                'a bag');
+        expect(n, lessThanOrEqualTo(5),
+            reason: '$id arrived $n times in one 16-window — composition is '
+                'rolling again');
+      }
+    }
+
+    // 2. NO BACK-TO-BACK REPEATS, including across a bag boundary.
+    for (var i = 1; i < draws.length; i++) {
+      expect(draws[i], isNot(draws[i - 1]),
+          reason: 'the same entity arrived twice running at arrival $i');
+    }
+
+    // 3. THE MILKMAN comes on a cadence, not in clumps. At rate 0.14 the
+    //    accumulator cannot fire twice within four eligible arrivals.
+    final List<int> milkAt = <int>[
+      for (var i = 0; i < milks.length; i++)
+        if (milks[i]) i,
+    ];
+    for (var i = 1; i < milkAt.length; i++) {
+      expect(milkAt[i] - milkAt[i - 1], greaterThanOrEqualTo(4),
+          reason: 'THE MILKMAN came twice in four arrivals — clustering is '
+              'back');
+    }
+
+    // 4. SURGES cannot chain. The debt drops below 1 when it fires and no
+    //    single chance reaches 1, so two consecutive surged gaps are
+    //    structurally impossible — where the Bernoulli made them a c² roll.
+    for (var i = 1; i < surges.length; i++) {
+      expect(surges[i] && surges[i - 1], isFalse,
+          reason: 'two surges in a row at arrival $i');
+    }
+  });
+
+  test('the same skill dies the same death', () {
+    // At fixed skill the CAUSE of death must not roll. Measured before the
+    // fair dice: LICENCE 17 / DREAD 3. After: LICENCE 20 of 20. The margin
+    // in this guard allows noise; what it forbids is the old world where a
+    // fifth of identical runs ended for a different reason.
+    final List<Run> runs = kSeeds.map(playNightmare).toList();
+    final int licence = runs.where((Run r) => r.how == 'LICENCE').length;
+    expect(licence, greaterThanOrEqualTo(17),
+        reason: 'only $licence of 20 identical runs died of the licence — '
+            'the death cause is rolling again');
+  });
+
   test('the run is long enough for the escalation to land', () {
     final List<double> lives =
         kSeeds.take(8).map((int s) => playNightmare(s).life).toList()..sort();
