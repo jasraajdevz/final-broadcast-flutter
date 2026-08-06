@@ -379,12 +379,19 @@ class BloodLayer {
   /// (a 0.40-per-call retention is 1e-24 over half a second of drag) and every
   /// tuning number is meaningless until the rate is pinned. Path LENGTH is the
   /// same whether it is sampled at 60Hz or 120Hz, so that is what is budgeted.
-  void wipe(double x, double y) {
+  /// Returns whether the sample was ACCEPTED — the runtime charges licence
+  /// for frames in which the hand really moved on the glass, and a rejected
+  /// (coalesced) sample must not bill anybody.
+  bool wipe(double x, double y) {
     if (_hand.isNotEmpty) {
       final ui.Offset l = _hand.last;
-      if ((l.dx - x).abs() < 6 && (l.dy - y).abs() < 6) return; // coalesce
+      if ((l.dx - x).abs() < 6 && (l.dy - y).abs() < 6) return false;
     }
-    if (_hand.length < 64) _hand.add(ui.Offset(x, y));
+    if (_hand.length < 64) {
+      _hand.add(ui.Offset(x, y));
+      return true;
+    }
+    return false;
   }
 
   final List<ui.Offset> _hand = <ui.Offset>[];

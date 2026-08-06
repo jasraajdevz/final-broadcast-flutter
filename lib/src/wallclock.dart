@@ -135,8 +135,8 @@ String? returnLine(GameState s) {
 /// sitting, [visits] is how many of these have already fired tonight.
 String? nightmareIntrusion(GameState s, double sat, int visits) {
   final n = gNow();
-  // it does not repeat itself and it does not start immediately
-  if (sat < 100) return null;
+  // it does not start immediately
+  if (sat < 50) return null;
   switch (visits) {
     case 0:
       return 'IT IS ${realClock()} WHERE YOU ARE';
@@ -154,6 +154,24 @@ String? nightmareIntrusion(GameState s, double sat, int visits) {
           ? 'IT IS THE WEEKEND. YOU CAME ANYWAY.'
           : 'YOU HAVE SOMEWHERE TO BE IN THE MORNING';
     default:
-      return null;
+      // THE STATION DOES NOT RUN OUT OF TRUE THINGS TO SAY.
+      //
+      // It used to: five lines, all fired by roughly minute nine, and then
+      // silence for the rest of the sitting — so the only mechanic in the
+      // build that is actually TRUE went quiet exactly as the night got
+      // long. The terminal bank cycles the strongest facts against the
+      // CURRENT clock and the CURRENT sitting length. 'IT IS 03:47 WHERE
+      // YOU ARE' after the same line said 03:12 is not a repeat; it is a
+      // worse sentence, because the difference is the part that is true.
+      switch ((visits - 5) % 3) {
+        case 0:
+          return 'STILL ${realClock()}. STILL YOU.';
+        case 1:
+          return 'YOU HAVE BEEN HERE ${plainDuration(sat).toUpperCase()} NOW';
+        default:
+          return isSmallHours()
+              ? 'IT IS ${realClock()}. THE SUN IS NOT COMING.'
+              : 'IT IS ${realClock()} AND THE DOOR IS BEHIND YOU';
+      }
   }
 }

@@ -391,7 +391,10 @@ void paintFeed(ui.Canvas f, GameState s, AnomalyRuntime a, double t) {
   // restored, so it composites over the feed instead of under it.
   void paintCorpse() {
     if (corpse == null) return;
-    final k = a.dyingP;
+    // dyingBurn, not dyingP: in NIGHTMARE the corpse DWELLS — it lies on the
+    // tube whole and only burns out in its last 0.35s. dyingP across a 2.4s
+    // window would stretch the blow-out into slow motion.
+    final k = a.dyingBurn;
     final e = k * k;
     f.save();
     f.translate(_fw / 2, _fh / 2);

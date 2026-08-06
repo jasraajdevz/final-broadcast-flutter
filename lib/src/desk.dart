@@ -492,6 +492,11 @@ class Rig {
       attached.isEmpty &&
       bite.isEmpty;
 
+  /// The one public door onto the invoice, for costs that originate outside
+  /// the rig — NIGHTMARE's glass-cleaning tariff is the caller. Everything on
+  /// the invoice must be something the player watched happen, and cleaning is.
+  void charge(String what, double amount) => _charge(what, amount);
+
   void _charge(String what, double amount) {
     if (amount <= 0) return;
     offAir += amount;

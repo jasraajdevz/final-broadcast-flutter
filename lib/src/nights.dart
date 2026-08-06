@@ -154,6 +154,28 @@ const NightCard kNoCard = NightCard(
   ds: 'No standing conditions. The station as it is written down.',
 );
 
+/// NIGHTMARE's standing conditions. ONE card, always the same, instead of
+/// whatever the career happened to be holding.
+///
+/// Measured before this existed: NIGHTMARE inherited the career deck and then
+/// multiplied it, so the first NIGHTMARE most players ever see (night 2) drew
+/// STORM FRONT and ran the carrier at 1.35 x 1.30 = 1.755 on the one axis
+/// that was already 81% of the death invoice — while a player whose career
+/// sat on a gentler card got a mode nearly twice as survivable. Medians
+/// across career nights ran 13.3 to 7.1 minutes: a 1.9x swing on a variable
+/// the player never chose. A mode with its own name gets its own weather.
+///
+/// decay 1.20 rather than the old effective 1.755, because the deaths have to
+/// leave room for everything else in this mode to be what kills you.
+const NightCard kNightmareCard = NightCard(
+  id: 'nightmare',
+  nm: 'NIGHTMARE',
+  ds: 'It does not end.',
+  decay: 1.20,
+  drift: 1.35,
+  ceiling: 0.70,
+);
+
 /// Tonight's card, from the night number alone.
 ///
 /// Deterministic and stateless: night 4 is FRESH CORES for everyone, forever.
@@ -165,4 +187,5 @@ NightCard cardForNight(int night) {
   return kNightCards[i];
 }
 
-NightCard cardOf(GameState s) => cardForNight(s.night);
+NightCard cardOf(GameState s) =>
+    s.nightmare ? kNightmareCard : cardForNight(s.night);

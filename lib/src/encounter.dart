@@ -60,12 +60,27 @@ import 'state.dart';
 /// Night one is deliberately EXACTLY zero: the opening shift is the tutorial
 /// and nothing in it is scaled.
 double nightPressure(GameState s) {
+  // NIGHTMARE runs at its own pace, for everyone, from the first second.
+  // Without this the mode ran at the CAREER's pressure — a first-timer at
+  // night 2 got 0.20 while a veteran got 0.75, in the one mode whose whole
+  // premise is that it is the same room for everybody. 0.55 is night-6
+  // intensity: gaps squeezed, banish windows squeezed, telegraphs shortened,
+  // surges and cold opens live.
+  //
+  // Measured to be intensity and not lethality before it shipped: swept at
+  // pressure 0.20 / 0.40 / 0.60 with the carrier pinned, survival moved
+  // 17.80 -> 17.66 minutes (noise) while arrivals went 3.14 -> 3.51/min and
+  // modifier rate 18% -> 26%.
+  if (s.nightmare) return kNightmarePressure;
   final n = math.max(0, s.night - 1).toDouble();
   return n / (n + kNightPressureHalf);
 }
 
 /// Nights past the first at which night pressure reaches 0.5.
 const double kNightPressureHalf = 4.0;
+
+/// The fixed pressure NIGHTMARE runs at, whoever is sitting down.
+const double kNightmarePressure = 0.55;
 
 // ---------------------------------------------------------------------------
 // Per-entity arrival profiles

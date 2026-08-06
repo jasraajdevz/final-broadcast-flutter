@@ -268,7 +268,7 @@ class _GameRootState extends State<GameRoot>
         p.dx <= kScr.right &&
         p.dy >= kScr.top &&
         p.dy <= kScr.bottom) {
-      runtime.blood.wipe(p.dx, p.dy);
+      runtime.wipeGlass(p.dx, p.dy);
       runtime.tuneStrike(p.dx, p.dy);
     }
   }
@@ -289,7 +289,7 @@ class _GameRootState extends State<GameRoot>
         p.dx <= kScr.right &&
         p.dy >= kScr.top &&
         p.dy <= kScr.bottom) {
-      runtime.blood.wipe(p.dx, p.dy);
+      runtime.wipeGlass(p.dx, p.dy);
     }
   }
 
@@ -484,7 +484,9 @@ class _GameRootState extends State<GameRoot>
       'NIGHTMARE is a different game and you should know what is in it '
       'before you agree.\n\n'
       'SUSTAINED GORE. Blood lands ON the screen you are reading and stays '
-      'there until you wipe it off by hand. It does not stop.\n\n'
+      'there until you wipe it off by hand. It does not stop, wiping costs '
+      'you licence time, and what has dried does not come off.\n\n'
+      'WHAT YOU KILL TAKES SECONDS TO FINISH DYING, on screen.\n\n'
       'JUMP SCARES WITHOUT WARNING, full-screen, with sound.\n\n'
       'FLASHING AND STROBING IMAGES.\n\n'
       'IT DOES NOT END. There is no 06:00 and no winning — only how long you '

@@ -552,6 +552,52 @@ typedef PlayAdFn = void Function(String label, void Function() done);
 /// Seconds a banished thing stays on the tube, coming apart.
 const double kDyingSpan = 0.35;
 
+/// The same, in NIGHTMARE. IT DOES NOT LEAVE WHEN YOU PRESS THE KEY.
+///
+/// The purest change in the mode's tuning pass: measured across twenty seeds,
+/// survival identical to two decimal places, decisions per minute identical —
+/// and the fraction of the run with something on the tube DOUBLED (9.3% to
+/// 20.6%). Dwell is the only lever in the whole design space that raises
+/// entity presence without raising workload, and it was free.
+const double kNmDyingSpan = 2.4;
+
+/// While a NIGHTMARE anomaly is live, dread inflow per second (through
+/// rig.bump, the single door). The counterpart of [kNmRelief].
+const double kNmPresence = 3.0;
+
+/// The relief a NIGHTMARE banish buys at cleanliness 1.0 — an instant answer.
+/// Scaled by cleanliness down to nothing at the last frame.
+const double kNmRelief = 12.0;
+
+/// NIGHTMARE's rising dread floor: 42 at the door, 78 by minute twelve.
+///
+/// Re-cut from 30-to-60-over-fourteen when the run was measured at its real
+/// length — the old ramp delivered its last third to nobody. ONE helper,
+/// because this was copy-pasted at two call sites and had already started to
+/// exist twice.
+///
+/// A max() into s.dread, never an add into rig.dread — so it is provably
+/// intensity, not lethality: everything atmospheric reads s.dread (the glass
+/// rate, the mark force, the breath period, the heart, coldOpenChance,
+/// surgeChance, the telegraph squeeze), while the death at 100 needs
+/// rig.dread to get there on its own. 78 is well under 100, so SIGNAL LOST
+/// stays something you did. Measured with and without across twenty seeds:
+/// survival medians agree inside half a minute — if they ever stop agreeing,
+/// someone has turned this into an add.
+double nightmareFloor() =>
+    kNmFloor0 + (sessionSeconds() / kNmFloorRamp).clamp(0.0, 1.0) * kNmFloorRise;
+
+const double kNmFloor0 = 42.0;
+const double kNmFloorRise = 36.0;
+const double kNmFloorRamp = 12 * 60.0;
+
+/// Licence per second of actual glass-cleaning. 0.08: measured at ~32s of a
+/// 126s ceiling over a full run for the operator who keeps the tube legible —
+/// the SECOND line of the invoice, never the first. At 0.10 it reached 39s;
+/// at 0.12 it became the largest line, which means a player can be killed BY
+/// cleaning, and that death has stopped being theirs.
+const double kTariffWipe = 0.08;
+
 /// The same, for a kill nobody earned (a bot assist, the MIRROR). Shorter,
 /// because it is not the player's moment.
 const double kDyingSpanQuiet = 0.18;
@@ -608,7 +654,11 @@ class AnomalyRuntime extends ChangeNotifier {
   double _roomIn = 2;
 
   /// Seconds until the station says something true. NIGHTMARE only.
-  double _clockIn = 110;
+  // 55, not 110: the first true sentence lands inside the first minute of a
+  // sitting, while it can still read as the game glitching. At 110 the field
+  // initialiser was the real gate and the wallclock's own threshold was
+  // decorative.
+  double _clockIn = 55;
   int _clockSaid = 0;
 
   /// Registered by the ad-break controller. If null, the spot is skipped and
@@ -1013,6 +1063,20 @@ class AnomalyRuntime extends ChangeNotifier {
   /// the kill, 1 when the corpse is gone. Painters: this is the dissolve.
   double get dyingP =>
       dying == null || dyingSpan <= 0 ? 0 : clampD(dyingT / dyingSpan, 0, 1);
+
+  /// 0..1 through the DISSOLVE alone, which is not the same thing once the
+  /// corpse has a dwell. NIGHTMARE holds the body on the tube for seconds —
+  /// and a 0.35s blow-out stretched across that window reads as slow motion,
+  /// not as a death. So the body LIES THERE, whole, and comes apart only in
+  /// the final [kDyingSpan] of its window. On an ordinary night the window IS
+  /// the dissolve and this is identical to [dyingP].
+  double get dyingBurn {
+    if (dying == null || dyingSpan <= 0) return 0;
+    final double burn = math.min(kDyingSpan, dyingSpan);
+    final double start = dyingSpan - burn;
+    if (dyingT <= start) return 0;
+    return clampD((dyingT - start) / burn, 0, 1);
+  }
 
   /// True on the frames the world is frozen for the impact.
   bool get frozen => hitstop > 0;
@@ -1542,8 +1606,7 @@ class AnomalyRuntime extends ChangeNotifier {
     // fine, because the room is not fine.
     s.dread = math.max(rig.dread, dreadFloor(s));
     if (s.nightmare) {
-      final double nf = 30 +
-          (sessionSeconds() / (14 * 60)).clamp(0.0, 1.0) * 30;
+      final double nf = nightmareFloor();
       if (s.dread < nf) s.dread = nf;
     }
   }
@@ -1566,6 +1629,26 @@ class AnomalyRuntime extends ChangeNotifier {
     audio.env('triangle', 213 + dir * 23, 0.05, 0.045, 151);
     notifyListeners();
   }
+
+  /// A hand across the tube — the ONLY way in for pointer wiping.
+  ///
+  /// In NIGHTMARE the wipe goes on the invoice: CLEANING THE GLASS is a
+  /// licence tariff, because seeing and surviving have to be different
+  /// purchases or the wipe is a chore rather than a choice. Measured with the
+  /// tariff in place: the operator who keeps the glass legible dies at 12.3
+  /// minutes with cleaning as the second line of the invoice; the one who
+  /// lets the tube go blind lives 2.7 minutes longer and reads 8-15 points
+  /// less of the band. On the shipped build those two were indistinguishable.
+  ///
+  /// Billed per FRAME in which the hand really moved (see _wiped and the
+  /// charge in _simulate), never per pointer sample — wipe() is called once
+  /// per PointerMoveEvent, up to ~120/s, and per-sample billing would make
+  /// the tariff a function of the mouse's report rate.
+  void wipeGlass(double x, double y) {
+    if (blood.wipe(x, y)) _wiped = true;
+  }
+
+  bool _wiped = false;
 
   /// The hand goes on the ninth key.
   void beginCarrier() {
@@ -1764,7 +1847,8 @@ class AnomalyRuntime extends ChangeNotifier {
       final clean = a.t < a.window * 0.4;
       dying = a;
       dyingT = 0;
-      dyingSpan = silent ? kDyingSpanQuiet : kDyingSpan;
+      dyingSpan =
+          silent ? kDyingSpanQuiet : (s.nightmare ? kNmDyingSpan : kDyingSpan);
       if (!silent) {
         hitstop = math.max(
             hitstop, clutch ? kHitstopClutch : (clean ? kHitstopClean : kHitstopPartial));
@@ -1805,7 +1889,11 @@ class AnomalyRuntime extends ChangeNotifier {
       s.segSig += bonus;
       s.lifetimeSig += bonus;
       banishFx = 1;
-      bumpDread(-6.0);
+      // In NIGHTMARE the relief is EARNED, not flat: full value for an
+      // instant answer, nothing for a kill landed at the last frame.
+      // 12.0, not more — at 16 the mean relief exceeds the old flat -6 and
+      // the mode gets easier for exactly the operator it is meant to test.
+      bumpDread(s.nightmare ? -kNmRelief * a.cleanliness : -6.0);
       if (clutch) {
         s.stats.clutch++;
         // THE NEAR MISS IS THE HOOK. "Short misses and the feeling of a little
@@ -2419,6 +2507,16 @@ class AnomalyRuntime extends ChangeNotifier {
     rig.bump(38);
     blood.addGlass(0.55);
     audio.setSub(0.7);
+    // NO FORTY SECONDS OF NOTHING. startBroadcast just scheduled the first
+    // arrival with the ordinary night's ease-in (openingEase(0) = 2.05, ~41s
+    // measured), which is the right courtesy for a shift and the wrong one
+    // for a room that is already wrong when you sit down. Six seconds — and
+    // nightAnoms starts past both grace counters, so the mode's FIRST arrival
+    // is allowed to be a cold open and its second a surge. Safe for a
+    // first-timer regardless: coldOpenChance hard-returns 0 on any entity not
+    // in s.seen.
+    nextAt = gapSpan = 6.0;
+    nightAnoms = 3;
   }
 
   void licenceVoid() {
@@ -3135,8 +3233,17 @@ class AnomalyRuntime extends ChangeNotifier {
     // 1/(1636+t) falls only 37% between minute 15 and minute 40: the values
     // are 0.036 / 0.168 / 0.438 / 0.903 at 1 / 5 / 15 / 40 minutes and 1.28 at
     // ninety, and it never reaches a ceiling so it never needs one.
+    //
+    // tau 900, re-cut from 1636 when the run itself was re-measured: the mode
+    // is played to a 12-15 minute death, not the 40-minute horizon the first
+    // constant assumed, and at 1636 the permanence was invisible for two
+    // thirds of a real run (deep at minute 12 was 0.36). At 900 it is 0.59.
+    // The log form survives on purpose — this is a re-anchoring, not a clamp;
+    // safe rather than escalatory because deep also sits in the glass-rate
+    // DENOMINATOR, so more permanence means fewer live marks, and every guard
+    // margin in nightmare_test measurably improved.
     blood.deep =
-        s.nightmare ? math.log(1 + sessionSeconds() / 1636.0) : 0.0;
+        s.nightmare ? math.log(1 + sessionSeconds() / 900.0) : 0.0;
 
     // AND IT KNOWS WHAT TIME IT IS WHERE YOU ARE.
     //
@@ -3248,13 +3355,23 @@ class AnomalyRuntime extends ChangeNotifier {
     // promise about a system that no longer exists. These three are the rig's
     // own dials and are what the faces now name.
     final card = cardOf(s);
-    rig.decayMul = card.decay * (s.nightmare ? 1.30 : 1.0);
-    rig.cardDriftMul = card.drift * (s.nightmare ? 1.35 : 1.0);
-    rig.ceilingMul = card.ceiling * (s.nightmare ? 0.70 : 1.0);
+    // No nightmare multipliers here any more: cardOf() hands NIGHTMARE its
+    // own card, so the mode's whole weather lives in ONE named place instead
+    // of being stacked on top of whatever the career happened to deal.
+    rig.decayMul = card.decay;
+    rig.cardDriftMul = card.drift;
+    rig.ceilingMul = card.ceiling;
 
     rig.recoveryScale = ((s.ups['failsafe'] ?? false) ? 1.6 : 0.8) *
         recordDecayMul(s) *
         (aftermath > 0 ? 2.6 : (calm > 0 ? 1.5 : 1.0));
+    // CLEANING THE GLASS goes on the invoice. Once per frame the hand really
+    // moved — never per pointer sample — and only while the run is live, so
+    // a wipe over the end sheet cannot bill a dead licence.
+    if (s.nightmare && _wiped && !lost) {
+      rig.charge('CLEANING THE GLASS', kTariffWipe * dt);
+    }
+    _wiped = false;
     rig.tick(dt, handsCommitted: handsUntil > tGlobal);
 
     // DREAD IS THE HIGHER OF TWO THINGS, and both of them matter.
@@ -3287,8 +3404,7 @@ class AnomalyRuntime extends ChangeNotifier {
     // fine, because the room is not fine.
     s.dread = math.max(rig.dread, dreadFloor(s));
     if (s.nightmare) {
-      final double nf = 30 +
-          (sessionSeconds() / (14 * 60)).clamp(0.0, 1.0) * 30;
+      final double nf = nightmareFloor();
       if (s.dread < nf) s.dread = nf;
     }
 
@@ -3398,13 +3514,40 @@ class AnomalyRuntime extends ChangeNotifier {
     final a = active;
     if (a != null) {
       a.t += dt;
-      // Saturated. This was the only depth() consumer in the codebase
-      // without a ceiling, so with the floor now live a deep career
-      // would cross 0->100 inside one ordinary encounter.
-      s.dread = math.min(
-          100,
-          s.dread +
-              dt * (1.2 + math.min(2.4, depth(s) * 0.02)) * cardOf(s).dread);
+      if (s.nightmare) {
+        // THE THING ON THE TUBE FINALLY COSTS SOMETHING.
+        //
+        // Measured over whole runs before this existed: the eight entities
+        // contributed EXACTLY ZERO to the fear meter. The write below this
+        // branch is dead code in practice — _simulate assigns
+        // s.dread = max(rig.dread, floor) earlier in the same frame, so
+        // every addition here was discarded one frame later, and the
+        // dread-death gate requires active == null so it could never fire
+        // while the cause was on screen. The entities were a rumour.
+        //
+        // rig.bump is the documented single door for dread changes; 3.0/s
+        // while something is live means a slow answer is a real payment,
+        // and — with the relief below scaled by cleanliness — reaction time
+        // becomes the currency. Measured: the skill sweep goes from 1.7x
+        // (shipped: answering at 0.2s and never answering were one minute
+        // apart) to 2.7x. It does not shorten a competent run; it kills the
+        // sloppy one, which is the difference between difficulty and noise.
+        rig.bump(kNmPresence * dt);
+      } else {
+        // Saturated. This was the only depth() consumer in the codebase
+        // without a ceiling, so with the floor now live a deep career
+        // would cross 0->100 inside one ordinary encounter.
+        //
+        // (KNOWN, SEPARATE: on ordinary nights this write is immediately
+        // overwritten by the floor assignment earlier in _simulate, so it
+        // does nothing there either. Left byte-identical on purpose —
+        // fixing it globally would retune every night, and this change is
+        // NIGHTMARE-only.)
+        s.dread = math.min(
+            100,
+            s.dread +
+                dt * (1.2 + math.min(2.4, depth(s) * 0.02)) * cardOf(s).dread);
+      }
       final p = a.t / a.window;
       audio.setStatic(a.def.id == 'dead' ? 0.005 : 0.08 + p * 0.22);
       // 54 -> 172bpm; p*p back-loads the panic
